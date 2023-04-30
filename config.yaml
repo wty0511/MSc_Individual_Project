@@ -1,0 +1,58 @@
+path:
+  root_dir: /d/individual_project/task5_2023
+  data_dir: ${path.root_dir}/Data_Set
+  train_dir: ${path.data_dir}/Training_Set
+  val_dir: ${path.data_dir}/Validation_Set
+  test_dir: ${path.data_dir}/Validation_Set
+  feature_dir: ${path.root_dir}/Features
+  train_feature_dir: ${path.feature_dir}/Training_Set
+  val_feature_dir: ${path.feature_dir}/Validation_Set
+  test_feature_dir: ${path.feature_dir}/Validation_Set
+
+features:
+  sr: 22050
+  n_mels: 128
+  n_fft: 2048
+  hop_length: 512
+  win_length: ${features.n_fft}
+  fmin: 0
+  fmax: null
+  feature_list: mel&logmel&pcen&mfcc
+  segment_length: 0.2
+
+train:
+  neg_prototype: true
+  n_way: 5
+  n_support: 5
+  n_query: 5
+  backbone: resnet
+  model_type: protonet
+  epoches: 100
+  lr: 0.001
+  momentum: 0.9
+  weight_decay: 0.0005
+
+val:
+  neg_prototype: true
+  n_way: 5
+  n_support: 5
+  n_query: 5
+  backbone: resnet
+  model_type: protonet
+  epoches: 100
+  lr: 0.001
+  momentum: 0.9
+  weight_decay: 0.0005
+  seg_len_base: 30
+  hop_len_frac: 3
+  test_loop_batch_size: 10
+  threshold: 0.5
+
+checkpoint:
+  save_freq: 10
+  resume: false
+  resume_path: ${path.best_model_dir}/model_best.pth.tar
+  start_epoch: 0
+  model_dir: ${path.root_dir}/Checkpoints
+  experiment_name: exp1
+  best_model_dir: ${checkpoint.model_dir}/${checkpoint.experiment_name}
