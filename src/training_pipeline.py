@@ -74,6 +74,7 @@ def train(train_loader, val_loader, config):
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
         print("Epoch [{}/{}], Train Loss: {:.4f},   Val F1: {:.4f}"
           .format(epoch+1, epoches, avg_loss, acc))
+        break
     return model
 
     
@@ -89,6 +90,6 @@ if __name__ == "__main__":
     print('preparing val dataset')
     val_dataset = ValDataset(cfg)
     train_loader = DataLoader(train_dataset, batch_sampler=BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
-    val_loader = DataLoader(val_dataset, batch_size = cfg.val.test_loop_batch_size, shuffle = False)
+    val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
     model = train(train_loader, val_loader, cfg)
 

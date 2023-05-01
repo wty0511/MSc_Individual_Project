@@ -37,6 +37,7 @@ class ProtoNet(BaseModel):
             if i % 10 == 0:
                 print('Step [{}/{}], Loss: {:.4f}'.format(i+1, len(data_loader), loss.item()))
             avg_loss = avg_loss + loss.item()
+            break
         avg_loss = avg_loss / len(data_loader)
         return avg_loss
             
@@ -44,11 +45,17 @@ class ProtoNet(BaseModel):
         all_prob = {}
         all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start) in enumerate(test_loader):
-            wav_file= pos_sup[0].split('&')[1]
-            print(pos_sup[1].device)
-            pos_dataset = TensorDataset(pos_sup[1], None)
-            neg_dataset = TensorDataset(neg_sup[1], None)
-            query_dataset = TensorDataset(query, None)
+            seg_hop = seg_hop.item()
+            query_start = query_start.item()
+
+            # print(pos_sup[1].squeeze().shape)
+            # print(neg_sup[1].squeeze().shape)
+            # print(query.shape)
+            wav_file= pos_sup[0][0].split('&')[1]
+            pos_dataset = TensorDataset(pos_sup[1].squeeze(), torch.zeros(pos_sup[1].squeeze().shape[0]))
+            neg_dataset = TensorDataset(neg_sup[1].squeeze(), torch.zeros(neg_sup[1].squeeze().shape[0]))
+
+            query_dataset = TensorDataset(query.squeeze(), torch.zeros(query.squeeze().shape[0]))
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)

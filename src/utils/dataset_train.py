@@ -117,7 +117,7 @@ class TrainDataset(Dataset):
                     self.seg_meta[column_neg] = self.seg_meta.get(column_neg, {})
                     self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
                     self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
-                    end.insert(0, 0)
+                    end.insert(0, 0.0)
                     start.append(librosa.get_duration(filename = file, sr = None))
                                  
                     for i in range(len(start)):
@@ -143,6 +143,7 @@ class TrainDataset(Dataset):
         end = sample[0]['end']
         start = time2frame(start, self.fps)
         end = time2frame(end, self.fps)
+        
         return self.select_sample(file, start, end, seg_length)
 
     def get_neg_sample(self, selected_class, seg_length = 10):

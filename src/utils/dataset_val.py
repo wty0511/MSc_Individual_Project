@@ -108,7 +108,7 @@ class ValDataset(Dataset):
                     self.seg_meta[column_neg] = self.seg_meta.get(column_neg, {})
                     self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
                     self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
-                    end.insert(0, 0)
+                    end.insert(0, 0.0)
                     start.append(librosa.get_duration(filename = file, sr = None))
                                  
                     for i in range(len(start)):
@@ -129,11 +129,18 @@ class ValDataset(Dataset):
             class_meta['duration'] = time2frame(class_meta['duration'], self.fps)
             self.seg_len, self.seg_hop = self.adaptive_length_hop(class_meta['duration'])
             all_pos_seg = []
-            for s, e, f in class_meta['time_spane']:
+            for i in class_meta['time_spane']:
+                f = i['file']
+                s = i['start']
+                e = i['end']
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
+                # print('s', s)
+                # print('e', e)
                 pos_seg = self.select_sample(f, s, e, self.seg_len, self.seg_hop)
+                # print('pos_seg', pos_seg)
                 all_pos_seg.extend(pos_seg)
+
             return np.stack(all_pos_seg)
 
     def get_neg_sample(self, selected_class):
@@ -146,32 +153,43 @@ class ValDataset(Dataset):
             print('empty', selected_class)
         else:
             class_meta['duration'] = time2frame(class_meta['duration'], self.fps)
-            self.seg_len, self.seg_hop = self.adaptive_length_hop(class_meta['duration'])
             all_neg_seg = []
-            for s, e, f in class_meta['time_spane']:
+            for i in class_meta['time_spane']:
+                f = i['file']
+                s = i['start']
+                e = i['end']
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
-                pos_seg = self.select_sample(f, s, e, self.sseg_len, self.sseg_hop)
+                pos_seg = self.select_sample(f, s, e, self.seg_len, self.seg_hop)
                 all_neg_seg.extend(pos_seg)
             return np.stack(all_neg_seg)
     
     
     def select_sample(self, file, start, end, seg_length, seg_hop):
         feature = self.feature_per_file[file][self.feature_list[0]]
+        
         res = []
         duration = end - start
-        if  duration< seg_length:
-            feature = np.tile(feature, (1,np.ceil(seg_length/duration).astype(int)))
-            res.append(feature[start: start+seg_length])
+        # print('duration', duration)
+        # print('seg_length', seg_length)
+        if  duration< seg_length & duration > 0:
+            # print('feature', feature.shape)
+            feature = np.tile(feature[:,start:end], (1,np.ceil(seg_length/duration).astype(int)))
+            res.append(feature[:, : seg_length])
 
+        elif duration == 0:
+            feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
+            res.append(feature[:, : seg_length])
+        
         else:
             for i in range(start, end - seg_length + 1, seg_hop):
-                segment = feature[i: i + seg_length]
+                segment = feature[:, i: i + seg_length]
                 res.append(segment)
             
             if (end -start - seg_length) % seg_hop != 0:
-                last_segment = feature[-seg_length:]
+                last_segment = feature[:, -seg_length:]
                 res.append(last_segment)
+
         return res
     
     def _class2index(self):
@@ -196,6 +214,7 @@ class ValDataset(Dataset):
 
         # Adaptive segment length based on the audio file.
         max_len = max(duration_list)
+        # print('max_len', max_len)
         # Choosing the segment length based on the maximum size in the 5-shot.
         # Logic was based on fitment on 12GB GPU since some segments are quite long.
         if max_len < 8:
@@ -219,22 +238,29 @@ class ValDataset(Dataset):
     def get_query_sample(self,class_name, query_start):
         class_meta = self.seg_meta[class_name]
         file =class_meta['time_spane'][0]['file']
-        self.seg_len, self.seg_hop = self.adaptive_length_hop(class_meta['duration'])
+        # self.seg_len, self.seg_hop = self.adaptive_length_hop(class_meta['duration'])
         feature = self.feature_per_file[file][self.feature_list[0]]
         res = []
-        end = feature.shape[0]
+        end = feature.shape[1]
+        query_start = time2frame(query_start, self.fps)
+        print('query_start', query_start)
+        print('end', end)
+        print('duration', end - query_start)
+
         duration = end - query_start
         if  duration< self.seg_len:
-            feature = np.tile(feature, (1,np.ceil(self.seg_len/duration).astype(int)))
-            res.append(feature[query_start: query_start+self.seg_len])
+            feature = np.tile(feature[:, query_start:end], (1,np.ceil(self.seg_len/duration).astype(int)))
+            res.append(feature[:, : self.seg_len])
         else:
             for i in range(query_start, end - self.seg_len + 1, self.seg_hop):
-                segment = feature[i: i + self.seg_len]
+                segment = feature[:, i: i + self.seg_len]
                 res.append(segment)
             # 最后一个怎么处理？
             if (end -query_start - self.seg_len) % self.seg_hop != 0:
-                last_segment = feature[-self.seg_len:]
+                last_segment = feature[:, -self.seg_len:]
                 res.append(last_segment)
+        
+        res = np.stack(res)
         return res
         
         
