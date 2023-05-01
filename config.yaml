@@ -1,5 +1,5 @@
 path:
-  root_dir: /d/individual_project/task5_2023
+  root_dir: /root/task5_2023
   data_dir: ${path.root_dir}/Data_Set
   train_dir: ${path.data_dir}/Training_Set
   val_dir: ${path.data_dir}/Validation_Set
@@ -47,7 +47,9 @@ val:
   weight_decay: 0.0005
   seg_len_base: 30
   hop_len_frac: 3
-  test_loop_batch_size: 10
+  test_loop_batch_size: 32
+  test_loop_neg_sample: 32
+  
   threshold: 0.5
   pred_dir: ${checkpoint.best_model_dir}/Predictions/pred.csv
   report_dir: ${checkpoint.best_model_dir}/Reports
@@ -62,5 +64,5 @@ checkpoint:
   best_model_dir: ${checkpoint.model_dir}/${checkpoint.experiment_name}/Model
 
 team_name: tw1022
-data_set: EVAL
+dataset: EVAL
 #EVAL or VAL

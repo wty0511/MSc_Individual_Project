@@ -38,7 +38,7 @@ def train(train_loader, val_loader, config):
     if config.train.model_type == 'protonet':
         model = ProtoNet(config)
     print('backbone:', config.train.backbone)
-    print(model)
+    # print(model)
     print('device:', device)
     model = model.to(device)
     epoches = config.train.epoches
@@ -61,8 +61,7 @@ def train(train_loader, val_loader, config):
             os.makedirs(best_model_dir)
 
         df_all_time, report = model.test_loop(val_loader)
-        print(report)
-        acc = report['overall_scores']
+        acc = report['overall_scores']['fmeasure (percentage)']
         if acc > best_acc :
             print("best model! save...")
             best_acc = acc
@@ -74,7 +73,6 @@ def train(train_loader, val_loader, config):
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
         print("Epoch [{}/{}], Train Loss: {:.4f},   Val F1: {:.4f}"
           .format(epoch+1, epoches, avg_loss, acc))
-        break
     return model
 
     

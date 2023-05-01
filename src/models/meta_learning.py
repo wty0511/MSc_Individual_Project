@@ -6,6 +6,7 @@ from abc import abstractmethod
 class BaseModel(nn.Module):
     def __init__(self, config):
         super(BaseModel, self).__init__()
+        self.config = config
         self.n_way = config.train.n_way
         self.n_support = config.train.n_support
         self.n_query = config.train.n_query

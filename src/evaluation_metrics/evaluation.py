@@ -159,8 +159,11 @@ def build_report(main_set_scores, scores_per_miniset, scores_per_audiofile, save
     }
     if "scores_per_class" in kwargs.keys():
         report["scores_per_class"] = kwargs['scores_per_class']
-
-    with open(os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json'), 'w') as outfile:
+    save_path = os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json')
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
+            
+    with open(save_path, 'w') as outfile:
         json.dump(report, outfile)
 
     return report
@@ -183,8 +186,8 @@ def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metada
         gt_file_structure[dataset][subset] = [os.path.basename(fl)[0:-4]+'.wav' for fl in glob.glob(os.path.join(ref_file_path,subset,"*.csv"))]
         for audiofile in gt_file_structure[dataset][subset]:
             inv_gt_file_structure[audiofile] = subset
-
-
+    print(gt_file_structure)
+    print(inv_gt_file_structure)
     #read prediction csv
     pred_csv = pd.read_csv(pred_file_path, dtype=str)
     #verify headers:

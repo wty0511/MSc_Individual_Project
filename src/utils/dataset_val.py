@@ -14,6 +14,7 @@ from hydra.core.global_hydra import GlobalHydra
 from tqdm import tqdm
 from src.utils.sampler import *
 from torch.utils.data import DataLoader
+from src.utils.dataset_train import *
 
 
 
@@ -109,11 +110,11 @@ class ValDataset(Dataset):
                     self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
                     self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
                     end.insert(0, 0.0)
-                    start.append(librosa.get_duration(filename = file, sr = None))
                                  
-                    for i in range(len(start)):
-                        self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
-                        self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
+                    for i in range(self.config.train.n_support):
+                        if start[i] > end[i]:
+                            self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
+                            self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
 
         
     
@@ -129,7 +130,7 @@ class ValDataset(Dataset):
             class_meta['duration'] = time2frame(class_meta['duration'], self.fps)
             self.seg_len, self.seg_hop = self.adaptive_length_hop(class_meta['duration'])
             all_pos_seg = []
-            for i in class_meta['time_spane']:
+            for i in class_meta['time_spane'][:self.config.train.n_support]:
                 f = i['file']
                 s = i['start']
                 e = i['end']
@@ -162,7 +163,12 @@ class ValDataset(Dataset):
                 e = time2frame(e, self.fps)
                 pos_seg = self.select_sample(f, s, e, self.seg_len, self.seg_hop)
                 all_neg_seg.extend(pos_seg)
-            return np.stack(all_neg_seg)
+            all_neg_seg =  np.stack(all_neg_seg)
+            if all_neg_seg.shape[0] > self.config.val.test_loop_neg_sample:
+                neg_indices = torch.randperm(all_neg_seg.shape[0])[: self.config.val.test_loop_neg_sample]
+                all_neg_seg = all_neg_seg[neg_indices]
+            
+            return all_neg_seg
     
     
     def select_sample(self, file, start, end, seg_length, seg_hop):
@@ -276,5 +282,4 @@ if __name__ == "__main__":
     dataloader = DataLoader(train_dataset, batch_sampler = BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
     for batch in dataloader:
         print(batch[0])
-        break 
         

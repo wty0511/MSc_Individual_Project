@@ -57,7 +57,7 @@ class TrainDataset(Dataset):
     
 
     def __getitem__(self, class_name):
-        start_time = time.time()
+        #start_time = time.time()
 
 
         # print('getting item', class_name)
@@ -67,9 +67,9 @@ class TrainDataset(Dataset):
         pos_index = self.class2index[class_name]
         
         neg_index = self.class2index[selected_class_neg]
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"代码执行时间为 {elapsed_time:.2f} 秒")
+        #end_time = time.time()
+        #elapsed_time = end_time - start_time
+        # print(f"代码执行时间为 {elapsed_time:.2f} 秒")
         if self.neg_prototype:
             return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index)
         
@@ -118,11 +118,12 @@ class TrainDataset(Dataset):
                     self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
                     self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
                     end.insert(0, 0.0)
-                    start.append(librosa.get_duration(filename = file, sr = None))
+                    
                                  
                     for i in range(len(start)):
-                        self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
-                        self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
+                        if start[i] > end[i]:
+                            self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
+                            self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
 
         
         
@@ -205,5 +206,4 @@ if __name__ == "__main__":
     dataloader = DataLoader(train_dataset, batch_sampler = BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
     for batch in dataloader:
         print(batch[0])
-        break 
-        
+

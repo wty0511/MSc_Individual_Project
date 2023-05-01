@@ -12,6 +12,7 @@ from src.evaluation_metrics.evaluation import *
 class ProtoNet(BaseModel):
     def __init__(self, config):
         super(ProtoNet, self).__init__(config)
+        
         self.test_loop_batch_size = config.val.test_loop_batch_size
 
 
@@ -37,7 +38,7 @@ class ProtoNet(BaseModel):
             if i % 10 == 0:
                 print('Step [{}/{}], Loss: {:.4f}'.format(i+1, len(data_loader), loss.item()))
             avg_loss = avg_loss + loss.item()
-            break
+
         avg_loss = avg_loss / len(data_loader)
         return avg_loss
             
@@ -56,9 +57,13 @@ class ProtoNet(BaseModel):
             neg_dataset = TensorDataset(neg_sup[1].squeeze(), torch.zeros(neg_sup[1].squeeze().shape[0]))
 
             query_dataset = TensorDataset(query.squeeze(), torch.zeros(query.squeeze().shape[0]))
+
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+            print(len(pos_dataset))
+            print(len(neg_dataset))
+            print(len(query_dataset))
             pos_feat = []
             for batch in pos_loader:
                 pos_data, _ = batch
@@ -70,42 +75,55 @@ class ProtoNet(BaseModel):
             neg_feat = []
             for batch in neg_loader:
                 neg_data, _ = batch
+                # print(neg_data.shape)
                 feat = self.forward(neg_data)
                 # print(feat.shape)
                 neg_feat.append(feat.mean(0))
             neg_feat = torch.stack(neg_feat, dim=0).mean(0)
             
-            query_feat = []
+            proto = torch.stack([pos_feat,neg_feat], dim=0)
+            
+            prob_all = []
             for batch in query_loader:
                 query_data, _ = batch
                 feat = self.forward(query_data)
-                query_feat.append(feat)
-            query_feat = torch.cat(query_feat, dim=0)
-            pos_feat = torch.stack([pos_feat,neg_feat], dim=0)
-            dist = self.euclidean_dist(query_feat, pos_feat)
-            scores = -dist
-            prob = F.softmax(scores, dim=1)
-            prob = prob[:,0].detach().cpu().numpy()
-            prob = np.where(prob>self.config.val.threshold, 1, 0)
-            all_prob[wav_file] = prob
+                dist = self.euclidean_dist(feat, proto)
+                scores = -dist
+                prob = F.softmax(scores, dim=1)
+                prob_all.append(prob.detach().cpu().numpy())
+
+            prob_all = np.concatenate(prob_all, axis=0)
+            prob_all = prob_all[:,0]
+            prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
+
+            all_prob[wav_file] = prob_all
+            
         for wav_file in all_prob.keys():
             prob = all_prob[wav_file]
-        
-            on_set = np.flatnonzero(np.diff(np.concatenate(np.zeros(1),prob))==1)
-            off_set = np.flatnonzero(np.diff(np.concatenate(prob,np.zeros(1)))==-1) + 1 #off_set is the index of the first 0 after 1
+            print(len(prob))
+            on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
+            off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
             query_start_time = query_start/self.fps
             
             on_set_time = on_set*seg_hop/self.fps + query_start_time
             off_set_time = off_set*seg_hop/self.fps + query_start_time
-            all_time['Audiofilename'].extend([wav_file]*len(on_set_time))
+            all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
             all_time['Starttime'].extend(on_set_time)
             all_time['Endtime'].extend(off_set_time)
+            print(len(on_set_time))
+            print(len(off_set_time))
+            print('~~~~~~~~~~~~')
+            
+            
         df_all_time = pd.DataFrame(all_time)
-        df_all_time.to_csv(self.config.val.pred_dir, index=False)
+        pred_path = self.config.val.pred_dir
+        if not os.path.dirname(pred_path):
+            os.makedirs(os.path.dirname(pred_path))
+        df_all_time.to_csv(pred_path, index=False)
 
-        ref_files_path = cfg.path.val_dir
+        ref_files_path = self.config.path.val_dir
 
-        report = evaluate(cfg.val.pred_dir, ref_files_path, cfg.team_name, cfg.dataset, cfg.val.report_dir)
+        report = evaluate(self.config.val.pred_dir, ref_files_path, self.config.team_name, self.config.dataset, self.config.val.report_dir)
         return df_all_time, report
             
     

@@ -57,6 +57,7 @@ class ResNet(nn.Module):
     def forward(self, x):
         x = x.to(self.device)
         x = x.unsqueeze(1)
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
