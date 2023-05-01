@@ -53,7 +53,7 @@ class TrainDataset(Dataset):
         self.process_labels()
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(3600 * 8 / self.config.features.segment_length)
+        self.length = int(0.33 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
     
 
     def __getitem__(self, class_name):
@@ -134,7 +134,7 @@ class TrainDataset(Dataset):
         if not class_meta['time_spane'] or not class_meta['duration']:
             # Handle the case when either list is empty
             # You may want to return a default value or raise an exception
-            print('empty', selected_class)
+            raise Exception('empty', selected_class)
         else:
             sample = random.choices(class_meta['time_spane'], weights=class_meta['duration'], k=1)
 
@@ -165,11 +165,20 @@ class TrainDataset(Dataset):
     def select_sample(self, file, start, end, seg_length = 10):
         feature = self.feature_per_file[file][self.feature_list[0]]
         duration = end - start
-        if  duration < seg_length:
+
+        if duration == 0:
+            feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
+            print('file', file, 'start', start, 'end', end)
+            res.append(feature[:, : seg_length])
+            raise ValueError('duration is 0')
+        
+        elif  0 < duration and duration < seg_length:
             start = end - seg_length
             feature = np.tile(feature, (1,np.ceil(seg_length/duration).astype(int)))
             res = feature[:, start:end]
+
         else:
+
             start = random.randint(start, end - seg_length)
             res = feature[:, start:start+seg_length]
         return res

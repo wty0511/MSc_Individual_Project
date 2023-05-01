@@ -27,15 +27,15 @@ class ProtoNet(BaseModel):
     def train_loop(self, data_loader, optimizer):
         avg_loss = 0
         for i, data in enumerate(data_loader):
-            print('waiting for data')
+            #print('waiting for data')
             support_data, query_data = self.split_support_query(data)
-            print('data split')
+            #print('data split')
             optimizer.zero_grad()
 
             loss = self.inner_loop(support_data, query_data)
             loss.backward()
             optimizer.step()
-            if i % 10 == 0:
+            if i % 5 == 0:
                 print('Step [{}/{}], Loss: {:.4f}'.format(i+1, len(data_loader), loss.item()))
             avg_loss = avg_loss + loss.item()
 
@@ -110,9 +110,9 @@ class ProtoNet(BaseModel):
             all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
             all_time['Starttime'].extend(on_set_time)
             all_time['Endtime'].extend(off_set_time)
-            print(len(on_set_time))
-            print(len(off_set_time))
-            print('~~~~~~~~~~~~')
+            # print(len(on_set_time))
+            # print(len(off_set_time))
+            # print('~~~~~~~~~~~~')
             
             
         df_all_time = pd.DataFrame(all_time)
