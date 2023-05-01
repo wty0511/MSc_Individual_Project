@@ -17,8 +17,9 @@ from torch.utils.data import DataLoader
 
 
 
-class TrainDataset(Dataset):
+class ValDataset(Dataset):
     def __init__(self, config, val=True):
+        self.is_val = val
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
         self.val_dir = normalize_path(config.path.val_dir) if val else normalize_path(config.path.test_dir)
@@ -40,7 +41,7 @@ class TrainDataset(Dataset):
         self.seg_len = 0
         self.seg_hop = 0
     
-    
+
     def __getitem__(self, idx):
         class_name = self.classes[idx]
         selected_class_neg = class_name + '_neg'
@@ -60,8 +61,11 @@ class TrainDataset(Dataset):
         return self.length
     
     def collect_features(self):
-        print("Collecting training set features...")
-        for file in tqdm(walk_files(normalize_path(self.config.path.train_dir), file_extension = ('.wav'))):
+        if self.is_val:
+            print("Collecting val set features...")
+        else:
+            print("Collecting test set features...")
+        for file in tqdm(walk_files(self.val_dir, file_extension = ('.wav'))):
             for feature in self.feature_list:
                 save_path = audio2feature(file, feature)
                 self.feature_per_file[file] = self.feature_per_file.get(file, {})
@@ -69,16 +73,19 @@ class TrainDataset(Dataset):
                 
     
     def process_labels(self):
-        print("Processing labels...")
-        for file in tqdm(walk_files(normalize_path(self.config.path.train_dir), file_extension = ('.csv'))):
+        if self.is_val:
+            print("Processing val labels...")
+        else:
+            print("Processing test labels...")
+        for file in tqdm(walk_files(self.val_dir, file_extension = ('.csv'))):
             df = pd.read_csv(file)
             file = file.replace('.csv','.wav')
             # class name starts from the 4th column(only one class in this case)
             for column in df.columns[3:]:
                 # class in each file is not clear, so we need to add the file name to the class name
-                column = column+'_'+file
-                self.classes.add(column+'_'+file)
                 pos_idx = df[df[column] == 'POS'].index.tolist()
+                column = column+'&'+file
+                self.classes.add(column)
                 start = df['Starttime'][pos_idx].tolist()
                 end = df['Endtime'][pos_idx].tolist()
                 # print('start', start)

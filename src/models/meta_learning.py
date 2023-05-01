@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from src.models.ResNet import ResNet
+from src.models.ResNet import *
+from abc import abstractmethod
 
 class BaseModel(nn.Module):
     def __init__(self, config):
@@ -11,8 +12,9 @@ class BaseModel(nn.Module):
         self.loss_fn = nn.CrossEntropyLoss()
         self.sr = config.features.sr
         self.fps = self.sr / config.features.hop_length
-        if config.feature_extractor == 'resnet':
-            self.feature_extractor = ResNet()
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        if config.train.backbone == 'resnet':
+            self.feature_extractor = ResNet(64, ResBlock)
         # elif config.feature_extractor == 'densenet':
         #     pass
         else:

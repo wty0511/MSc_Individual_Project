@@ -3,7 +3,7 @@ path:
   data_dir: ${path.root_dir}/Data_Set
   train_dir: ${path.data_dir}/Training_Set
   val_dir: ${path.data_dir}/Validation_Set
-  test_dir: ${path.data_dir}/Validation_Set
+  test_dir: ${path.data_dir}/Evaluation_Set
   feature_dir: ${path.root_dir}/Features
   train_feature_dir: ${path.feature_dir}/Training_Set
   val_feature_dir: ${path.feature_dir}/Validation_Set
@@ -19,6 +19,7 @@ features:
   fmax: null
   feature_list: mel&logmel&pcen&mfcc
   segment_length: 0.2
+  segment_len_frame: 17
 
 train:
   neg_prototype: true
@@ -31,6 +32,7 @@ train:
   lr: 0.001
   momentum: 0.9
   weight_decay: 0.0005
+  optimizer: Adam
 
 val:
   neg_prototype: true
@@ -47,6 +49,8 @@ val:
   hop_len_frac: 3
   test_loop_batch_size: 10
   threshold: 0.5
+  pred_dir: ${checkpoint.best_model_dir}/Predictions/pred.csv
+  report_dir: ${checkpoint.best_model_dir}/Reports
 
 checkpoint:
   save_freq: 10
@@ -55,4 +59,8 @@ checkpoint:
   start_epoch: 0
   model_dir: ${path.root_dir}/Checkpoints
   experiment_name: exp1
-  best_model_dir: ${checkpoint.model_dir}/${checkpoint.experiment_name}
+  best_model_dir: ${checkpoint.model_dir}/${checkpoint.experiment_name}/Model
+
+team_name: tw1022
+data_set: EVAL
+#EVAL or VAL

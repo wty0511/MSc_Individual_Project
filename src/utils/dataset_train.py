@@ -14,6 +14,7 @@ from hydra.core.global_hydra import GlobalHydra
 from tqdm import tqdm
 from src.utils.sampler import *
 from torch.utils.data import DataLoader
+import time
 def meta_learning_collate_fn(batch):
     print(batch)
     support_set_indices = batch[0]['support_set']
@@ -52,17 +53,23 @@ class TrainDataset(Dataset):
         self.process_labels()
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(3600 * 10 / self.config.features.segment_length)
+        self.length = int(3600 * 8 / self.config.features.segment_length)
     
 
     def __getitem__(self, class_name):
+        start_time = time.time()
+
+
         # print('getting item', class_name)
         selected_class_neg = class_name + '_neg'
-        pos = self.get_pos_sample(class_name)
-        neg = self.get_neg_sample(selected_class_neg)
+        pos = self.get_pos_sample(class_name, self.config.features.segment_len_frame)
+        neg = self.get_neg_sample(selected_class_neg, self.config.features.segment_len_frame)
         pos_index = self.class2index[class_name]
         
         neg_index = self.class2index[selected_class_neg]
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"代码执行时间为 {elapsed_time:.2f} 秒")
         if self.neg_prototype:
             return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index)
         
@@ -73,7 +80,7 @@ class TrainDataset(Dataset):
         return(self.length )
     def collect_features(self):
         print("Collecting training set features...")
-        for file in tqdm(walk_files(normalize_path(self.config.path.train_dir), file_extension = ('.wav'))):
+        for file in tqdm(walk_files(self.train_dir, file_extension = ('.wav'))):
             for feature in self.feature_list:
                 save_path = audio2feature(file, feature)
                 self.feature_per_file[file] = self.feature_per_file.get(file, {})
@@ -81,7 +88,7 @@ class TrainDataset(Dataset):
     
     def process_labels(self):
         print("Processing labels...")
-        for file in tqdm(walk_files(normalize_path(self.config.path.train_dir), file_extension = ('.csv'))):
+        for file in tqdm(walk_files(self.train_dir, file_extension = ('.csv'))):
             df = pd.read_csv(file)
             file = file.replace('.csv','.wav')
             # class name starts from the 4th column

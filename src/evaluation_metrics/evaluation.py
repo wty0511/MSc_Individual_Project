@@ -1,15 +1,21 @@
-
+import os
+import sys
+current_dir = os.path.abspath(os.path.dirname(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+src_dir = os.path.abspath(os.path.join(parent_dir, os.pardir))
+sys.path.append(src_dir)
 import pandas as pd
 import argparse
-import os
 import json
 import numpy as np
 import csv
-import metrics
+import src.evaluation_metrics.metrics as metrics
 from datetime import datetime
 import copy
 from scipy import stats
 import glob
+from hydra import initialize, compose
+from hydra.core.global_hydra import GlobalHydra
 
 MIN_EVAL_VALUE = 0.00001
 N_SHOTS = 5
@@ -157,7 +163,7 @@ def build_report(main_set_scores, scores_per_miniset, scores_per_audiofile, save
     with open(os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json'), 'w') as outfile:
         json.dump(report, outfile)
 
-    return
+    return report
 
 def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metadata=[]):
 
@@ -310,31 +316,44 @@ def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metada
     print("\nOverall_scores:",  overall_scores)
     print("\nwriting report")
     if metadata:
-        build_report(overall_scores, scores_per_set, scores_per_audiofile,
+        report = build_report(overall_scores, scores_per_set, scores_per_audiofile,
                 savepath, 
                 dataset,
                 team_name,
                 scores_per_class=scores_per_class_per_set)
     else:
-        build_report(overall_scores, scores_per_set, scores_per_audiofile,
+        report = build_report(overall_scores, scores_per_set, scores_per_audiofile,
                 savepath, 
                 dataset,
                 team_name)
     
-    return
+    return report
 
+
+# if __name__ == "__main__":
+
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('-pred_file', type=str, help='csv predictions file')
+#     parser.add_argument('-ref_files_path', type=str, help='path to the ground truth csvs folder')
+#     parser.add_argument('-metadata', type=str, help="path for metadata json. Participants may ignore this option.")
+#     parser.add_argument('-team_name', type=str, help='team identification')
+#     parser.add_argument('-dataset', type=str, help="which set to evaluate: EVAL or VAL")
+#     parser.add_argument('-savepath', type=str, help="path where to save the report to")
+#     args = parser.parse_args()
+#     # print(args)
+
+#     evaluate( args.pred_file, args.ref_files_path, args.team_name, args.dataset, args.savepath)
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-pred_file', type=str, help='csv predictions file')
-    parser.add_argument('-ref_files_path', type=str, help='path to the ground truth csvs folder')
-    parser.add_argument('-metadata', type=str, help="path for metadata json. Participants may ignore this option.")
-    parser.add_argument('-team_name', type=str, help='team identification')
-    parser.add_argument('-dataset', type=str, help="which set to evaluate: EVAL or VAL")
-    parser.add_argument('-savepath', type=str, help="path where to save the report to")
-    args = parser.parse_args()
-    # print(args)
-
-    evaluate( args.pred_file, args.ref_files_path, args.team_name, args.dataset, args.savepath)
-
+    if not GlobalHydra().is_initialized():
+        initialize(config_path="../../")
+    # Compose the configuration
+    cfg = compose(config_name="config.yaml")
+    if cfg.dataset == "EVAL":
+        ref_files_path = cfg.path.test_dir
+    elif cfg.dataset == "VAL":
+        ref_files_path = cfg.path.val_dir
+    else:
+        raise ValueError("dataset must be either EVAL or VAL")
+    
+    evaluate(cfg.val.pred_dir, ref_files_path, cfg.team_name, cfg.dataset, cfg.val.report_dir)
