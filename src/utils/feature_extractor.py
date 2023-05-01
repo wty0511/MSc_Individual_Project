@@ -76,8 +76,9 @@ def normalize_path(path=''):
     
     path = path.split("/")
     if os.name == 'posix':
-        # print("Current operating system is Linux")
         path = os.path.join(*path)
+        path = '/' + path
+        # print("Current operating system is Linux")
     else:
         # print("Current operating system is Windows")
         drive = path[1].upper() + ':' +os.sep
