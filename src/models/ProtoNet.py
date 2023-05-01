@@ -17,11 +17,16 @@ class ProtoNet(BaseModel):
 
 
     def inner_loop(self,support, query):
-        prototype     = support['feature'].view(self.n_support, self.n_way * 2, -1 ).mean(0).squeeze()
-        dists = self.euclidean_dist(query['feature'], prototype)
+        # print(support['label'].view(self.n_support, self.n_way * 2, -1 ))
+        prototype     = support['feature'].mean(0).squeeze()
+        query['label'] = query['label'].to(self.device)
+        dists = self.euclidean_dist(query['feature'].view(-1, query['feature'].shape[-1]), prototype)
+        pred = dists.argmin(-1)
+        acc = torch.eq(pred, query['label'].view(-1)).float().mean()
         scores = -dists
         y_query = torch.from_numpy(np.tile(np.arange(self.n_way * 2),self.n_query)).long().to(self.device)
-        return self.loss_fn(scores, y_query )
+        
+        return self.loss_fn(scores, y_query ), acc
 
 
     def train_loop(self, data_loader, optimizer):
@@ -32,11 +37,11 @@ class ProtoNet(BaseModel):
             #print('data split')
             optimizer.zero_grad()
 
-            loss = self.inner_loop(support_data, query_data)
+            loss, acc = self.inner_loop(support_data, query_data)
             loss.backward()
             optimizer.step()
             if i % 5 == 0:
-                print('Step [{}/{}], Loss: {:.4f}'.format(i+1, len(data_loader), loss.item()))
+                print('Step [{}/{}], Loss: {:.4f}, Acc: {:.4f}'.format(i+1, len(data_loader), loss.item(), acc.item()))
             avg_loss = avg_loss + loss.item()
 
         avg_loss = avg_loss / len(data_loader)
@@ -61,9 +66,9 @@ class ProtoNet(BaseModel):
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-            print(len(pos_dataset))
-            print(len(neg_dataset))
-            print(len(query_dataset))
+            # print(len(pos_dataset))
+            # print(len(neg_dataset))
+            # print(len(query_dataset))
             pos_feat = []
             for batch in pos_loader:
                 pos_data, _ = batch
@@ -116,6 +121,7 @@ class ProtoNet(BaseModel):
             
             
         df_all_time = pd.DataFrame(all_time)
+        
         pred_path = self.config.val.pred_dir
         if not os.path.dirname(pred_path):
             os.makedirs(os.path.dirname(pred_path))
@@ -131,17 +137,41 @@ class ProtoNet(BaseModel):
         pos_data, neg_data = data
         class_pos, feature_pos, label_pos =pos_data
         class_neg, feature_neg, label_neg =neg_data
+        class_pos = np.array(class_pos)
+        class_neg = np.array(class_neg)
+
+        class_pos = class_pos.reshape(-1, self.n_way)
+        class_neg = class_neg.reshape(-1, self.n_way)
+        class_all = np.concatenate([class_pos, class_neg], axis=1)
+        
+        
+        label_pos = label_pos.view(-1, self.n_way)
+        label_neg = label_neg.view(-1, self.n_way)
+        label_all = torch.cat([label_pos, label_neg], dim=1)
+        
         feature_all = self.forward(torch.cat([feature_pos, feature_neg], dim=0))
         feature_pos, feature_neg = torch.split(feature_all, [feature_pos.size(0), feature_neg.size(0)], dim=0)
+        
+        feature_pos = feature_pos.view(-1, self.n_way, feature_pos.size(-1))
+        feature_neg = feature_neg.view(-1, self.n_way, feature_neg.size(-1))
+        
+        feature_all = torch.cat([feature_pos, feature_neg], dim=1)
+        
 
-        class_support = list(class_pos[:self.n_way*self.n_support]).extend(list(class_neg[:self.n_way*self.n_support]))
-        feature_support = torch.cat([feature_pos[:self.n_way*self.n_support], feature_neg[:self.n_way*self.n_support]], dim=0)
-        label_support = torch.cat([label_pos[:self.n_way*self.n_support], label_neg[:self.n_way*self.n_support]], dim=0)
+        
 
-        class_query = list(class_pos[self.n_way*self.n_support:]).extend(list(class_neg[self.n_way*self.n_support:]))
-        feature_query = torch.cat([feature_pos[self.n_way*self.n_support:], feature_neg[self.n_way*self.n_support:]], dim=0)
-        label_query = torch.cat([label_pos[self.n_way*self.n_support:], label_neg[self.n_way*self.n_support:]], dim=0)
+        class_support = class_all[: self.n_support, :]
+        feature_support = feature_all[: self.n_support, :, :]
+        label_support = label_all[: self.n_support, :]
 
+        class_query = class_all[self.n_support :, :]
+        feature_query = feature_all[self.n_support :, :, :]
+        label_query = label_all[self.n_support :, :]
+        # print('label')
+        # print(label_support)
+        # print(label_query)
+        
+        
         return {'class':class_support, 'feature':feature_support, 'label':label_support}, {'class':class_query, 'feature':feature_query, 'label':label_query}
                 
 
