@@ -103,7 +103,7 @@ def preprecess(cfg):
     feature_extractor = Feature_Extractor(cfg)
     print("Extracting features...")
     feature_list = cfg.features.feature_list.split("&")
-    print(normalize_path(cfg.path.data_dir))
+    # print(normalize_path(cfg.path.data_dir))
     for file in tqdm(walk_files(normalize_path(cfg.path.data_dir), '.wav')):
         feature = feature_extractor.extract_all_features(file)
         for feature_name in feature_list:

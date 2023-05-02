@@ -122,8 +122,8 @@ class ValDataset(Dataset):
         # print('getting pos sample', self.seg_meta[selected_class])
         # print('getting pos sample')
         class_meta = self.seg_meta[selected_class]
-        print(class_meta['time_spane'])
-        print(class_meta['duration'])
+        # print(class_meta['time_spane'])
+        # print(class_meta['duration'])
         
         if not class_meta['time_spane'] or not class_meta['duration']:
             # Handle the case when either list is empty

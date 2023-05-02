@@ -186,8 +186,8 @@ def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metada
         gt_file_structure[dataset][subset] = [os.path.basename(fl)[0:-4]+'.wav' for fl in glob.glob(os.path.join(ref_file_path,subset,"*.csv"))]
         for audiofile in gt_file_structure[dataset][subset]:
             inv_gt_file_structure[audiofile] = subset
-    print(gt_file_structure)
-    print(inv_gt_file_structure)
+    # print(gt_file_structure)
+    # print(inv_gt_file_structure)
     #read prediction csv
     pred_csv = pd.read_csv(pred_file_path, dtype=str)
     #verify headers:
@@ -215,7 +215,7 @@ def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metada
         tp_count, fp_count, fn_count , total_n_events_in_audiofile = compute_tp_fp_fn(pred_events_by_audiofile[audiofilename], ref_events_this_audiofile )
 
         counts_per_audiofile[audiofilename] = {"TP": tp_count, "FP": fp_count, "FN": fn_count, "total_n_pos_events": total_n_events_in_audiofile}
-        print(audiofilename, counts_per_audiofile[audiofilename])
+        # print(audiofilename, counts_per_audiofile[audiofilename])
 
     # seems to use classes in each subset to further classify the audiofiles
     if metadata:

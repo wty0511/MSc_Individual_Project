@@ -7,6 +7,7 @@ from torch.utils.data import TensorDataset
 from torch.utils.data import DataLoader
 import pandas as pd
 from src.evaluation_metrics.evaluation import *
+from src.utils.feature_extractor import *
 
 
 class ProtoNet(BaseModel):
@@ -25,8 +26,8 @@ class ProtoNet(BaseModel):
         acc = torch.eq(pred, query['label'].view(-1)).float().mean()
         scores = -dists
         y_query = torch.from_numpy(np.tile(np.arange(self.n_way * 2),self.n_query)).long().to(self.device)
-        print(y_query)
-        print(pred)
+        # print(y_query)
+        # print(pred)
         return self.loss_fn(scores, y_query ), acc
 
 
@@ -106,7 +107,6 @@ class ProtoNet(BaseModel):
             
         for wav_file in all_prob.keys():
             prob = all_prob[wav_file]
-            print(len(prob))
             on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
             off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
             query_start_time = query_start/self.fps
@@ -123,14 +123,14 @@ class ProtoNet(BaseModel):
             
         df_all_time = pd.DataFrame(all_time)
         
-        pred_path = self.config.val.pred_dir
+        pred_path = normalize_path(self.config.val.pred_dir)
         if not os.path.dirname(pred_path):
             os.makedirs(os.path.dirname(pred_path))
         df_all_time.to_csv(pred_path, index=False)
 
-        ref_files_path = self.config.path.val_dir
-
-        report = evaluate(self.config.val.pred_dir, ref_files_path, self.config.team_name, self.config.dataset, self.config.val.report_dir)
+        ref_files_path = normalize_path(self.config.path.val_dir)
+        report_dir = normalize_path(self.config.val.report_dir)
+        report = evaluate(pred_path, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
         return df_all_time, report
             
     
