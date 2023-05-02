@@ -122,13 +122,16 @@ class ValDataset(Dataset):
         # print('getting pos sample', self.seg_meta[selected_class])
         # print('getting pos sample')
         class_meta = self.seg_meta[selected_class]
+        print(class_meta['time_spane'])
+        print(class_meta['duration'])
+        
         if not class_meta['time_spane'] or not class_meta['duration']:
             # Handle the case when either list is empty
             # You may want to return a default value or raise an exception
-            print('empty', selected_class)
+            raise Exception('empty', selected_class)
         else:
-            class_meta['duration'] = time2frame(class_meta['duration'], self.fps)
-            self.seg_len, self.seg_hop = self.adaptive_length_hop(class_meta['duration'])
+            duration_frame = time2frame(class_meta['duration'], self.fps)
+            self.seg_len, self.seg_hop = self.adaptive_length_hop(duration_frame)
             all_pos_seg = []
             for i in class_meta['time_spane'][:self.config.train.n_support]:
                 f = i['file']
@@ -151,9 +154,9 @@ class ValDataset(Dataset):
         if not class_meta['time_spane'] or not class_meta['duration']:
             # Handle the case when either list is empty
             # You may want to return a default value or raise an exception
-            print('empty', selected_class)
+            raise Exception('empty', selected_class)
         else:
-            class_meta['duration'] = time2frame(class_meta['duration'], self.fps)
+            duration_frame = time2frame(class_meta['duration'], self.fps)
             all_neg_seg = []
             for i in class_meta['time_spane']:
                 f = i['file']
@@ -178,15 +181,17 @@ class ValDataset(Dataset):
         duration = end - start
         # print('duration', duration)
         # print('seg_length', seg_length)
-        if  duration< seg_length & duration > 0:
+        
+        if duration == 0:
+            feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
+            res.append(feature[:, : seg_length])
+            print('file', file, 'start', start, 'end', end)
+            raise ValueError('duration is 0')
+        elif  0 < duration and duration< seg_length:
             # print('feature', feature.shape)
             feature = np.tile(feature[:,start:end], (1,np.ceil(seg_length/duration).astype(int)))
             res.append(feature[:, : seg_length])
 
-        elif duration == 0:
-            feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
-            res.append(feature[:, : seg_length])
-        
         else:
             for i in range(start, end - seg_length + 1, seg_hop):
                 segment = feature[:, i: i + seg_length]
@@ -249,9 +254,9 @@ class ValDataset(Dataset):
         res = []
         end = feature.shape[1]
         query_start = time2frame(query_start, self.fps)
-        print('query_start', query_start)
-        print('end', end)
-        print('duration', end - query_start)
+        # print('query_start', query_start)
+        # print('end', end)
+        # print('duration', end - query_start)
 
         duration = end - query_start
         if  duration< self.seg_len:

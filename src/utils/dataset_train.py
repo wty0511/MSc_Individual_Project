@@ -53,9 +53,9 @@ class TrainDataset(Dataset):
         self.process_labels()
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(3600 * 8 / self.config.features.segment_length)
+        self.length = int(0.33 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-
     def __getitem__(self, class_name):
         #start_time = time.time()
 
@@ -63,10 +63,12 @@ class TrainDataset(Dataset):
         # print('getting item', class_name)
         selected_class_neg = class_name + '_neg'
         pos = self.get_pos_sample(class_name, self.config.features.segment_len_frame)
+        # pos = torch.from_numpy(pos).to(self.device)
         neg = self.get_neg_sample(selected_class_neg, self.config.features.segment_len_frame)
-        pos_index = self.class2index[class_name]
-        
-        neg_index = self.class2index[selected_class_neg]
+        # neg = torch.from_numpy(neg).to(self.device)
+
+        pos_index = self.class2index[class_name] # int
+        neg_index = self.class2index[selected_class_neg] # int
         #end_time = time.time()
         #elapsed_time = end_time - start_time
         # print(f"代码执行时间为 {elapsed_time:.2f} 秒")
@@ -134,7 +136,7 @@ class TrainDataset(Dataset):
         if not class_meta['time_spane'] or not class_meta['duration']:
             # Handle the case when either list is empty
             # You may want to return a default value or raise an exception
-            print('empty', selected_class)
+            raise Exception('empty', selected_class)
         else:
             sample = random.choices(class_meta['time_spane'], weights=class_meta['duration'], k=1)
 
@@ -165,13 +167,23 @@ class TrainDataset(Dataset):
     def select_sample(self, file, start, end, seg_length = 10):
         feature = self.feature_per_file[file][self.feature_list[0]]
         duration = end - start
-        if  duration < seg_length:
+
+        if duration == 0:
+            feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
+            print('file', file, 'start', start, 'end', end)
+            res.append(feature[:, : seg_length])
+            raise ValueError('duration is 0')
+        
+        elif  0 < duration and duration < seg_length:
             start = end - seg_length
             feature = np.tile(feature, (1,np.ceil(seg_length/duration).astype(int)))
             res = feature[:, start:end]
+
         else:
+
             start = random.randint(start, end - seg_length)
             res = feature[:, start:start+seg_length]
+        res = torch.from_numpy(res).to(self.device)
         return res
     
     def _class2index(self):

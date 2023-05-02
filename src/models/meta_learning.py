@@ -15,7 +15,7 @@ class BaseModel(nn.Module):
         self.fps = self.sr / config.features.hop_length
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if config.train.backbone == 'resnet':
-            self.feature_extractor = ResNet(64, ResBlock)
+            self.feature_extractor = ResNet(config.features.inchannel, ResBlock)
         # elif config.feature_extractor == 'densenet':
         #     pass
         else:

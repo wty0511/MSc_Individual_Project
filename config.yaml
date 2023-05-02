@@ -21,10 +21,11 @@ features:
   feature_list: mel&logmel&pcen&mfcc
   segment_length: 0.2
   segment_len_frame: 17
+  inchannel: 1
 
 train:
   neg_prototype: true
-  n_way: 5
+  n_way: 6
   n_support: 5
   n_query: 5
   backbone: resnet

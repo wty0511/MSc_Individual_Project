@@ -42,9 +42,9 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_layer(block, 64, 2, stride=1)
         self.layer2 = self._make_layer(block, 128, 2, stride=2)
-        self.layer3 = self._make_layer(block, 256, 2, stride=2)
+        self.layer3 = self._make_layer(block, 64, 2, stride=2)
         self.layer4 = self._make_layer(block, 512, 2, stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d((4,8))
+        self.avgpool = nn.AdaptiveAvgPool2d((8,4))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     def _make_layer(self, block, output_channels, n_layers,stride=1):
         layers = []
@@ -55,17 +55,21 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
     def forward(self, x):
+        # print(x.shape)
         x = x.to(self.device)
         x = x.unsqueeze(1)
 
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
+        #x = self.conv1(x)
+        #x = self.bn1(x)
+        #x = self.relu(x)
         x = self.layer1(x)
         
         x = self.layer2(x)
         x = self.layer3(x)
-        x = self.layer4(x)
+        # print(x.shape)
+        #x = self.layer4(x)
         x = self.avgpool(x)
+        # print(x.shape)
         x = x.view(x.size(0), -1)
+        # print('~~~~~')
         return x
