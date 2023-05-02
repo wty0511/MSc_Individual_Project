@@ -1,0 +1,20 @@
+dataset,class_code,class_name
+BV,AMRE,American Redstart
+BV,BBWA,Bay-breasted Warbler
+BV,BTBW,Black-throated Blue Warbler
+BV,CHSP,Chipping Sparrow
+BV,COYE,Common Yellowthroat
+BV,GCTH,Gray-cheeked Thrush
+BV,OVEN,Ovenbird
+BV,RBGR,Rose-breasted Grosbeak
+BV,SAVS,Savannah Sparrow
+BV,SWTH,Swainson's Thrush
+BV,WTSP,White-throated Sparrow
+HT,GRN,Hyena groan and moo
+HT,GIG,Hyena giggle
+HT,SQT,Hyena squitter
+JD,CALL,Jackdaw call
+MT,SNMK,Meerkat short note
+MT,CCMK,Meerkat close call
+MT,AGGM,Meerkat aggression call
+MT,SOCM,Meerkat social call
