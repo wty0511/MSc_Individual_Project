@@ -54,8 +54,8 @@ class TrainDataset(Dataset):
         self.class2index = self._class2index()
         self.index2class = self._index2class()
         self.length = int(0.33 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-
     def __getitem__(self, class_name):
         #start_time = time.time()
 
@@ -63,10 +63,12 @@ class TrainDataset(Dataset):
         # print('getting item', class_name)
         selected_class_neg = class_name + '_neg'
         pos = self.get_pos_sample(class_name, self.config.features.segment_len_frame)
+        # pos = torch.from_numpy(pos).to(self.device)
         neg = self.get_neg_sample(selected_class_neg, self.config.features.segment_len_frame)
-        pos_index = self.class2index[class_name]
-        
-        neg_index = self.class2index[selected_class_neg]
+        # neg = torch.from_numpy(neg).to(self.device)
+
+        pos_index = self.class2index[class_name] # int
+        neg_index = self.class2index[selected_class_neg] # int
         #end_time = time.time()
         #elapsed_time = end_time - start_time
         # print(f"代码执行时间为 {elapsed_time:.2f} 秒")
@@ -181,6 +183,7 @@ class TrainDataset(Dataset):
 
             start = random.randint(start, end - seg_length)
             res = feature[:, start:start+seg_length]
+        res = torch.from_numpy(res).to(self.device)
         return res
     
     def _class2index(self):

@@ -25,7 +25,8 @@ class ProtoNet(BaseModel):
         acc = torch.eq(pred, query['label'].view(-1)).float().mean()
         scores = -dists
         y_query = torch.from_numpy(np.tile(np.arange(self.n_way * 2),self.n_query)).long().to(self.device)
-        
+        print(y_query)
+        print(pred)
         return self.loss_fn(scores, y_query ), acc
 
 
@@ -134,7 +135,7 @@ class ProtoNet(BaseModel):
             
     
     def split_support_query(self, data):
-        pos_data, neg_data = data
+        pos_data, neg_data = data        
         class_pos, feature_pos, label_pos =pos_data
         class_neg, feature_neg, label_neg =neg_data
         class_pos = np.array(class_pos)
