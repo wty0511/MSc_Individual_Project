@@ -1,0 +1,32 @@
+dataset,recording,class_code,class_name
+DC,DC01,Q,Cuckoo
+DC,DC02,Q,Cuckoo
+DC,DC03,Q,Cuckoo
+DC,DC04,Q,Cuckoo
+DC,DC05,Q,Cuckoo
+DC,DC06,Q,Cuckoo
+DC,DC07,Q,Robin
+DC,DC08,Q,Robin
+DC,DC09,Q,Robin
+DC,DC10,Q,Wren
+DC,DC11,Q,Wren
+DC,DC12,Q,Wren
+ME,ME1,Q,Meerkat move call
+ME,ME2,Q,Meerkat alarm call
+ML,DCASE2021-ML_37045,Q,Side-striped Jackal
+ML,DCASE2021-ML_40509,Q,Northern Goshawk
+ML,DCASE2021-ML_53963,Q,Kinkajou
+ML,DCASE2021-ML_89792 ,Q,Jaguarundi
+ML,DCASE2021-ML_126376,Q,Striped Skunk
+ML,DCASE2021-ML_129696,Q,Walrus
+ML,DCASE2021-ML_131198,Q,White-tailed Deer
+ML,DCASE2021-ML_131369,Q,California Sea Lion
+ML,DCASE2021-ML_168236,Q,Black-backed Jackal
+ML,DCASE2021-ML_176488,Q,Bobcat
+ML,DCASE2021-ML_190099 ,Q,Ocelot
+ML,DCASE2021-ML_191491,Q,Red Fox
+ML,DCASE2021-ML_197045,Q,American Black Duck
+ML,DCASE2021-ML_268995 ,Q,Giant Otter
+ML,DCASE2021-ML_273164,Q,Eastern Chipmunk
+ML,DCASE2021-ML_521435,Q,Common Raccoon
+ML,DCASE2021-ML_72010931,Q,Killdeer
