@@ -57,10 +57,8 @@ class TrainDataset(Dataset):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):
-        #start_time = time.time()
-
-
-        # print('getting item', class_name)
+        start_time = time.time()
+        
         selected_class_neg = class_name + '_neg'
         pos = self.get_pos_sample(class_name, self.config.features.segment_len_frame)
         # pos = torch.from_numpy(pos).to(self.device)
@@ -69,9 +67,9 @@ class TrainDataset(Dataset):
 
         pos_index = self.class2index[class_name] # int
         neg_index = self.class2index[selected_class_neg] # int
-        #end_time = time.time()
-        #elapsed_time = end_time - start_time
-        # print(f"代码执行时间为 {elapsed_time:.2f} 秒")
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        #print(f"代码执行时间为 {elapsed_time:.2f} 秒")
         if self.neg_prototype:
             return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index)
         
@@ -134,6 +132,7 @@ class TrainDataset(Dataset):
     def get_pos_sample(self, selected_class, seg_length = 10):
         # print('getting pos sample', self.seg_meta[selected_class])
         # print('getting pos sample')
+
         class_meta = self.seg_meta[selected_class]
         if not class_meta['time_spane'] or not class_meta['duration']:
             # Handle the case when either list is empty
@@ -148,8 +147,10 @@ class TrainDataset(Dataset):
         end = sample[0]['end']
         start = time2frame(start, self.fps)
         end = time2frame(end, self.fps)
-        
-        return self.select_sample(file, start, end, seg_length)
+
+        res = self.select_sample(file, start, end, seg_length)
+
+        return res
 
     def get_neg_sample(self, selected_class, seg_length = 10):
         # 要不要保证最短negative sample的长度
@@ -167,6 +168,7 @@ class TrainDataset(Dataset):
     
     
     def select_sample(self, file, start, end, seg_length = 10):
+
         feature = self.feature_per_file[file][self.feature_list[0]]
         length = self.feature_per_file[file]['duration']
         # print('my fps', self.fps)
@@ -182,21 +184,26 @@ class TrainDataset(Dataset):
             raise ValueError('duration is 0')
         
         elif  0 < duration and duration < seg_length:
-            # print('too short')
-            end = start + seg_length
-            feature = np.tile(feature, (1,np.ceil(seg_length/duration).astype(int)))
-            res = feature[:, start:end]
+            start_time = time.time()
+            feature = np.tile(feature[:, start:end], (1,np.ceil(seg_length/duration).astype(int)))
+            res = feature[:, :seg_length]
+            
+            end_time = time.time()
+            elapsed_time = end_time - start_time
 
+            # print(f"代码执行时间为 {elapsed_time:.2f} 秒")
         else:
+
             # print('normal')
             start = random.randint(start, end - seg_length)
             # print('start', start)
             # print('end', end)
             # print('shape', feature.shape)
             res = feature[:, start:start+seg_length]
-        # print(res.shape)
+
 
         res = torch.from_numpy(res).to(self.device)
+
         return res
     
     def _class2index(self):

@@ -3,7 +3,7 @@ import torch.nn as nn
 from src.models.ResNet import *
 from abc import abstractmethod
 from src.models.ConvNet import *
-
+import numpy as np
 class BaseModel(nn.Module):
     def __init__(self, config):
         super(BaseModel, self).__init__()

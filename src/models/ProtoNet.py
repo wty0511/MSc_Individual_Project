@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 import pandas as pd
 from src.evaluation_metrics.evaluation import *
 from src.utils.feature_extractor import *
+import time
+
 
 
 class ProtoNet(BaseModel):
@@ -37,7 +39,15 @@ class ProtoNet(BaseModel):
 
     def train_loop(self, data_loader, optimizer):
         avg_loss = 0
+
+        
         for i, data in enumerate(data_loader):
+            if i != 0:
+                end = time.time()
+                elapsed_time = end - start
+                # print(f"代码运行时间：{elapsed_time:.2f} 秒")
+
+
             #print('waiting for data')
             support_data, query_data = self.split_support_query(data)
             #print('data split')
@@ -46,8 +56,13 @@ class ProtoNet(BaseModel):
             loss, acc = self.inner_loop(support_data, query_data)
             loss.backward()
             optimizer.step()
+
             if i % 1 == 0:
                 print('Step [{}/{}], Loss: {:.4f}, Acc: {:.4f}'.format(i+1, len(data_loader), loss.item(), acc.item()))
+            
+            start = time.time()
+            
+            
             avg_loss = avg_loss + loss.item()
 
         avg_loss = avg_loss / len(data_loader)
