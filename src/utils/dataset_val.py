@@ -41,6 +41,7 @@ class ValDataset(Dataset):
         self.hop_len_frac = config.val.hop_len_frac
         self.seg_len = 0
         self.seg_hop = 0
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
 
     def __getitem__(self, idx):
@@ -145,7 +146,7 @@ class ValDataset(Dataset):
                 # print('pos_seg', pos_seg)
                 all_pos_seg.extend(pos_seg)
 
-            return np.stack(all_pos_seg)
+            return torch.stack(all_pos_seg)
 
     def get_neg_sample(self, selected_class):
         # print('getting pos sample', self.seg_meta[selected_class])
@@ -166,7 +167,7 @@ class ValDataset(Dataset):
                 e = time2frame(e, self.fps)
                 pos_seg = self.select_sample(f, s, e, self.seg_len, self.seg_hop)
                 all_neg_seg.extend(pos_seg)
-            all_neg_seg =  np.stack(all_neg_seg)
+            all_neg_seg = torch.stack(all_neg_seg)
             if all_neg_seg.shape[0] > self.config.val.test_loop_neg_sample:
                 neg_indices = torch.randperm(all_neg_seg.shape[0])[: self.config.val.test_loop_neg_sample]
                 all_neg_seg = all_neg_seg[neg_indices]
@@ -176,7 +177,6 @@ class ValDataset(Dataset):
     
     def select_sample(self, file, start, end, seg_length, seg_hop):
         feature = self.feature_per_file[file][self.feature_list[0]]
-        
         res = []
         duration = end - start
         # print('duration', duration)
@@ -193,15 +193,22 @@ class ValDataset(Dataset):
             res.append(feature[:, : seg_length])
 
         else:
-            for i in range(start, end - seg_length + 1, seg_hop):
-                segment = feature[:, i: i + seg_length]
-                res.append(segment)
-            
-            if (end -start - seg_length) % seg_hop != 0:
-                last_segment = feature[:, -seg_length:]
-                res.append(last_segment)
+            # from base line
+            shift = 0
+            while end - (start + shift) > seg_length:
 
+                pcen_patch = feature[:, int(start + shift):int(start + shift + seg_length)]
+                res.append(pcen_patch)
+                shift = shift + seg_hop
+            res.append(feature[:, end - seg_length:end])
+        # for i in res:
+        #     print('res', i.shape)
+        res = np.stack(res)
+        res = torch.from_numpy(res).to(self.device)
         return res
+    
+    
+    
     
     def _class2index(self):
         
@@ -262,18 +269,23 @@ class ValDataset(Dataset):
         if  duration< self.seg_len:
             feature = np.tile(feature[:, query_start:end], (1,np.ceil(self.seg_len/duration).astype(int)))
             res.append(feature[:, : self.seg_len])
+
+        
         else:
-            for i in range(query_start, end - self.seg_len + 1, self.seg_hop):
-                segment = feature[:, i: i + self.seg_len]
-                res.append(segment)
-            # 最后一个怎么处理？
-            if (end -query_start - self.seg_len) % self.seg_hop != 0:
-                last_segment = feature[:, -self.seg_len:]
-                res.append(last_segment)
-        
+            # from base line
+            shift = 0
+            while end - (query_start + shift) > self.seg_len:
+
+                pcen_patch = feature[:, int(query_start + shift):int(query_start + shift + self.seg_len)]
+                res.append(pcen_patch)
+                shift = shift + self.seg_hop
+            res.append(feature[:, end - self.seg_len:end])
+
         res = np.stack(res)
+        res = torch.from_numpy(res).to(self.device)
         return res
-        
+    
+
         
         
 

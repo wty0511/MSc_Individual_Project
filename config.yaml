@@ -1,6 +1,6 @@
 path:
-  # root_dir: /root/task5_2023
-  root_dir: /d/individual_project/task5_2023
+  root_dir: /root/task5_2023
+  # root_dir: /d/individual_project/task5_2023
   data_dir: ${path.root_dir}/Data_Set
   train_dir: ${path.data_dir}/Training_Set
   val_dir: ${path.data_dir}/Validation_Set
@@ -29,13 +29,14 @@ train:
   n_way: 10
   n_support: 5
   n_query: 5
-  backbone: resnet
+  backbone: convnet
   model_type: protonet
   epoches: 100
   lr: 0.001
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
+
 
 val:
   neg_prototype: true
@@ -51,7 +52,7 @@ val:
   seg_len_base: 30
   hop_len_frac: 3
   test_loop_batch_size: 32
-  test_loop_neg_sample: 5
+  test_loop_neg_sample: 30
   
   threshold: 0.5
   pred_dir: ${checkpoint.best_model_dir}/Predictions/pred.csv

@@ -35,11 +35,13 @@ class Feature_Extractor():
             # ref = ? and top_db = ?
             log_mel = librosa.power_to_db(mel)
         return mel, log_mel
-    
+    def norm(self, y):
+        return y / np.max(np.abs(y))
     def extract_pcen(self,audio):
         # as sugested
+        audio = self.norm(audio)
         audio = audio*(2**32)
-        mel = librosa.feature.melspectrogram(audio, sr=self.sr, n_mels=self.n_mels, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, fmin=self.fmin, fmax=self.fmax)
+        mel = librosa.feature.melspectrogram(audio, sr=self.sr, n_mels=self.n_mels, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, fmax=self.fmax)
         # mel or log_mel
         pcen = librosa.pcen(mel, sr=self.sr).astype(np.float32)
         return pcen

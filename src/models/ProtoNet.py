@@ -105,92 +105,48 @@ class ProtoNet(BaseModel):
 
             prob_all = np.concatenate(prob_all, axis=0)
             prob_all = prob_all[:,0]
-            prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
+            # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
 
             all_prob[wav_file] = prob_all
-            
-        for wav_file in all_prob.keys():
-            prob = all_prob[wav_file]
-            on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
-            off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
-            query_start_time = query_start/self.fps
-            
-            on_set_time = on_set*seg_hop/self.fps + query_start_time
-            off_set_time = off_set*seg_hop/self.fps + query_start_time
-            all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
-            all_time['Starttime'].extend(on_set_time)
-            all_time['Endtime'].extend(off_set_time)
-            # print(len(on_set_time))
-            # print(len(off_set_time))
-            # print('~~~~~~~~~~~~')
-            
-            
-        df_all_time = pd.DataFrame(all_time)
         
-        pred_path = normalize_path(self.config.val.pred_dir)
-        if not os.path.dirname(pred_path):
-            os.makedirs(os.path.dirname(pred_path))
-        df_all_time.to_csv(pred_path, index=False)
-
-        ref_files_path = normalize_path(self.config.path.val_dir)
-        report_dir = normalize_path(self.config.val.report_dir)
-        report = evaluate(pred_path, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
-        return df_all_time, report
-            
-    
-    def split_support_query(self, data):
-        pos_data, neg_data = data        
-        class_pos, feature_pos, label_pos =pos_data
-        class_neg, feature_neg, label_neg =neg_data
-        class_pos = np.array(class_pos)
-        class_neg = np.array(class_neg)
-
-        class_pos = class_pos.reshape(-1, self.n_way)
-        class_neg = class_neg.reshape(-1, self.n_way)
-
-        class_all = np.concatenate([class_pos, class_neg], axis=1)
-        
-        
-        label_pos = label_pos.view(-1, self.n_way)
-        label_neg = label_neg.view(-1, self.n_way)
-
-        label_all = torch.cat([label_pos, label_neg], dim=1)
-
-        
-        feature_all = self.forward(torch.cat([feature_pos, feature_neg], dim=0))
-        feature_pos, feature_neg = torch.split(feature_all, [feature_pos.size(0), feature_neg.size(0)], dim=0)
-        
-        feature_pos = feature_pos.view(-1, self.n_way, feature_pos.size(-1))
-        feature_neg = feature_neg.view(-1, self.n_way, feature_neg.size(-1))
-        
-        feature_all = torch.cat([feature_pos, feature_neg], dim=1)
-        
-
-        
-
-        class_support = class_all[: self.n_support, :]
-        feature_support = feature_all[: self.n_support, :, :]
-        label_support = label_all[: self.n_support, :]
-
-        class_query = class_pos[self.n_support :, :]
-        feature_query = feature_pos[self.n_support :, :, :]
-        label_query = label_pos[self.n_support :, :]
-        # print('feature_support',feature_support)
-        # print('feature_query',feature_query)
-        # print(class_support)
-        # print(label_support)
-        # print(class_query)
-        # print(label_query)
-        # print('label')
-        # print(label_support)
-        # print(label_query)
-        
-        
-        return {'class':class_support, 'feature':feature_support, 'label':label_support}, {'class':class_query, 'feature':feature_query, 'label':label_query}
+        best_res = None
+        best_f1 = 0
+        for threshold in np.arange(0.05, 1, 0.05):
+            for wav_file in all_prob.keys():
+                prob = np.where(all_prob[wav_file]>threshold, 1, 0)
+                on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
+                off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
+                query_start_time = query_start/self.fps
+                
+                on_set_time = on_set*seg_hop/self.fps + query_start_time
+                off_set_time = off_set*seg_hop/self.fps + query_start_time
+                all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
+                all_time['Starttime'].extend(on_set_time)
+                all_time['Endtime'].extend(off_set_time)
                 
 
+                # print(len(on_set_time))
+                # print(len(off_set_time))
+                # print('~~~~~~~~~~~~')
+                
+                
+            df_all_time = pd.DataFrame(all_time)
+            
+            pred_path = normalize_path(self.config.val.pred_dir)
+            if not os.path.dirname(pred_path):
+                os.makedirs(os.path.dirname(pred_path))
+            df_all_time.to_csv(pred_path, index=False)
 
-
+            ref_files_path = normalize_path(self.config.path.val_dir)
+            report_dir = normalize_path(self.config.val.report_dir)
+            report = evaluate(pred_path, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
+            if report['overall_scores']['fmeasure (percentage)'] > best_f1:
+                best_f1 = report['overall_scores']['fmeasure (percentage)']
+                best_res = report
+        print(best_res)
+        return df_all_time, best_res
+        
+    
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)

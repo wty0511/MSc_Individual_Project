@@ -170,7 +170,7 @@ def build_report(main_set_scores, scores_per_miniset, scores_per_audiofile, save
 
 def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metadata=[]):
 
-    print("\nEvaluation for:", team_name, dataset)
+    # print("\nEvaluation for:", team_name, dataset)
     #read Gt file structure: get subsets and paths for ref csvs make an inverted dictionary with audiofilenames as keys and folder as value
     
     # dataset = VAL or EVAL
@@ -317,7 +317,7 @@ def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metada
                     }
     
     print("\nOverall_scores:",  overall_scores)
-    print("\nwriting report")
+    # print("\nwriting report")
     if metadata:
         report = build_report(overall_scores, scores_per_set, scores_per_audiofile,
                 savepath, 
