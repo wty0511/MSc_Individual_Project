@@ -23,9 +23,13 @@ class ProtoNet(BaseModel):
         query['label'] = query['label'].to(self.device)
         dists = self.euclidean_dist(query['feature'].view(-1, query['feature'].shape[-1]), prototype)
         pred = dists.argmin(-1)
-        acc = torch.eq(pred, query['label'].view(-1)).float().mean()
+        
         scores = -dists
-        y_query = torch.from_numpy(np.tile(np.arange(self.n_way * 2),self.n_query)).long().to(self.device)
+        # print(scores)
+        # print(pred)
+        # print(query['label'].view(-1))
+        y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
+        acc = torch.eq(pred, y_query).float().mean()
         # print(y_query)
         # print(pred)
         return self.loss_fn(scores, y_query ), acc
@@ -42,7 +46,7 @@ class ProtoNet(BaseModel):
             loss, acc = self.inner_loop(support_data, query_data)
             loss.backward()
             optimizer.step()
-            if i % 5 == 0:
+            if i % 1 == 0:
                 print('Step [{}/{}], Loss: {:.4f}, Acc: {:.4f}'.format(i+1, len(data_loader), loss.item(), acc.item()))
             avg_loss = avg_loss + loss.item()
 
@@ -143,12 +147,15 @@ class ProtoNet(BaseModel):
 
         class_pos = class_pos.reshape(-1, self.n_way)
         class_neg = class_neg.reshape(-1, self.n_way)
+
         class_all = np.concatenate([class_pos, class_neg], axis=1)
         
         
         label_pos = label_pos.view(-1, self.n_way)
         label_neg = label_neg.view(-1, self.n_way)
+
         label_all = torch.cat([label_pos, label_neg], dim=1)
+
         
         feature_all = self.forward(torch.cat([feature_pos, feature_neg], dim=0))
         feature_pos, feature_neg = torch.split(feature_all, [feature_pos.size(0), feature_neg.size(0)], dim=0)
@@ -165,9 +172,15 @@ class ProtoNet(BaseModel):
         feature_support = feature_all[: self.n_support, :, :]
         label_support = label_all[: self.n_support, :]
 
-        class_query = class_all[self.n_support :, :]
-        feature_query = feature_all[self.n_support :, :, :]
-        label_query = label_all[self.n_support :, :]
+        class_query = class_pos[self.n_support :, :]
+        feature_query = feature_pos[self.n_support :, :, :]
+        label_query = label_pos[self.n_support :, :]
+        # print('feature_support',feature_support)
+        # print('feature_query',feature_query)
+        # print(class_support)
+        # print(label_support)
+        # print(class_query)
+        # print(label_query)
         # print('label')
         # print(label_support)
         # print(label_query)

@@ -84,9 +84,11 @@ class TrainDataset(Dataset):
         print("Collecting training set features...")
         for file in tqdm(walk_files(self.train_dir, file_extension = ('.wav'))):
             for feature in self.feature_list:
-                save_path = audio2feature(file, feature)
                 self.feature_per_file[file] = self.feature_per_file.get(file, {})
+                self.feature_per_file[file]['duration'] = librosa.get_duration(filename = file)
+                save_path = audio2feature(file, feature)
                 self.feature_per_file[file][feature] = np.load(save_path)
+                
     
     def process_labels(self):
         print("Processing labels...")
@@ -166,23 +168,34 @@ class TrainDataset(Dataset):
     
     def select_sample(self, file, start, end, seg_length = 10):
         feature = self.feature_per_file[file][self.feature_list[0]]
+        length = self.feature_per_file[file]['duration']
+        # print('my fps', self.fps)
+        # print('real fps', feature.shape[1]/length)
+        if end > feature.shape[1]:
+            raise ValueError('end is larger than feature length')
         duration = end - start
-
+        # print('file', file, 'start', start, 'end', end)
         if duration == 0:
             feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
-            print('file', file, 'start', start, 'end', end)
+            # print('file', file, 'start', start, 'end', end)
             res.append(feature[:, : seg_length])
             raise ValueError('duration is 0')
         
         elif  0 < duration and duration < seg_length:
-            start = end - seg_length
+            # print('too short')
+            end = start + seg_length
             feature = np.tile(feature, (1,np.ceil(seg_length/duration).astype(int)))
             res = feature[:, start:end]
 
         else:
-
+            # print('normal')
             start = random.randint(start, end - seg_length)
+            # print('start', start)
+            # print('end', end)
+            # print('shape', feature.shape)
             res = feature[:, start:start+seg_length]
+        # print(res.shape)
+
         res = torch.from_numpy(res).to(self.device)
         return res
     

@@ -110,8 +110,7 @@ def preprecess(cfg):
             save_path = audio2feature(file, feature_name)
             if not os.path.exists(os.path.dirname(save_path)):
                 os.makedirs(os.path.dirname(save_path))
-            if not os.path.exists(save_path):
-                np.save(save_path, feature[feature_name])
+            np.save(save_path, feature[feature_name])
 
 if __name__ == "__main__":
     if not GlobalHydra().is_initialized():

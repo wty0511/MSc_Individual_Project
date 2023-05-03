@@ -13,19 +13,20 @@ path:
 features:
   sr: 22050
   n_mels: 128
-  n_fft: 2048
-  hop_length: 512
+  n_fft: 1024
+  hop_length: 256
   win_length: ${features.n_fft}
-  fmin: 0
-  fmax: null
-  feature_list: mel&logmel&pcen&mfcc
+  fmin: 50
+  fmax: 11025
+  feature_list: pcen #&logmel&pcen&mfcc
   segment_length: 0.2
   segment_len_frame: 17
   inchannel: 1
 
+
 train:
   neg_prototype: true
-  n_way: 6
+  n_way: 10
   n_support: 5
   n_query: 5
   backbone: resnet
@@ -50,7 +51,7 @@ val:
   seg_len_base: 30
   hop_len_frac: 3
   test_loop_batch_size: 32
-  test_loop_neg_sample: 32
+  test_loop_neg_sample: 5
   
   threshold: 0.5
   pred_dir: ${checkpoint.best_model_dir}/Predictions/pred.csv

@@ -12,7 +12,7 @@ class ResBlock(nn.Module):
         self.conv2 = nn.Conv2d(output_channels, output_channels, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(output_channels)
         
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
         
         self.shortcut = nn.Sequential()
         
@@ -39,7 +39,7 @@ class ResNet(nn.Module):
         self.input_channels = input_channels
         self.conv1 = nn.Conv2d(1, input_channels, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(input_channels)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
         self.layer1 = self._make_layer(block, 64, 2, stride=1)
         self.layer2 = self._make_layer(block, 128, 2, stride=2)
         self.layer3 = self._make_layer(block, 64, 2, stride=2)
