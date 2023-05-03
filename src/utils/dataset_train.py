@@ -53,7 +53,7 @@ class TrainDataset(Dataset):
         self.process_labels()
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(0.33 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.length = int(8 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):

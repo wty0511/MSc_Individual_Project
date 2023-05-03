@@ -57,7 +57,7 @@ class ProtoNet(BaseModel):
             loss.backward()
             optimizer.step()
 
-            if i % 1 == 0:
+            if i % 100 == 0:
                 print('Step [{}/{}], Loss: {:.4f}, Acc: {:.4f}'.format(i+1, len(data_loader), loss.item(), acc.item()))
             
             start = time.time()
