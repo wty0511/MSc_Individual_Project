@@ -26,29 +26,20 @@ features:
 
 train:
   neg_prototype: false
-  n_way: 10
-  n_support: 5
-  n_query: 5
-  backbone: resnet
-  model_type: protonet
-  epoches: 100
-  lr: 0.001
-  momentum: 0.9
-  weight_decay: 0.0005
-  optimizer: Adam
-
-
-val:
-  neg_prototype: true
-  n_way: 5
+  n_way: 15
   n_support: 5
   n_query: 5
   backbone: resnet
   model_type: protonet
   epoches: 100
   lr: 0.01
+  lr_inner: 0.001
   momentum: 0.9
   weight_decay: 0.0005
+  optimizer: Adam
+
+
+val:
   seg_len_base: 30
   hop_len_frac: 3
   test_loop_batch_size: 32

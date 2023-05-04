@@ -23,9 +23,9 @@ class ProtoNet(BaseModel):
 
     def inner_loop(self,support, query):
         # print(support['label'].view(self.n_support, self.n_way * 2, -1 ))
-        prototype     = support['feature'].mean(0).squeeze()
-        query['label'] = query['label'].to(self.device)
-        dists = self.euclidean_dist(query['feature'].view(-1, query['feature'].shape[-1]), prototype)
+        prototype     = support.mean(0).squeeze()
+        # query['label'] = query['label'].to(self.device)
+        dists = self.euclidean_dist(query.view(-1, query.shape[-1]), prototype)
         # print(dists)
         pred = dists.argmin(-1)
         
@@ -52,10 +52,17 @@ class ProtoNet(BaseModel):
 
 
             #print('waiting for data')
-            support_data, query_data = self.split_support_query(data)
-            #print('data split')
+            if self.config.train.neg_prototype:
+                pos_data, neg_data = data 
+                _, data_pos, _ =pos_data
+                _, data_neg, _ =neg_data
+                support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+            else:
+                pos_data = data 
+                _, data_pos, _ =pos_data
+                support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
             optimizer.zero_grad()
-            loss, acc = self.inner_loop(support_data, query_data)
+            loss, acc = self.inner_loop(support_feat, query_feat)
             loss.backward()
             optimizer.step()
 
@@ -82,12 +89,9 @@ class ProtoNet(BaseModel):
             # print(query.shape)
             wav_file= pos_sup[0][0].split('&')[1]
             pos_dataset = TensorDataset(pos_sup[1].squeeze(), torch.zeros(pos_sup[1].squeeze().shape[0]))
-            neg_dataset = TensorDataset(neg_sup[1].squeeze(), torch.zeros(neg_sup[1].squeeze().shape[0]))
-
             query_dataset = TensorDataset(query.squeeze(), torch.zeros(query.squeeze().shape[0]))
 
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-            neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             # print(len(pos_dataset))
             # print(len(neg_dataset))
@@ -100,40 +104,51 @@ class ProtoNet(BaseModel):
                 pos_feat.append(feat.mean(0))
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
-            neg_feat = []
-            for batch in neg_loader:
-                neg_data, _ = batch
-                # print(neg_data.shape)
-                feat = self.forward(neg_data)
-                # print(feat.shape)
-                neg_feat.append(feat.mean(0))
-            neg_feat = torch.stack(neg_feat, dim=0).mean(0)
-            
-            proto = torch.stack([pos_feat,neg_feat], dim=0)
-            
-            prob_all = []
-            for batch in query_loader:
-                query_data, _ = batch
-                feat = self.forward(query_data)
-                dist = self.euclidean_dist(feat, proto)
-                scores = -dist
+            prob_mean = []
+            for i in range(1):
+                neg_sup[1] = neg_sup[1].squeeze() 
                 
-                prob = F.softmax(scores, dim=1)
-                prob_all.append(prob.detach().cpu().numpy())
+                if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
+                    neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
+                    neg_seg_sample = neg_sup[1][neg_indices]
+                
+                neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
+                neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                neg_feat = []
+                for batch in neg_loader:
+                    neg_data, _ = batch
+                    # print(neg_data.shape)
+                    feat = self.forward(neg_data)
+                    # print(feat.shape)
+                    neg_feat.append(feat.mean(0))
+                neg_feat = torch.stack(neg_feat, dim=0).mean(0)
+                
+                
+                proto = torch.stack([pos_feat,neg_feat], dim=0)
+                
+                prob_all = []
+                for batch in query_loader:
+                    query_data, _ = batch
+                    query_feat = self.forward(query_data)
+                    dist = self.euclidean_dist(query_feat, proto)
+                    scores = -dist
+                    prob = F.softmax(scores, dim=1)
+                    prob_all.append(prob.detach().cpu().numpy())
 
-            prob_all = np.concatenate(prob_all, axis=0)
-            # print(prob_all)
-            prob_all = prob_all[:,0]
-            # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
-
-            all_prob[wav_file] = prob_all
+                prob_all = np.concatenate(prob_all, axis=0)
+                # print(prob_all)
+                prob_all = prob_all[:,0]
+                # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
+                prob_mean.append(prob_all)
+            prob_mean = np.stack(prob_mean, axis=0).mean(0)
+            all_prob[wav_file] = prob_mean
         
         best_res = None
         best_f1 = 0
-        for threshold in np.arange(0.05, 1, 0.05):
+        for threshold in np.arange(0.4, 0.6, 0.05):
             for wav_file in all_prob.keys():
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
-
+                print(np.sum(prob))
                 on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                 
                 off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
@@ -145,11 +160,6 @@ class ProtoNet(BaseModel):
                 all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
                 all_time['Starttime'].extend(on_set_time)
                 all_time['Endtime'].extend(off_set_time)
-                
-
-                # print(len(on_set_time))
-                # print(len(off_set_time))
-                # print('~~~~~~~~~~~~')
                 
             
             df_all_time = pd.DataFrame(all_time)

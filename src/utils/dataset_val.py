@@ -35,7 +35,6 @@ class ValDataset(Dataset):
         self.neg_prototype = self.config.train.neg_prototype
         self.collect_features()
         self.process_labels()
-        print(self.seg_meta.keys())
         self.class2index = self._class2index()
         self.index2class = self._index2class()
         self.classes = list(self.classes)
@@ -180,9 +179,9 @@ class ValDataset(Dataset):
 
             all_neg_seg = torch.stack(all_neg_seg)
 
-            if all_neg_seg.shape[0] > self.config.val.test_loop_neg_sample:
-                neg_indices = torch.randperm(all_neg_seg.shape[0])[: self.config.val.test_loop_neg_sample]
-                all_neg_seg = all_neg_seg[neg_indices]
+            # if all_neg_seg.shape[0] > self.config.val.test_loop_neg_sample:
+            #     neg_indices = torch.randperm(all_neg_seg.shape[0])[: self.config.val.test_loop_neg_sample]
+            #     all_neg_seg = all_neg_seg[neg_indices]
             return all_neg_seg
     
     
