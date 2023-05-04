@@ -25,11 +25,11 @@ features:
 
 
 train:
-  neg_prototype: true
+  neg_prototype: false
   n_way: 10
   n_support: 5
   n_query: 5
-  backbone: convnet
+  backbone: resnet
   model_type: protonet
   epoches: 100
   lr: 0.001
@@ -53,9 +53,8 @@ val:
   hop_len_frac: 3
   test_loop_batch_size: 32
   test_loop_neg_sample: 10
-  
   threshold: 0.5
-  pred_dir: ${checkpoint.best_model_dir}/Predictions/pred.csv
+  pred_dir: ${checkpoint.best_model_dir}/Predictions/
   report_dir: ${checkpoint.best_model_dir}/Reports
 
 checkpoint:

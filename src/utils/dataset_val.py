@@ -35,6 +35,7 @@ class ValDataset(Dataset):
         self.neg_prototype = self.config.train.neg_prototype
         self.collect_features()
         self.process_labels()
+        print(self.seg_meta.keys())
         self.class2index = self._class2index()
         self.index2class = self._index2class()
         self.classes = list(self.classes)
@@ -53,13 +54,12 @@ class ValDataset(Dataset):
         neg = self.get_neg_sample(selected_class_neg)
         pos_index = self.class2index[class_name]
         neg_index = self.class2index[selected_class_neg]
-        query_start = self.seg_meta[class_name]['time_spane'][-1]['end']
+        query_start = self.seg_meta[class_name]['time_spane'][self.config.train.n_support-1]['end']
         query = self.get_query_sample(class_name,query_start)
-        if self.neg_prototype:
-            return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start
+
+        return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start
         
-        else:
-            return(class_name, pos, pos_index), None, query, self.seg_len, self.seg_hop, query_start
+
         
     def __len__(self):
         return self.length
@@ -109,21 +109,21 @@ class ValDataset(Dataset):
                     raise ValueError('No positive sample in file {}, class {}'.format(file, column))
                     
                 
-                if self.neg_prototype:
-                    column_neg = column + '_neg'
-                    self.seg_meta[column_neg] = self.seg_meta.get(column_neg, {})
-                    self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
-                    self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
-                    end.insert(0, 0.0)
-                    
-                    for i in range(len(start)):
-                        if start[i] > end[i]:
-                            self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
-                            self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
-                        else:
-                            print(file)
-                            print('start', start[i])
-                            print('end', end[i])
+                
+                column_neg = column + '_neg'
+                self.seg_meta[column_neg] = self.seg_meta.get(column_neg, {})
+                self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
+                self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
+                end.insert(0, 0.0)
+                
+                for i in range(len(start)):
+                    if start[i] > end[i]:
+                        self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
+                        self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
+                    else:
+                        print(file)
+                        print('start', start[i])
+                        print('end', end[i])
 
 
 
@@ -224,12 +224,12 @@ class ValDataset(Dataset):
     def _class2index(self):
         
         label_to_index = {label: index for index, label in enumerate(self.classes)}
-        if self.neg_prototype:
-            temp = {}
-            for label in label_to_index.keys():
-                label_to_index[label] = label_to_index[label] * 2
-                temp[label+'_neg'] = label_to_index[label] + 1
-            label_to_index.update(temp)
+
+        temp = {}
+        for label in label_to_index.keys():
+            label_to_index[label] = label_to_index[label] * 2
+            temp[label+'_neg'] = label_to_index[label] + 1
+        label_to_index.update(temp)
         return label_to_index
             
     
@@ -303,9 +303,13 @@ if __name__ == "__main__":
         initialize(config_path="../../")
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
-    train_dataset =  TrainDataset(cfg)
-
-    dataloader = DataLoader(train_dataset, batch_sampler = BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
-    for batch in dataloader:
-        print(batch[0])
+    val_dataset =  ValDataset(cfg,val=False)
+    meta = val_dataset.seg_meta
+    for key in meta.keys():
+        if 'neg' not in key:
+            print('key:', key, 'mean:', np.mean(meta[key]['duration']), 'std:', np.std(meta[key]['duration']))
+    
+    # dataloader = DataLoader(train_dataset, batch_sampler = BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
+    # for batch in dataloader:
+    #     print(batch[0])
         

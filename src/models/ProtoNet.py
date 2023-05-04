@@ -26,6 +26,7 @@ class ProtoNet(BaseModel):
         prototype     = support['feature'].mean(0).squeeze()
         query['label'] = query['label'].to(self.device)
         dists = self.euclidean_dist(query['feature'].view(-1, query['feature'].shape[-1]), prototype)
+        # print(dists)
         pred = dists.argmin(-1)
         
         scores = -dists
@@ -54,7 +55,6 @@ class ProtoNet(BaseModel):
             support_data, query_data = self.split_support_query(data)
             #print('data split')
             optimizer.zero_grad()
-
             loss, acc = self.inner_loop(support_data, query_data)
             loss.backward()
             optimizer.step()
@@ -135,7 +135,9 @@ class ProtoNet(BaseModel):
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
 
                 on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
+                
                 off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
+                
                 query_start_time = query_start/self.fps
                 all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
                 on_set_time = on_set*seg_hop/self.fps + query_start_time
@@ -149,17 +151,19 @@ class ProtoNet(BaseModel):
                 # print(len(off_set_time))
                 # print('~~~~~~~~~~~~')
                 
-                
+            
             df_all_time = pd.DataFrame(all_time)
             df_all_time = post_processing(df_all_time)
+            df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.val.pred_dir)
+            pred_path = os.path.join(pred_path, 'pred_{}.csv'.format(threshold))
             if not os.path.dirname(pred_path):
                 os.makedirs(os.path.dirname(pred_path))
             df_all_time.to_csv(pred_path, index=False)
 
             ref_files_path = normalize_path(test_loader.dataset.val_dir)
             report_dir = normalize_path(self.config.val.report_dir)
-            report = evaluate(pred_path, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
+            report = evaluate(df_all_time, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
             if report['overall_scores']['fmeasure (percentage)'] > best_f1:
                 best_f1 = report['overall_scores']['fmeasure (percentage)']
                 best_res = report
@@ -170,7 +174,7 @@ class ProtoNet(BaseModel):
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-
+        
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
 

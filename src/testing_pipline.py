@@ -16,20 +16,16 @@ best_model_dir = cfg.checkpoint.best_model_dir
 save_file = os.path.join(best_model_dir, 'best_model.pth')
 
 
-
-
-
-
-
-
 # 加载模型
 checkpoint = torch.load(save_file)
 
 # 从checkpoint中获取模型的状态和配置信息
 model_state = checkpoint['state']
 config = checkpoint['config']
-epoch = checkpoint['epoch']
+config = cfg
 
+epoch = checkpoint['epoch']
+print('epoch:', epoch)
 # 创建一个新的模型实例
 model = ProtoNet(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 

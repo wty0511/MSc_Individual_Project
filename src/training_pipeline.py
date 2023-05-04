@@ -60,11 +60,13 @@ def train(train_loader, val_loader, config):
 
         df_all_time, report = model.test_loop(val_loader)
         acc = report['overall_scores']['fmeasure (percentage)']
-        if acc > best_acc :
+        
+        # if acc > best_acc :
+        if 1 ==1 :
             print("best model! save...")
             best_acc = acc
             save_file = os.path.join(best_model_dir, 'best_model.pth')
-            torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
+            # torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
 
         if (epoch % config.checkpoint.save_freq==0) or (epoch==epoches-1):
             save_file = os.path.join(best_model_dir, '{:d}.pth'.format(epoch))

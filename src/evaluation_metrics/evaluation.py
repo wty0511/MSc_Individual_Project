@@ -168,7 +168,7 @@ def build_report(main_set_scores, scores_per_miniset, scores_per_audiofile, save
 
     return report
 
-def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metadata=[]):
+def evaluate(pred_csv, ref_file_path, team_name, dataset, savepath, metadata=[]):
 
     # print("\nEvaluation for:", team_name, dataset)
     #read Gt file structure: get subsets and paths for ref csvs make an inverted dictionary with audiofilenames as keys and folder as value
@@ -189,7 +189,8 @@ def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metada
     # print(gt_file_structure)
     # print(inv_gt_file_structure)
     #read prediction csv
-    pred_csv = pd.read_csv(pred_file_path, dtype=str)
+    # pred_csv = pd.read_csv(pred_file_path, dtype=str)
+    
     #verify headers:
     if list(pred_csv.columns) !=  PRED_FILE_HEADER:
         print('Please correct the header of the prediction file. This should be', PRED_FILE_HEADER)

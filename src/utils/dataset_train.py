@@ -14,6 +14,7 @@ from hydra.core.global_hydra import GlobalHydra
 from tqdm import tqdm
 from src.utils.sampler import *
 from torch.utils.data import DataLoader
+from src.utils.helpers import *
 import time
 def meta_learning_collate_fn(batch):
     print(batch)
@@ -62,11 +63,13 @@ class TrainDataset(Dataset):
         selected_class_neg = class_name + '_neg'
         pos = self.get_pos_sample(class_name, self.config.features.segment_len_frame)
         # pos = torch.from_numpy(pos).to(self.device)
-        neg = self.get_neg_sample(selected_class_neg, self.config.features.segment_len_frame)
+        if self.neg_prototype:
+            neg = self.get_neg_sample(selected_class_neg, self.config.features.segment_len_frame)
         # neg = torch.from_numpy(neg).to(self.device)
 
         pos_index = self.class2index[class_name] # int
-        neg_index = self.class2index[selected_class_neg] # int
+        if self.neg_prototype:
+            neg_index = self.class2index[selected_class_neg] # int
         end_time = time.time()
         elapsed_time = end_time - start_time
         #print(f"代码执行时间为 {elapsed_time:.2f} 秒")
@@ -74,7 +77,7 @@ class TrainDataset(Dataset):
             return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index)
         
         else:
-            return(class_name, pos, pos_index), None
+            return(class_name, pos, pos_index)
         
     def __len__(self):
         return(self.length )
@@ -92,6 +95,7 @@ class TrainDataset(Dataset):
         print("Processing labels...")
         for file in tqdm(walk_files(self.train_dir, file_extension = ('.csv'))):
             df = pd.read_csv(file)
+            df = df.sort_values(by='Starttime', ascending=True)
             file = file.replace('.csv','.wav')
             # class name starts from the 4th column
             for column in df.columns[3:]:
@@ -104,30 +108,41 @@ class TrainDataset(Dataset):
                 self.seg_meta[column] = self.seg_meta.get(column, {})
                 self.seg_meta[column]['time_spane'] = self.seg_meta[column].get('time_spane', [])
                 self.seg_meta[column]['duration'] = self.seg_meta[column].get('duration', [])
-
+                meta_temp = {'time_spane': [], 'duration': []}
                 for s, e in zip(start, end):
-                    self.seg_meta[column]['time_spane'].append({'start': s, 'end': e, 'file': file})
-                    self.seg_meta[column]['duration'].append(e - s)
+                    meta_temp['time_spane'].append({'start': s, 'end': e, 'file': file})
+                    meta_temp['duration'].append(e - s)
+                # print('file', file, 'column', column)
+                # print('before merge', len(meta_temp['time_spane']))
+                meta_temp = merge_intervals(meta_temp)
+                # print('after merge', len(meta_temp['time_spane']))
+
+                self.seg_meta[column]['time_spane'] += meta_temp['time_spane']
+                self.seg_meta[column]['duration'] += meta_temp['duration']
                 
                 if self.seg_meta[column]['time_spane'] == []:
                     self.classes.remove(column)
                     self.seg_meta.pop(column)
                     continue
+
                 
                 if self.neg_prototype:
+                    start = [meta['start'] for meta in meta_temp['time_spane']]
+                    start = start + [self.feature_per_file[file]['duration']]
+                    end = [0.0] + [meta['end'] for meta in meta_temp['time_spane']]
                     column_neg = column + '_neg'
                     self.seg_meta[column_neg] = self.seg_meta.get(column_neg, {})
                     self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
-                    self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
-                    end.insert(0, 0.0)
+                    self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])                    
                     
-                                 
                     for i in range(len(start)):
                         if start[i] > end[i]:
                             self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
                             self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
+                        else:
+                            raise Exception('start time is smaller than end time')
 
-        
+                    
         
     def get_pos_sample(self, selected_class, seg_length = 10):
         # print('getting pos sample', self.seg_meta[selected_class])
@@ -179,9 +194,10 @@ class TrainDataset(Dataset):
         # print('file', file, 'start', start, 'end', end)
         if duration == 0:
             feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
-            # print('file', file, 'start', start, 'end', end)
-            res.append(feature[:, : seg_length])
+            print('file', file, 'start', start, 'end', end)
             raise ValueError('duration is 0')
+            res.append(feature[:, : seg_length])
+            
         
         elif  0 < duration and duration < seg_length:
             start_time = time.time()
@@ -234,8 +250,13 @@ if __name__ == "__main__":
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
     train_dataset =  TrainDataset(cfg)
-
-    dataloader = DataLoader(train_dataset, batch_sampler = BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
-    for batch in dataloader:
-        print(batch[0])
+    meta = train_dataset.seg_meta
+    
+    for key in meta.keys():
+        if 'neg' not in key:
+            print('key:', key, 'mean:', np.mean(meta[key]['duration']), 'std:', np.std(meta[key]['duration']))
+    
+    # dataloader = DataLoader(train_dataset, batch_sampler = BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
+    # for batch in dataloader:
+    #     print(batch[0])
 

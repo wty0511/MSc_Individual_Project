@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class ResBlock(nn.Module):
     # 来自于 DL CW1
@@ -30,6 +31,7 @@ class ResBlock(nn.Module):
         out = self.bn2(out)
         out += self.shortcut(x)
         out = self.relu(out)
+        out = F.dropout(out, p=0.5, training=self.training)
         return out 
 
 class ResNet(nn.Module):
