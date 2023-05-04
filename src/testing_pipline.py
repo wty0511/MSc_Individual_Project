@@ -15,6 +15,13 @@ cfg = compose(config_name="config.yaml")
 best_model_dir = cfg.checkpoint.best_model_dir
 save_file = os.path.join(best_model_dir, 'best_model.pth')
 
+
+
+
+
+
+
+
 # 加载模型
 checkpoint = torch.load(save_file)
 

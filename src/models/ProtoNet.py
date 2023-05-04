@@ -10,6 +10,8 @@ from src.evaluation_metrics.evaluation import *
 from src.utils.feature_extractor import *
 import time
 
+import pynvml
+from src.utils.post_processing import *
 
 
 class ProtoNet(BaseModel):
@@ -70,7 +72,7 @@ class ProtoNet(BaseModel):
             
     def test_loop(self, test_loader):
         all_prob = {}
-        all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
+
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start) in enumerate(test_loader):
             seg_hop = seg_hop.item()
             query_start = query_start.item()
@@ -115,10 +117,12 @@ class ProtoNet(BaseModel):
                 feat = self.forward(query_data)
                 dist = self.euclidean_dist(feat, proto)
                 scores = -dist
+                
                 prob = F.softmax(scores, dim=1)
                 prob_all.append(prob.detach().cpu().numpy())
 
             prob_all = np.concatenate(prob_all, axis=0)
+            # print(prob_all)
             prob_all = prob_all[:,0]
             # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
 
@@ -129,10 +133,11 @@ class ProtoNet(BaseModel):
         for threshold in np.arange(0.05, 1, 0.05):
             for wav_file in all_prob.keys():
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
+
                 on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                 off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
                 query_start_time = query_start/self.fps
-                
+                all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
                 on_set_time = on_set*seg_hop/self.fps + query_start_time
                 off_set_time = off_set*seg_hop/self.fps + query_start_time
                 all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
@@ -146,13 +151,13 @@ class ProtoNet(BaseModel):
                 
                 
             df_all_time = pd.DataFrame(all_time)
-            
+            df_all_time = post_processing(df_all_time)
             pred_path = normalize_path(self.config.val.pred_dir)
             if not os.path.dirname(pred_path):
                 os.makedirs(os.path.dirname(pred_path))
             df_all_time.to_csv(pred_path, index=False)
 
-            ref_files_path = normalize_path(self.config.path.val_dir)
+            ref_files_path = normalize_path(test_loader.dataset.val_dir)
             report_dir = normalize_path(self.config.val.report_dir)
             report = evaluate(pred_path, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
             if report['overall_scores']['fmeasure (percentage)'] > best_f1:

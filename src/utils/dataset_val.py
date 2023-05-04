@@ -24,6 +24,8 @@ class ValDataset(Dataset):
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
         self.val_dir = normalize_path(config.path.val_dir) if val else normalize_path(config.path.test_dir)
+        # self.val_dir = normalize_path(config.path.train_dir)
+        
         # for each csv file, we have a list of features
         self.feature_per_file = {}
         self.classes = set()
@@ -104,6 +106,8 @@ class ValDataset(Dataset):
                     self.classes.remove(column)
                     self.seg_meta.pop(column)
                     continue
+                    raise ValueError('No positive sample in file {}, class {}'.format(file, column))
+                    
                 
                 if self.neg_prototype:
                     column_neg = column + '_neg'
@@ -111,11 +115,17 @@ class ValDataset(Dataset):
                     self.seg_meta[column_neg]['time_spane'] = self.seg_meta[column_neg].get('time_spane', [])
                     self.seg_meta[column_neg]['duration'] = self.seg_meta[column_neg].get('duration', [])
                     end.insert(0, 0.0)
-                                 
-                    for i in range(self.config.train.n_support):
+                    
+                    for i in range(len(start)):
                         if start[i] > end[i]:
                             self.seg_meta[column_neg]['time_spane'].append({'start': end[i], 'end': start[i], 'file': file})
                             self.seg_meta[column_neg]['duration'].append(start[i] - end[i])
+                        else:
+                            print(file)
+                            print('start', start[i])
+                            print('end', end[i])
+
+
 
         
     
@@ -159,19 +169,20 @@ class ValDataset(Dataset):
         else:
             duration_frame = time2frame(class_meta['duration'], self.fps)
             all_neg_seg = []
-            for i in class_meta['time_spane']:
+            for i in class_meta['time_spane'][:self.config.train.n_support]:
                 f = i['file']
                 s = i['start']
                 e = i['end']
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
-                pos_seg = self.select_sample(f, s, e, self.seg_len, self.seg_hop)
-                all_neg_seg.extend(pos_seg)
+                neg_seg = self.select_sample(f, s, e, self.seg_len, self.seg_hop)
+                all_neg_seg.extend(neg_seg)
+
             all_neg_seg = torch.stack(all_neg_seg)
+
             if all_neg_seg.shape[0] > self.config.val.test_loop_neg_sample:
                 neg_indices = torch.randperm(all_neg_seg.shape[0])[: self.config.val.test_loop_neg_sample]
                 all_neg_seg = all_neg_seg[neg_indices]
-            
             return all_neg_seg
     
     
@@ -269,8 +280,6 @@ class ValDataset(Dataset):
         if  duration< self.seg_len:
             feature = np.tile(feature[:, query_start:end], (1,np.ceil(self.seg_len/duration).astype(int)))
             res.append(feature[:, : self.seg_len])
-
-        
         else:
             # from base line
             shift = 0
@@ -282,7 +291,7 @@ class ValDataset(Dataset):
             res.append(feature[:, end - self.seg_len:end])
 
         res = np.stack(res)
-        res = torch.from_numpy(res).to(self.device)
+        res = torch.from_numpy(res).to(self.device) 
         return res
     
 

@@ -52,7 +52,7 @@ val:
   seg_len_base: 30
   hop_len_frac: 3
   test_loop_batch_size: 32
-  test_loop_neg_sample: 30
+  test_loop_neg_sample: 10
   
   threshold: 0.5
   pred_dir: ${checkpoint.best_model_dir}/Predictions/pred.csv

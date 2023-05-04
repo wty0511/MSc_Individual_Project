@@ -14,7 +14,8 @@ def post_processing(df):
     new_df = pd.DataFrame(columns=['Audiofilename', 'Starttime', 'Endtime'])
     for i, row in df.iterrows():
         if row['Endtime'] - row['Starttime'] > 0.200:
-            new_df = new_df.append(row)
+            new_df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+
         
-    return df 
+    return new_df 
     
