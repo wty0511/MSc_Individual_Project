@@ -20,13 +20,19 @@ if not GlobalHydra().is_initialized():
 # Compose the configuration
 cfg = compose(config_name="config.yaml")
 print('preparing training dataset')
-train_dataset = TrainDataset(cfg)
+train_dataset = ClassDataset(cfg)
 print('preparing val dataset')
-val_dataset = ValDataset(cfg)
+val_dataset = FileDataset(cfg)
 train_loader = DataLoader(train_dataset, batch_sampler=BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 model = ProtoMAML(cfg)
 model = model.cuda()
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
-model.train_loop(train_loader, optimizer)
-
+for epoch in range(100):
+    model.train_loop(train_loader, optimizer)
+    best_model_dir = cfg.checkpoint.best_model_dir
+    if not os.path.exists(best_model_dir):
+        os.makedirs(best_model_dir)
+    save_file = os.path.join(best_model_dir, '{:d}.pth'.format(epoch))
+    torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
+18.pth

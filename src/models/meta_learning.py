@@ -5,6 +5,7 @@ from src.models.ResNet2 import *
 from abc import abstractmethod
 from src.models.ConvNet import *
 import numpy as np
+from torch.utils.data import TensorDataset, DataLoader
 class BaseModel(nn.Module):
     def __init__(self, config):
         super(BaseModel, self).__init__()
@@ -77,7 +78,7 @@ class BaseModel(nn.Module):
             data_neg = self.split_2d(data_neg)
             data_all = torch.cat([data_pos, data_neg], dim=1)
             data_support = data_all[:self.n_support, :, :, :]
-            data_query = data_all[self.n_support:, :, :, :]
+            data_query = data_pos[self.n_support:, :, :, :]
         else:
             data_pos = self.split_2d(data_pos)
             data_support = data_pos[:self.n_support, :, :, :]
@@ -90,13 +91,29 @@ class BaseModel(nn.Module):
         
         if self.config.train.neg_prototype:
             if is_data:
-                if model is not None:
-                    feature_pos = model.forward(pos_input)
-                    feature_neg = model.forward(neg_input)
-                else:
-                    feature_pos = self.forward(pos_input)
-                    feature_neg = self.forward(neg_input)
-            
+                pos_dataset = TensorDataset(pos_input, torch.zeros(pos_input.shape[0]))
+                neg_dataset = TensorDataset(neg_input, torch.zeros(neg_input.shape[0]))
+                pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                pos_all = []
+                for batch in pos_loader:
+                    data, _ = batch
+                    if model is not None:
+                        feature_pos = model.forward(data)
+                    else:
+                        feature_pos = self.forward(data)
+                    pos_all.append(feature_pos)
+                feature_pos = torch.cat(pos_all, dim=0)
+                
+                neg_all = []
+                for batch in neg_loader:
+                    data, _ = batch
+                    if model is not None:
+                        feature_neg = model.forward(data)
+                    else:
+                        feature_neg = self.forward(data)
+                    neg_all.append(feature_neg)
+                feature_neg = torch.cat(neg_all, dim=0)
             else:
                 feature_pos = pos_input
                 feature_neg = neg_input
@@ -106,7 +123,7 @@ class BaseModel(nn.Module):
             feature_all = torch.cat([feature_pos, feature_neg], dim=1)
             
             feature_support = feature_all[:self.n_support, :, :]
-            feature_query = feature_all[self.n_support:, :, :]
+            feature_query = feature_pos[self.n_support:, :, :]
             
         else:
             if is_data:

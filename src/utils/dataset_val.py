@@ -18,7 +18,7 @@ from src.utils.dataset_train import *
 
 
 
-class ValDataset(Dataset):
+class FileDataset(Dataset):
     def __init__(self, config, val=True):
         self.is_val = val
         self.config = config
@@ -55,8 +55,12 @@ class ValDataset(Dataset):
         neg_index = self.class2index[selected_class_neg]
         query_start = self.seg_meta[class_name]['time_spane'][self.config.train.n_support-1]['end']
         query = self.get_query_sample(class_name,query_start)
-
-        return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start
+        file = class_name.split('&')[1]
+        print("class_name:",class_name)
+        print('start:',query_start)
+        print('len query:',len(query)/self.fps*self.seg_hop)
+        query_end = librosa.get_duration(filename = file)
+        return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start, query_end
         
 
         
@@ -302,7 +306,7 @@ if __name__ == "__main__":
         initialize(config_path="../../")
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
-    val_dataset =  ValDataset(cfg,val=False)
+    val_dataset =  FileDataset(cfg,val=False)
     meta = val_dataset.seg_meta
     for key in meta.keys():
         if 'neg' not in key:

@@ -21,9 +21,9 @@ if __name__ == "__main__":
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
     print('preparing training dataset')
-    train_dataset = TrainDataset(cfg)
+    train_dataset = ClassDataset(cfg)
     print('preparing val dataset')
-    val_dataset = ValDataset(cfg)
+    val_dataset = FileDataset(cfg)
     train_loader = DataLoader(train_dataset, batch_sampler=BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
     val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
     model = train(train_loader, val_loader, cfg)

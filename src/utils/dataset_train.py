@@ -39,11 +39,18 @@ def meta_learning_collate_fn(batch):
 #         'query_set': query_set_samples
 #     }
 
-class TrainDataset(Dataset):
-    def __init__(self, config):
+class ClassDataset(Dataset):
+    def __init__(self, config, mode='train'):
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
-        self.train_dir = normalize_path(config.path.train_dir)
+        if mode == 'train':
+            self.data_dir = normalize_path(config.path.train_dir)
+        elif mode == 'val':
+            self.data_dir = normalize_path(config.path.val_dir)
+        elif mode == 'test':
+            self.data_dir = normalize_path(config.path.test_dir)
+        else:
+            raise ValueError('Unknown mode')
         self.feature_per_file = {}
         self.classes = set()
         self.seg_meta = {}
@@ -51,15 +58,14 @@ class TrainDataset(Dataset):
         self.fps = self.sr / config.features.hop_length
         self.neg_prototype = self.config.train.neg_prototype
         self.collect_features()
-        self.process_labels()
+        self.process_labels(config.train.same_label)
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(8 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):
         start_time = time.time()
-        
         selected_class_neg = class_name + '_neg'
         pos = self.get_pos_sample(class_name, self.config.features.segment_len_frame)
         # pos = torch.from_numpy(pos).to(self.device)
@@ -83,7 +89,7 @@ class TrainDataset(Dataset):
         return(self.length )
     def collect_features(self):
         print("Collecting training set features...")
-        for file in tqdm(walk_files(self.train_dir, file_extension = ('.wav'))):
+        for file in tqdm(walk_files(self.data_dir, file_extension = ('.wav'))):
             for feature in self.feature_list:
                 self.feature_per_file[file] = self.feature_per_file.get(file, {})
                 self.feature_per_file[file]['duration'] = librosa.get_duration(filename = file)
@@ -91,16 +97,21 @@ class TrainDataset(Dataset):
                 self.feature_per_file[file][feature] = np.load(save_path)
                 
     
-    def process_labels(self):
+    def process_labels(self, same_label):
         print("Processing labels...")
-        for file in tqdm(walk_files(self.train_dir, file_extension = ('.csv'))):
+        for file in tqdm(walk_files(self.data_dir, file_extension = ('.csv'))):
+
             df = pd.read_csv(file)
             df = df.sort_values(by='Starttime', ascending=True)
             file = file.replace('.csv','.wav')
+
             # class name starts from the 4th column
             for column in df.columns[3:]:
-                self.classes.add(column)
+
                 pos_idx = df[df[column] == 'POS'].index.tolist()
+                if not same_label:
+                    column = column + '&'+ file
+                self.classes.add(column)
                 start = df['Starttime'][pos_idx].tolist()
                 end = df['Endtime'][pos_idx].tolist()
                 # print('start', start)
@@ -249,7 +260,7 @@ if __name__ == "__main__":
         initialize(config_path="../../")
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
-    train_dataset =  TrainDataset(cfg)
+    train_dataset =  ClassDataset(cfg)
     meta = train_dataset.seg_meta
     
     for key in meta.keys():

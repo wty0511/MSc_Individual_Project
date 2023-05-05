@@ -76,11 +76,11 @@ class ProtoNet(BaseModel):
 
         avg_loss = avg_loss / len(data_loader)
         return avg_loss
-            
+    
     def test_loop(self, test_loader):
         all_prob = {}
-
-        for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start) in enumerate(test_loader):
+        all_meta = {}
+        for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end) in enumerate(test_loader):
             seg_hop = seg_hop.item()
             query_start = query_start.item()
 
@@ -88,12 +88,18 @@ class ProtoNet(BaseModel):
             # print(neg_sup[1].squeeze().shape)
             # print(query.shape)
             wav_file= pos_sup[0][0].split('&')[1]
-            pos_dataset = TensorDataset(pos_sup[1].squeeze(), torch.zeros(pos_sup[1].squeeze().shape[0]))
-            query_dataset = TensorDataset(query.squeeze(), torch.zeros(query.squeeze().shape[0]))
+            all_meta[wav_file]={}
+            all_meta[wav_file]['start'] = query_start
+            all_meta[wav_file]['end'] = query_end
+            all_meta[wav_file]['seg_hop'] = seg_hop
+            pos_data = pos_sup[1].squeeze()
+            query = query.squeeze()
+            pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
+            query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
 
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-            # print(len(pos_dataset))
+                        # print(len(pos_dataset))
             # print(len(neg_dataset))
             # print(len(query_dataset))
             pos_feat = []
@@ -122,10 +128,9 @@ class ProtoNet(BaseModel):
                     # print(feat.shape)
                     neg_feat.append(feat.mean(0))
                 neg_feat = torch.stack(neg_feat, dim=0).mean(0)
-                
+                ##############################################################################
                 
                 proto = torch.stack([pos_feat,neg_feat], dim=0)
-                
                 prob_all = []
                 for batch in query_loader:
                     query_data, _ = batch
@@ -134,7 +139,8 @@ class ProtoNet(BaseModel):
                     scores = -dist
                     prob = F.softmax(scores, dim=1)
                     prob_all.append(prob.detach().cpu().numpy())
-
+                ##############################################################################
+                
                 prob_all = np.concatenate(prob_all, axis=0)
                 # print(prob_all)
                 prob_all = prob_all[:,0]
@@ -145,7 +151,8 @@ class ProtoNet(BaseModel):
         
         best_res = None
         best_f1 = 0
-        for threshold in np.arange(0.4, 0.6, 0.05):
+        for threshold in np.arange(0.4, 1.0, 0.05):
+            all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
                 print(np.sum(prob))
@@ -153,10 +160,10 @@ class ProtoNet(BaseModel):
                 
                 off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
                 
-                query_start_time = query_start/self.fps
-                all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
-                on_set_time = on_set*seg_hop/self.fps + query_start_time
-                off_set_time = off_set*seg_hop/self.fps + query_start_time
+
+
+                on_set_time = on_set*all_meta[wav_file]['seg_hop']/self.fps + all_meta[wav_file]['start']
+                off_set_time = off_set*all_meta[wav_file]['seg_hop']/self.fps + all_meta[wav_file]['start']
                 all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
                 all_time['Starttime'].extend(on_set_time)
                 all_time['Endtime'].extend(off_set_time)

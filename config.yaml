@@ -25,25 +25,26 @@ features:
 
 
 train:
-  neg_prototype: false
-  n_way: 15
+  neg_prototype: true
+  n_way: 1
   n_support: 5
-  n_query: 5
+  n_query: 300
   backbone: resnet
   model_type: protonet
   epoches: 100
-  lr: 0.01
+  lr: 0.005
   lr_inner: 0.001
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
+  same_label: False
 
 
 val:
   seg_len_base: 30
   hop_len_frac: 3
   test_loop_batch_size: 32
-  test_loop_neg_sample: 10
+  test_loop_neg_sample: 100
   threshold: 0.5
   pred_dir: ${checkpoint.best_model_dir}/Predictions/
   report_dir: ${checkpoint.best_model_dir}/Reports
@@ -54,7 +55,7 @@ checkpoint:
   resume_path: ${path.best_model_dir}/model_best.pth.tar
   start_epoch: 0
   model_dir: ${path.root_dir}/Checkpoints
-  experiment_name: exp1
+  experiment_name: expMAML
   best_model_dir: ${checkpoint.model_dir}/${checkpoint.experiment_name}/Model
 
 team_name: tw1022
