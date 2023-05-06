@@ -9,10 +9,10 @@ import pandas as pd
 from src.evaluation_metrics.evaluation import *
 from src.utils.feature_extractor import *
 import time
-
+from sklearn.metrics import classification_report, f1_score
 import pynvml
 from src.utils.post_processing import *
-
+from src.evaluation_metrics.evaluation_confidence_intervals import *
 
 class ProtoNet(BaseModel):
     def __init__(self, config):
@@ -53,12 +53,13 @@ class ProtoNet(BaseModel):
 
             #print('waiting for data')
             if self.config.train.neg_prototype:
+                data = data[0]
                 pos_data, neg_data = data 
                 _, data_pos, _ =pos_data
                 _, data_neg, _ =neg_data
                 support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
             else:
-                pos_data = data 
+                pos_data = data[0]
                 _, data_pos, _ =pos_data
                 support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
             optimizer.zero_grad()
@@ -80,7 +81,7 @@ class ProtoNet(BaseModel):
     def test_loop(self, test_loader):
         all_prob = {}
         all_meta = {}
-        for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end) in enumerate(test_loader):
+        for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
             seg_hop = seg_hop.item()
             query_start = query_start.item()
 
@@ -92,6 +93,7 @@ class ProtoNet(BaseModel):
             all_meta[wav_file]['start'] = query_start
             all_meta[wav_file]['end'] = query_end
             all_meta[wav_file]['seg_hop'] = seg_hop
+            all_meta[wav_file]['label'] = label[0]
             pos_data = pos_sup[1].squeeze()
             query = query.squeeze()
             pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
@@ -156,7 +158,14 @@ class ProtoNet(BaseModel):
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
-                print(np.sum(prob))
+                y_pred = prob^1
+                y_true =  np.array(all_meta[wav_file]['label'])
+                report = classification_report(y_true, y_pred,zero_division=0, digits=5)
+                print(os.path.basename(wav_file))
+                # 输出分类报告
+                print("Classification report:")
+                print(report)
+                
                 on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                 
                 off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
@@ -173,18 +182,26 @@ class ProtoNet(BaseModel):
             df_all_time = pd.DataFrame(all_time)
             df_all_time = post_processing(df_all_time)
             df_all_time = df_all_time.astype('str')
-            pred_path = normalize_path(self.config.val.pred_dir)
+            pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{}.csv'.format(threshold))
             if not os.path.dirname(pred_path):
                 os.makedirs(os.path.dirname(pred_path))
             df_all_time.to_csv(pred_path, index=False)
 
             ref_files_path = normalize_path(test_loader.dataset.val_dir)
-            report_dir = normalize_path(self.config.val.report_dir)
+            report_dir = normalize_path(self.config.checkpoint.report_dir)
+            # evaluate_bootstrapped
+            # reports = evaluate_bootstrapped(df_all_time, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
+            # print(reports)
+            # if reports['fmeasure']['mean'] > best_f1:
+            #     best_f1 = reports['overall_scores']['fmeasure (percentage)']
+            #     best_res = reports
+            
             report = evaluate(df_all_time, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
             if report['overall_scores']['fmeasure (percentage)'] > best_f1:
                 best_f1 = report['overall_scores']['fmeasure (percentage)']
                 best_res = report
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(best_res)
         return df_all_time, best_res
         

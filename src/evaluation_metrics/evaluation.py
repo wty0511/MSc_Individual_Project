@@ -360,4 +360,3 @@ if __name__ == "__main__":
     else:
         raise ValueError("dataset must be either EVAL or VAL")
     
-    evaluate(cfg.val.pred_dir, ref_files_path, cfg.team_name, cfg.dataset, cfg.val.report_dir)

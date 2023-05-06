@@ -7,22 +7,22 @@ sys.path.append(src_dir)
 
 import torch
 from src.models.ProtoMAML import ProtoMAML
-from src.utils.dataset_val import *
+from utils.file_dataset import *
 if not GlobalHydra().is_initialized():
     initialize(config_path="../")
 # Compose the configuration
 cfg = compose(config_name="config.yaml")
-best_model_dir = cfg.checkpoint.best_model_dir
-save_file = os.path.join(best_model_dir, 'best_model.pth')
+model_dir = cfg.checkpoint.model_dir
+save_file = os.path.join(model_dir, 'best_model.pth')
 
 
 # 加载模型
-checkpoint = torch.load('/root/task5_2023/Checkpoints/exp2/Model/95.pth')
+checkpoint = torch.load('/root/task5_2023/Checkpoints/exp2/Model/18.pth')
 
 # 从checkpoint中获取模型的状态和配置信息
 model_state = checkpoint['state']
 config = checkpoint['config']
-# config = cfg
+config = cfg
 
 epoch = checkpoint['epoch']
 print('epoch:', epoch)
@@ -38,7 +38,7 @@ df_all_time, report = model.test_loop(val_loader)
 acc = report['overall_scores']['fmeasure (percentage)']
         
 
-# val_dataset = ClassDataset(cfg, mode = 'val')
+# val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))
 
 # model.test_loop_task(val_loader)

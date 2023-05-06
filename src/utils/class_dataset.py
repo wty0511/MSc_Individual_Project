@@ -40,7 +40,7 @@ def meta_learning_collate_fn(batch):
 #     }
 
 class ClassDataset(Dataset):
-    def __init__(self, config, mode='train'):
+    def __init__(self, config, mode='train',same_class_in_different_file=False):
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
         if mode == 'train':
@@ -58,10 +58,10 @@ class ClassDataset(Dataset):
         self.fps = self.sr / config.features.hop_length
         self.neg_prototype = self.config.train.neg_prototype
         self.collect_features()
-        self.process_labels(config.train.same_label)
+        self.process_labels(same_class_in_different_file)
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(4 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):
@@ -71,7 +71,7 @@ class ClassDataset(Dataset):
                 task_batch.append(self.get_task(name))
             return task_batch
         elif isinstance(class_name, str):
-            return self.get_task(class_name)
+            return [self.get_task(class_name)]
         else:
             raise ValueError('Unknown type')
     

@@ -37,7 +37,7 @@ train:
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
-  same_label: False
+
   task_batch_size: 16
 
 
@@ -47,19 +47,20 @@ val:
   test_loop_batch_size: 32
   test_loop_neg_sample: 30
   threshold: 0.5
-  pred_dir: ${checkpoint.best_model_dir}/Predictions/
-  report_dir: ${checkpoint.best_model_dir}/Reports
+
 
 
 checkpoint:
   save_freq: 10
   resume: false
-  resume_path: ${path.best_model_dir}/model_best.pth.tar
+  best_model_dir: ${path.model_dir}/model_best.pth.tar
   start_epoch: 0
-  model_dir: ${path.root_dir}/Checkpoints
   #experiment_name: expMAML
   experiment_name: exp2
-  best_model_dir: ${checkpoint.model_dir}/${checkpoint.experiment_name}/Model
+  exp_dir: ${path.root_dir}/Checkpoints/${checkpoint.experiment_name}
+  model_dir: ${checkpoint.exp_dir}/Model
+  pred_dir: ${checkpoint.exp_dir}/Predictions
+  report_dir: ${checkpoint.exp_dir}/Reports
 
 team_name: tw1022
 dataset: EVAL

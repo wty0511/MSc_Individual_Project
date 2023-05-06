@@ -5,7 +5,7 @@ import os
 import json
 import numpy as np
 import csv
-import metrics
+import src.evaluation_metrics.metrics as metrics
 from datetime import datetime
 import copy
 from scipy import stats
@@ -149,10 +149,10 @@ def build_report(main_set_scores, scores_per_miniset, scores_per_audiofile, save
     if "scores_per_class" in kwargs.keys():
         report["scores_per_class"] = kwargs['scores_per_class']
 
-    with open(os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json'), 'w') as outfile:
-        json.dump(report, outfile)
+    # with open(os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json'), 'w') as outfile:
+    #     json.dump(report, outfile)
 
-    return
+    return report
 
 def build_mini_report_bootstrapped_results(low, high, meanFmeasure, low_precision,  mean_precision, high_precision, low_recall, 
                                     mean_recall, high_recall, save_path, main_set_name="EVAL", team_name="test_team" ):
@@ -176,9 +176,9 @@ def build_mini_report_bootstrapped_results(low, high, meanFmeasure, low_precisio
     with open(os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json'), 'w') as outfile:
         json.dump(report, outfile)
 
-    return
+    return report
 
-def evaluate_bootstrapped(pred_file_path, ref_file_path, team_name, dataset, savepath, bootstraps = 1000):
+def evaluate_bootstrapped(pred_csv, ref_file_path, team_name, dataset, savepath, bootstraps = 100):
 
     #computes overall scores with 95% confidence intervals
     #generates report.
@@ -196,7 +196,7 @@ def evaluate_bootstrapped(pred_file_path, ref_file_path, team_name, dataset, sav
 
 
     #read prediction csv
-    pred_csv = pd.read_csv(pred_file_path, dtype=str)
+    # pred_csv = pd.read_csv(pred_file_path, dtype=str)
     #verify headers:
     if list(pred_csv.columns) !=  PRED_FILE_HEADER:
         print('Please correct the header of the prediction file. This should be', PRED_FILE_HEADER)
@@ -297,11 +297,11 @@ def evaluate_bootstrapped(pred_file_path, ref_file_path, team_name, dataset, sav
 
     # print(overall_low_fmeasure, '<',overall_mean_fmeasure, '<', overall_high_fmeasure )
     # print('min:', np.min(overall_fmeasures_bootstrapped), '------ max:', np.max(overall_fmeasures_bootstrapped))
-    build_mini_report_bootstrapped_results(overall_low_fmeasure, overall_high_fmeasure, overall_mean_fmeasure,
+    res = build_mini_report_bootstrapped_results(overall_low_fmeasure, overall_high_fmeasure, overall_mean_fmeasure,
                                      overall_high_precision, overall_low_precision,  overall_mean_precision, overall_high_recall,
                                      overall_low_recall, overall_mean_recall, savepath, dataset, team_name)
        
-    return
+    return res
 
 
 if __name__ == "__main__":

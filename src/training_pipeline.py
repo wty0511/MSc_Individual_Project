@@ -11,8 +11,8 @@ from src.models.ProtoNet import ProtoNet
 import random
 from hydra import initialize, compose
 from hydra.core.global_hydra import GlobalHydra
-from src.utils.dataset_train import *
-from src.utils.dataset_val import *
+from src.utils.class_dataset import *
+from src.utils.file_dataset import *
 
 # GPT
 def set_seed(seed):
@@ -49,27 +49,26 @@ def train(train_loader, val_loader, config):
 
     print('optimizer:', config.train.optimizer)
     best_acc = 0       
-    best_model_dir = config.checkpoint.best_model_dir
+    model_dir = config.checkpoint.model_dir
     for epoch in range(epoches):
         model.train()
         avg_loss = model.train_loop(train_loader,  optimizer )
         model.eval()
 
-        if not os.path.exists(best_model_dir):
-            os.makedirs(best_model_dir)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
 
         df_all_time, report = model.test_loop(val_loader)
         acc = report['overall_scores']['fmeasure (percentage)']
         
-        # if acc > best_acc :
-        if 1 ==1 :
+        if acc > best_acc :
             print("best model! save...")
             best_acc = acc
-            save_file = os.path.join(best_model_dir, 'best_model.pth')
+            save_file = os.path.join(model_dir, 'best_model.pth')
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
 
         if (epoch % config.checkpoint.save_freq==0) or (epoch==epoches-1):
-            save_file = os.path.join(best_model_dir, '{:d}.pth'.format(epoch))
+            save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
         print("Epoch [{}/{}], Train Loss: {:.4f},   Val F1: {:.4f}"
           .format(epoch+1, epoches, avg_loss, acc))

@@ -14,8 +14,9 @@ from hydra.core.global_hydra import GlobalHydra
 from tqdm import tqdm
 from src.utils.sampler import *
 from torch.utils.data import DataLoader
-from src.utils.dataset_train import *
-
+from src.utils.class_dataset import *
+from intervaltree import IntervalTree
+from intervaltree import IntervalTree
 
 
 class FileDataset(Dataset):
@@ -54,13 +55,16 @@ class FileDataset(Dataset):
         pos_index = self.class2index[class_name]
         neg_index = self.class2index[selected_class_neg]
         query_start = self.seg_meta[class_name]['time_spane'][self.config.train.n_support-1]['end']
-        query = self.get_query_sample(class_name,query_start)
+        query, label = self.get_query_sample(class_name,query_start)
         file = class_name.split('&')[1]
         # print("class_name:",class_name)
         # print('start:',query_start)
         # print('len query:',len(query)/self.fps*self.seg_hop)
         query_end = librosa.get_duration(filename = file)
-        return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start, query_end
+        print('query_len:', len(query))
+        print(len(label))
+        print(np.sum(label))
+        return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start, query_end, label
         
 
         
@@ -271,6 +275,13 @@ class FileDataset(Dataset):
     def get_query_sample(self,class_name, query_start):
         class_meta = self.seg_meta[class_name]
         file =class_meta['time_spane'][0]['file']
+        
+        event_tree = IntervalTree()
+
+        # 将事件跨度添加到树中
+        for time in class_meta['time_spane']:
+            event_tree.addi(time2frame(time['start'], self.fps), time2frame(time['end'], self.fps))
+        
         # self.seg_len, self.seg_hop = self.adaptive_length_hop(class_meta['duration'])
         feature = self.feature_per_file[file][self.feature_list[0]]
         res = []
@@ -279,24 +290,43 @@ class FileDataset(Dataset):
         # print('query_start', query_start)
         # print('end', end)
         # print('duration', end - query_start)
-
+        label = []
         duration = end - query_start
         if  duration< self.seg_len:
             feature = np.tile(feature[:, query_start:end], (1,np.ceil(self.seg_len/duration).astype(int)))
             res.append(feature[:, : self.seg_len])
+            if self.time_in_intervals(event_tree, query_start):
+                label.append(0)
+            else:
+                label.append(1)
         else:
             # from base line
             shift = 0
             while end - (query_start + shift) > self.seg_len:
-
                 pcen_patch = feature[:, int(query_start + shift):int(query_start + shift + self.seg_len)]
                 res.append(pcen_patch)
                 shift = shift + self.seg_hop
+                if self.time_in_intervals(event_tree, int(query_start + shift)):
+                    label.append(0)
+                else:
+                    label.append(1)
             res.append(feature[:, end - self.seg_len:end])
+            if self.time_in_intervals(event_tree, end - self.seg_len):
+                label.append(0)
+            else:
+                label.append(1)
 
         res = np.stack(res)
         res = torch.from_numpy(res).to(self.device) 
-        return res
+        label = np.array(label)
+        return res, label
+    
+
+
+    def time_in_intervals(self, tree, time_point):
+        return bool(tree.at(time_point))
+
+
     
 
         

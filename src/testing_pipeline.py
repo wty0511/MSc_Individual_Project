@@ -7,14 +7,14 @@ sys.path.append(src_dir)
 
 import torch
 from src.models.ProtoNet import *
-from src.utils.dataset_val import *
+from utils.file_dataset import *
 if not GlobalHydra().is_initialized():
     initialize(config_path="../")
 # Compose the configuration
 cfg = compose(config_name="config.yaml")
-best_model_dir = cfg.checkpoint.best_model_dir
-save_file = os.path.join(best_model_dir, '10.pth')
-
+model_dir = cfg.checkpoint.model_dir
+save_file = os.path.join(model_dir, 'best_model.pth')
+print(save_file)
 
 # 加载模型
 checkpoint = torch.load(save_file)

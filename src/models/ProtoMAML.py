@@ -10,6 +10,7 @@ import pandas as pd
 from src.utils.feature_extractor import *
 from src.evaluation_metrics.evaluation import *
 from src.utils.post_processing import *
+from sklearn.metrics import classification_report, f1_score
 class ProtoMAML(BaseModel):
     
     def __init__(self, config):
@@ -25,7 +26,7 @@ class ProtoMAML(BaseModel):
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
     
-    def inner_loop(self, support_data, support_feature, support_label):
+    def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
 
         prototypes     = support_feature.mean(0).squeeze()
@@ -45,7 +46,7 @@ class ProtoMAML(BaseModel):
         # Optimize inner loop model on support set
         for i in range(5):
             # Determine loss on the support set
-            loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label)
+            loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
             
             # Calculate gradients and perform inner loop update
             loss.backward()
@@ -57,10 +58,10 @@ class ProtoMAML(BaseModel):
             local_optim.zero_grad()
             output_weight.grad.fill_(0)
             output_bias.grad.fill_(0)
-            loss = loss.detach()
-            acc = torch.mean(acc).detach()
-            print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
-        print('!!!!!!!!!')
+        #     loss = loss.detach()
+        #     acc = torch.mean(acc).detach()
+        #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
+        # print('!!!!!!!!!')
         # Re-attach computation graph of prototypes
         output_weight = (output_weight - init_weight).detach() + init_weight
         output_bias = (output_bias - init_bias).detach() + init_bias
@@ -68,7 +69,7 @@ class ProtoMAML(BaseModel):
         return local_model, output_weight, output_bias
     
     
-    def feed_forward(self, local_model, output_weight, output_bias, data, labels):
+    def feed_forward(self, local_model, output_weight, output_bias, data, labels, mode):
         # Execute a model with given output layer weights and inputs
         feats = local_model(data)
         dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
@@ -79,7 +80,12 @@ class ProtoMAML(BaseModel):
             preds = F.linear(data, output_weight, output_bias)
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
-        loss = F.cross_entropy(preds, labels)
+        half_size = output_weight.shape[0] // 2
+        if self.config.train.neg_prototype or mode == 'test':
+            weights = torch.cat((torch.full((half_size,), 3, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            loss = F.cross_entropy(preds, labels, weight=weights)
+        else:
+            loss = F.cross_entropy(preds, labels)
         acc = (preds.argmax(dim=1) == labels).float()
         return loss, preds, acc
 
@@ -102,7 +108,6 @@ class ProtoMAML(BaseModel):
             self.feature_extractor.zero_grad()
             for task in task_batch:
                 if self.config.train.neg_prototype:
-
                     pos_data, neg_data = task 
                     classes, data_pos, _ =pos_data
                     _, data_neg, _ =neg_data
@@ -118,11 +123,14 @@ class ProtoMAML(BaseModel):
 
                 # print(len(set(list(classes))))
                 # Perform inner loop adaptation
+                # print(data_pos.shape)
+                # print(data_neg.shape)
+                
                 local_model, output_weight, output_bias = self.inner_loop(support_data, support_feat, support_label)
                 
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
                 
-                loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label)
+                loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label, mode = 'train')
                 
                 if mode == 'train':
                     loss.backward()
@@ -132,7 +140,7 @@ class ProtoMAML(BaseModel):
                         p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
                 loss = loss.detach().cpu().item()
                 acc = acc.mean().detach().cpu().item()
-                # print("loss: ", loss.detach().cpu().item(), "acc: ", acc.mean().detach().cpu().item())
+                # print("loss: ", loss, "acc: ", acc)
                 accuracies.append(acc)
                 losses.append(loss)
             
@@ -148,7 +156,7 @@ class ProtoMAML(BaseModel):
     def test_loop(self, test_loader):
         all_prob = {}
         all_meta = {}
-        for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end) in enumerate(test_loader):
+        for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
             seg_hop = seg_hop.item()
             query_start = query_start.item()
 
@@ -158,8 +166,10 @@ class ProtoMAML(BaseModel):
             wav_file= pos_sup[0][0].split('&')[1]
             all_meta[wav_file]={}
             all_meta[wav_file]['start'] = query_start
+
             all_meta[wav_file]['end'] = query_end
             all_meta[wav_file]['seg_hop'] = seg_hop
+            all_meta[wav_file]['label'] = label[0]
             # print(wav_file)
             # print(query_start)
             pos_data = pos_sup[1].squeeze()
@@ -209,7 +219,7 @@ class ProtoMAML(BaseModel):
                 n = neg_seg_sample.shape[0]
                 support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
                 support_label = torch.from_numpy(support_label).long().to(self.device)
-                local_model, output_weight, output_bias = self.inner_loop(support_data, proto, support_label)
+                local_model, output_weight, output_bias = self.inner_loop(support_data, proto, support_label, mode = 'test')
                 prob_all = []
                 for batch in tqdm(query_loader):
                     query_data, _ = batch
@@ -226,14 +236,32 @@ class ProtoMAML(BaseModel):
         
         best_res = None
         best_f1 = 0
-        for threshold in np.arange(0.5, 1, 0.05):
+        for threshold in np.arange(0.95, 1, 0.05):
+            threshold = 0.99
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
+
+                # acc = np.sum(prob^1 == np.array(all_meta[wav_file]['label']))/len(prob)
+                # 计算分类报告
+                y_pred = prob^1
+                y_true =  np.array(all_meta[wav_file]['label'])
+                report = classification_report(y_true, y_pred,zero_division=0, digits=5)
+                print(os.path.basename(wav_file))
+                # 输出分类报告
+                print("Classification report:")
+                print(report)
+
+                # 计算各个类别的F1分数
+                # f1_scores = f1_score(y_true, y_pred, average=None)
+
+                # # 输出各个类别的F1分数
+                # print("F1 scores for each class:")
+                # print(f1_scores)
                 # print(len(prob))
                 # print(np.sum(prob))
                 # print(np.sum(prob)/len(prob))
-                # print('~~~~~~~~')
+
 
                 on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                 off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
@@ -256,7 +284,7 @@ class ProtoMAML(BaseModel):
             df_all_time = pd.DataFrame(all_time)
             df_all_time = post_processing(df_all_time)
             df_all_time = df_all_time.astype('str')
-            pred_path = normalize_path(self.config.val.pred_dir)
+            pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
 
             if not os.path.dirname(pred_path):
@@ -264,7 +292,7 @@ class ProtoMAML(BaseModel):
             df_all_time.to_csv(pred_path, index=False)
             
             ref_files_path = normalize_path(test_loader.dataset.val_dir)
-            report_dir = normalize_path(self.config.val.report_dir)
+            report_dir = normalize_path(self.config.checkpoint.report_dir)
             report = evaluate(df_all_time, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
             if report['overall_scores']['fmeasure (percentage)'] > best_f1:
                 best_f1 = report['overall_scores']['fmeasure (percentage)']

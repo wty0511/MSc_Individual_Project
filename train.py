@@ -9,8 +9,8 @@ from src.models.ProtoNet import ProtoNet
 import random
 from hydra import initialize, compose
 from hydra.core.global_hydra import GlobalHydra
-from src.utils.dataset_train import *
-from src.utils.dataset_val import *
+from src.utils.class_dataset import *
+from src.utils.file_dataset import *
 from src.training_pipeline import train
 
     
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
     print('preparing training dataset')
-    train_dataset = ClassDataset(cfg)
+    train_dataset = ClassDataset(cfg, mode='train', same_class_in_different_file=True)
     print('preparing val dataset')
     val_dataset = FileDataset(cfg)
     train_loader = DataLoader(train_dataset, batch_sampler=BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
