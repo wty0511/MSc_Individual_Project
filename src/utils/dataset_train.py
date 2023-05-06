@@ -61,10 +61,22 @@ class ClassDataset(Dataset):
         self.process_labels(config.train.same_label)
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.length = int(4 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):
+        if isinstance(class_name, np.ndarray):
+            task_batch = []
+            for name in class_name:
+                task_batch.append(self.get_task(name))
+            return task_batch
+        elif isinstance(class_name, str):
+            return self.get_task(class_name)
+        else:
+            raise ValueError('Unknown type')
+    
+    
+    def get_task(self, class_name):
         start_time = time.time()
         selected_class_neg = class_name + '_neg'
         pos = self.get_pos_sample(class_name, self.config.features.segment_len_frame)
@@ -84,7 +96,7 @@ class ClassDataset(Dataset):
         
         else:
             return(class_name, pos, pos_index)
-        
+    
     def __len__(self):
         return(self.length )
     def collect_features(self):

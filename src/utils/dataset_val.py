@@ -56,9 +56,9 @@ class FileDataset(Dataset):
         query_start = self.seg_meta[class_name]['time_spane'][self.config.train.n_support-1]['end']
         query = self.get_query_sample(class_name,query_start)
         file = class_name.split('&')[1]
-        print("class_name:",class_name)
-        print('start:',query_start)
-        print('len query:',len(query)/self.fps*self.seg_hop)
+        # print("class_name:",class_name)
+        # print('start:',query_start)
+        # print('len query:',len(query)/self.fps*self.seg_hop)
         query_end = librosa.get_duration(filename = file)
         return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start, query_end
         
@@ -178,6 +178,7 @@ class FileDataset(Dataset):
                 e = i['end']
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
+
                 neg_seg = self.select_sample(f, s, e, self.seg_len, self.seg_hop)
                 all_neg_seg.extend(neg_seg)
 
@@ -199,8 +200,8 @@ class FileDataset(Dataset):
         if duration == 0:
             feature = np.tile(feature[:,start:end+1], (1,np.ceil(seg_length).astype(int)))
             res.append(feature[:, : seg_length])
-            print('file', file, 'start', start, 'end', end)
-            raise ValueError('duration is 0')
+            
+            #raise ValueError('duration is 0')
         elif  0 < duration and duration< seg_length:
             # print('feature', feature.shape)
             feature = np.tile(feature[:,start:end], (1,np.ceil(seg_length/duration).astype(int)))

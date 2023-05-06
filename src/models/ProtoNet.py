@@ -117,7 +117,8 @@ class ProtoNet(BaseModel):
                 if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
                     neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
                     neg_seg_sample = neg_sup[1][neg_indices]
-                
+                else:
+                    neg_seg_sample = neg_sup[1]
                 neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                 neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 neg_feat = []

@@ -43,24 +43,24 @@ class ProtoMAML(BaseModel):
         output_bias = init_bias.detach().requires_grad_()
         
         # Optimize inner loop model on support set
-        for i in range(200):
+        for i in range(5):
             # Determine loss on the support set
-
             loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label)
             
             # Calculate gradients and perform inner loop update
             loss.backward()
             local_optim.step()
             # Update output layer via SGD
-            output_weight.data -= 0.005 * output_weight.grad
-            output_bias.data -= 0.005 * output_bias.grad
+            output_weight.data -= self.config.train.lr_inner * output_weight.grad
+            output_bias.data -= self.config.train.lr_inner * output_bias.grad
             # Reset gradients
             local_optim.zero_grad()
             output_weight.grad.fill_(0)
             output_bias.grad.fill_(0)
-            # loss = loss.detach()
-            # acc = torch.mean(acc).detach()
-            # print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
+            loss = loss.detach()
+            acc = torch.mean(acc).detach()
+            print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
+        print('!!!!!!!!!')
         # Re-attach computation graph of prototypes
         output_weight = (output_weight - init_weight).detach() + init_weight
         output_bias = (output_bias - init_bias).detach() + init_bias
@@ -94,46 +94,50 @@ class ProtoMAML(BaseModel):
         return preds
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
-        accuracies = []
-        losses = []
-        
-        
-        for i, data in tqdm(enumerate(data_loader)):
-            if i %1 ==0:
-                self.feature_extractor.zero_grad()
-            if self.config.train.neg_prototype:
-                pos_data, neg_data = data 
-                classes, data_pos, _ =pos_data
-                _, data_neg, _ =neg_data
-                support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
-                support_data, query_data = self.split_support_query_data(data_pos, data_neg)
-                support_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_support)).long().to(self.device)
-            else:
-                pos_data = data 
-                classes, data_pos, _ =pos_data
-                support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
-                support_data, query_data = self.split_support_query_data(data_pos, None)
-                support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
-            print(set(list(classes)))
-            # Perform inner loop adaptation
-            local_model, output_weight, output_bias = self.inner_loop(support_data, support_feat, support_label)
+
+
+        for i, task_batch in tqdm(enumerate(data_loader)):
+            accuracies = []
+            losses = []
+            self.feature_extractor.zero_grad()
+            for task in task_batch:
+                if self.config.train.neg_prototype:
+
+                    pos_data, neg_data = task 
+                    classes, data_pos, _ =pos_data
+                    _, data_neg, _ =neg_data
+                    support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+                    support_data, query_data = self.split_support_query_data(data_pos, data_neg)
+                    support_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_support)).long().to(self.device)
+                else:
+                    pos_data = task 
+                    classes, data_pos, _ =pos_data
+                    support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
+                    support_data, query_data = self.split_support_query_data(data_pos, None)
+                    support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
+
+                # print(len(set(list(classes))))
+                # Perform inner loop adaptation
+                local_model, output_weight, output_bias = self.inner_loop(support_data, support_feat, support_label)
+                
+                query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
+                
+                loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label)
+                
+                if mode == 'train':
+                    loss.backward()
+                    for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
+                        if p_global.grad is None or p_local.grad is None:
+                            continue
+                        p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
+                loss = loss.detach().cpu().item()
+                acc = acc.mean().detach().cpu().item()
+                # print("loss: ", loss.detach().cpu().item(), "acc: ", acc.mean().detach().cpu().item())
+                accuracies.append(acc)
+                losses.append(loss)
             
-            query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-            
-            loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label)
-            
-            if mode == 'train':
-                loss.backward()
-                for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
-                    if p_global.grad is None or p_local.grad is None:
-                        continue
-                    p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
-            
-            print("loss: ", loss.detach().cpu().item(), "acc: ", acc.mean().detach().cpu().item())
-            accuracies.append(acc.mean().detach())
-            losses.append(loss.detach())
-            
-            if mode == "train" and i %1 ==0:
+            print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
+            if mode == "train":
                 opt.step()
                 opt.zero_grad()
 
@@ -156,8 +160,8 @@ class ProtoMAML(BaseModel):
             all_meta[wav_file]['start'] = query_start
             all_meta[wav_file]['end'] = query_end
             all_meta[wav_file]['seg_hop'] = seg_hop
-            print(wav_file)
-            print(query_start)
+            # print(wav_file)
+            # print(query_start)
             pos_data = pos_sup[1].squeeze()
             query = query.squeeze()
             pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
@@ -177,13 +181,14 @@ class ProtoMAML(BaseModel):
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
             prob_mean = []
-            for i in range(10):
+            for i in range(1):
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
                 if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
                     neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
                     neg_seg_sample = neg_sup[1][neg_indices]
-                
+                else:
+                    neg_seg_sample = neg_sup[1]
 
                 
                 neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
@@ -252,7 +257,7 @@ class ProtoMAML(BaseModel):
             df_all_time = post_processing(df_all_time)
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.val.pred_dir)
-            pred_path = os.path.join(pred_path, 'pred_{}.csv'.format(threshold))
+            pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
 
             if not os.path.dirname(pred_path):
                 os.makedirs(os.path.dirname(pred_path))
