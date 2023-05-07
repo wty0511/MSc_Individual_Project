@@ -28,9 +28,11 @@ class ProtoMAML(BaseModel):
     
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
-
-        prototypes     = support_feature.mean(0).squeeze()
         
+        prototypes     = support_feature.mean(0).squeeze()
+        norms = torch.norm(prototypes, dim=1, keepdim=True)
+        expanded_norms = norms.expand_as(prototypes)
+        prototypes = prototypes / expanded_norms
         
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
@@ -38,8 +40,13 @@ class ProtoMAML(BaseModel):
         local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
         local_optim.zero_grad()
         # Create output layer weights with prototype-based initialization
+        # init_weight = 2 * prototypes
+        # init_bias = -torch.norm(prototypes, dim=1)**2
         init_weight = 2 * prototypes
         init_bias = -torch.norm(prototypes, dim=1)**2
+
+
+
         output_weight = init_weight.detach().requires_grad_()
         output_bias = init_bias.detach().requires_grad_()
         
@@ -58,8 +65,8 @@ class ProtoMAML(BaseModel):
             local_optim.zero_grad()
             output_weight.grad.fill_(0)
             output_bias.grad.fill_(0)
-        #     loss = loss.detach()
-        #     acc = torch.mean(acc).detach()
+            loss = loss.detach()
+            acc = torch.mean(acc).detach()
         #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
         # print('!!!!!!!!!')
         # Re-attach computation graph of prototypes
@@ -86,6 +93,9 @@ class ProtoMAML(BaseModel):
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:
             loss = F.cross_entropy(preds, labels)
+        # print(preds.argmax(dim=1))
+        # print(labels)
+        # print('!!!!!!')
         acc = (preds.argmax(dim=1) == labels).float()
         return loss, preds, acc
 
@@ -143,8 +153,8 @@ class ProtoMAML(BaseModel):
                 # print("loss: ", loss, "acc: ", acc)
                 accuracies.append(acc)
                 losses.append(loss)
-            
-            print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
+            if i % 100 == 0:
+                print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
             if mode == "train":
                 opt.step()
                 opt.zero_grad()
@@ -184,8 +194,8 @@ class ProtoMAML(BaseModel):
             # print(len(query_dataset))
             pos_feat = []
             for batch in pos_loader:
-                pos_data, _ = batch
-                feat = self.forward(pos_data)
+                p_data, _ = batch
+                feat = self.forward(p_data)
                 # print(feat.shape)
                 pos_feat.append(feat.mean(0))
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
@@ -194,8 +204,8 @@ class ProtoMAML(BaseModel):
             for i in range(1):
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
-                if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
-                    neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
+                if neg_sup[1].shape[0] > pos_data.shape[0]:
+                    neg_indices = torch.randperm(neg_sup[1].shape[0])[: pos_data.shape[0]]
                     neg_seg_sample = neg_sup[1][neg_indices]
                 else:
                     neg_seg_sample = neg_sup[1]
@@ -205,20 +215,26 @@ class ProtoMAML(BaseModel):
                 neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 neg_feat = []
                 for batch in neg_loader:
-                    neg_data, _ = batch
+                    n_data, _ = batch
                     # print(neg_data.shape)
-                    feat = self.forward(neg_data)
+                    feat = self.forward(n_data)
                     # print(feat.shape)
                     neg_feat.append(feat.mean(0))
                 neg_feat = torch.stack(neg_feat, dim=0).mean(0)
                 #########################################################################
                 # use less unsqueeze, used to match the dimension of inner loop
                 proto = torch.stack([pos_feat,neg_feat], dim=0).unsqueeze(0)
-                support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
+                
+                #support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
+                support_data = pos_data
                 m = pos_data.shape[0]
                 n = neg_seg_sample.shape[0]
-                support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
+
+                #support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
+                #support_label = torch.from_numpy(support_label).long().to(self.device)
+                support_label = np.zeros((m,))
                 support_label = torch.from_numpy(support_label).long().to(self.device)
+                
                 local_model, output_weight, output_bias = self.inner_loop(support_data, proto, support_label, mode = 'test')
                 prob_all = []
                 for batch in tqdm(query_loader):
@@ -247,10 +263,10 @@ class ProtoMAML(BaseModel):
                 y_pred = prob^1
                 y_true =  np.array(all_meta[wav_file]['label'])
                 report = classification_report(y_true, y_pred,zero_division=0, digits=5)
-                print(os.path.basename(wav_file))
+                # print(os.path.basename(wav_file))
                 # 输出分类报告
-                print("Classification report:")
-                print(report)
+                # print("Classification report:")
+                # print(report)
 
                 # 计算各个类别的F1分数
                 # f1_scores = f1_score(y_true, y_pred, average=None)

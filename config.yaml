@@ -38,7 +38,7 @@ train:
   weight_decay: 0.0005
   optimizer: Adam
 
-  task_batch_size: 16
+  task_batch_size: 1
 
 
 val:
