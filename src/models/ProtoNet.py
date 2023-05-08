@@ -161,10 +161,10 @@ class ProtoNet(BaseModel):
                 y_pred = prob^1
                 y_true =  np.array(all_meta[wav_file]['label'])
                 report = classification_report(y_true, y_pred,zero_division=0, digits=5)
-                print(os.path.basename(wav_file))
-                # 输出分类报告
-                print("Classification report:")
-                print(report)
+                # print(os.path.basename(wav_file))
+                # # 输出分类报告
+                # print("Classification report:")
+                # print(report)
                 
                 on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                 
@@ -184,8 +184,9 @@ class ProtoNet(BaseModel):
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{}.csv'.format(threshold))
-            if not os.path.dirname(pred_path):
+            if not os.path.exists(os.path.dirname(pred_path)):
                 os.makedirs(os.path.dirname(pred_path))
+            print(os.path.dirname(pred_path))
             df_all_time.to_csv(pred_path, index=False)
 
             ref_files_path = normalize_path(test_loader.dataset.val_dir)
@@ -214,3 +215,35 @@ class ProtoNet(BaseModel):
         support = support.unsqueeze(0).expand(n, m, -1)
 
         return torch.pow(query - support, 2).sum(2)
+
+    
+    # def euclidean_dist(self,query, support):
+    #     init_weight = 2 * support
+
+    #     init_bias = -torch.norm(support, dim=1)**2
+        # print(init_weight.shape)
+        # print(init_bias.shape)
+        
+        # output_weight = init_weight.detach()
+        # output_bias = init_bias.detach()
+        # score2 = query.matmul(init_weight.t()) + init_bias-(torch.norm(query, dim=1)**2).unsqueeze(1)
+        
+        # score2 = F.linear(query, init_weight, init_bias)
+        # score2 = score2-(torch.norm(query, dim=1)**2).unsqueeze(1)
+
+        # n = query.size(0)
+        # m = support.size(0)
+        
+        # query = query.unsqueeze(1).expand(n, m, -1)
+        # support = support.unsqueeze(0).expand(n, m, -1)
+        # score = torch.pow(query - support, 2).sum(2)
+
+        # prob2 = F.softmax(score2, dim=1)
+        # prob1 = F.softmax(-score, dim=1)
+
+        # print(torch.argmax(prob1, dim=1))
+        # print(torch.argmax(prob2, dim=1))
+        # print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        # return -score2
+    
+    

@@ -61,9 +61,9 @@ class FileDataset(Dataset):
         # print('start:',query_start)
         # print('len query:',len(query)/self.fps*self.seg_hop)
         query_end = librosa.get_duration(filename = file)
-        print('query_len:', len(query))
-        print(len(label))
-        print(np.sum(label))
+        # print('query_len:', len(query))
+        # print(len(label))
+        # print(np.sum(label))
         return (class_name, pos, pos_index), (selected_class_neg, neg, neg_index), query, self.seg_len, self.seg_hop, query_start, query_end, label
         
 
@@ -251,7 +251,7 @@ class FileDataset(Dataset):
 
         # Adaptive segment length based on the audio file.
         max_len = max(duration_list)
-        # print('max_len', max_len)
+        print('max_len', max_len)
         # Choosing the segment length based on the maximum size in the 5-shot.
         # Logic was based on fitment on 12GB GPU since some segments are quite long.
         if max_len < 8:
@@ -269,6 +269,8 @@ class FileDataset(Dataset):
             seg_len = max_len // 8
         # print(f"Adaptive segment length for %s is {seg_len}" % (file))
         hop_seg = seg_len // self.hop_len_frac
+        # seg_len = 3
+        # hop_seg = 1
         return seg_len, hop_seg
         #################################################################################
         

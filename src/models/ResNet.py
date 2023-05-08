@@ -43,7 +43,7 @@ class ResNet(nn.Module):
         self.bn1 = nn.BatchNorm2d(input_channels)
         self.relu = nn.LeakyReLU(inplace=True)
         self.layer1 = self._make_layer(block, 64, 2, stride=1)
-        self.layer2 = self._make_layer(block, 128, 2, stride=2)
+        self.layer2 = self._make_layer(block, 64, 2, stride=2)
         self.layer3 = self._make_layer(block, 64, 2, stride=2)
         self.layer4 = self._make_layer(block, 512, 2, stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((8,4))

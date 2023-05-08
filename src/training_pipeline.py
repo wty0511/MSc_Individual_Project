@@ -90,3 +90,4 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
     model = train(train_loader, val_loader, cfg)
 
+    

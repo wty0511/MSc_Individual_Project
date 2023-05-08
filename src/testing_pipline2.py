@@ -17,8 +17,8 @@ save_file = os.path.join(model_dir, 'best_model.pth')
 
 
 # 加载模型
-checkpoint = torch.load('/root/task5_2023/Checkpoints/exp2/Model/18.pth')
-
+checkpoint = torch.load('/root/task5_2023/Checkpoints/protoMAMLRes/Model/best_model.pth')
+print(checkpoint.keys())
 # 从checkpoint中获取模型的状态和配置信息
 model_state = checkpoint['state']
 config = checkpoint['config']

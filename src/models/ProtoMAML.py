@@ -53,7 +53,7 @@ class ProtoMAML(BaseModel):
         # Optimize inner loop model on support set
         for i in range(5):
             # Determine loss on the support set
-            loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
+            loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
             
             # Calculate gradients and perform inner loop update
             loss.backward()
@@ -67,8 +67,11 @@ class ProtoMAML(BaseModel):
             output_bias.grad.fill_(0)
             loss = loss.detach()
             acc = torch.mean(acc).detach()
-        #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
-        # print('!!!!!!!!!')
+            if mode != 'train':
+                print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
+                # print(preds)
+        if mode != 'train':    
+            print('!!!!!!!!!')
         # Re-attach computation graph of prototypes
         output_weight = (output_weight - init_weight).detach() + init_weight
         output_bias = (output_bias - init_bias).detach() + init_bias
@@ -97,7 +100,11 @@ class ProtoMAML(BaseModel):
         # print(labels)
         # print('!!!!!!')
         acc = (preds.argmax(dim=1) == labels).float()
-        return loss, preds, acc
+        labels = labels.cpu().numpy()
+        preds = preds.argmax(dim=1).detach().cpu().numpy()
+        report = classification_report(labels, preds,zero_division=0, digits=3)
+
+        return loss, report, acc
 
     
     
@@ -153,7 +160,7 @@ class ProtoMAML(BaseModel):
                 # print("loss: ", loss, "acc: ", acc)
                 accuracies.append(acc)
                 losses.append(loss)
-            if i % 100 == 0:
+            if i % 50 == 0:
                 print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
             if mode == "train":
                 opt.step()
@@ -179,6 +186,8 @@ class ProtoMAML(BaseModel):
 
             all_meta[wav_file]['end'] = query_end
             all_meta[wav_file]['seg_hop'] = seg_hop
+            all_meta[wav_file]['seg_len'] = seg_len
+            
             all_meta[wav_file]['label'] = label[0]
             # print(wav_file)
             # print(query_start)
@@ -225,15 +234,15 @@ class ProtoMAML(BaseModel):
                 # use less unsqueeze, used to match the dimension of inner loop
                 proto = torch.stack([pos_feat,neg_feat], dim=0).unsqueeze(0)
                 
-                #support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
-                support_data = pos_data
+                support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
+                # support_data = pos_data
                 m = pos_data.shape[0]
                 n = neg_seg_sample.shape[0]
 
-                #support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
-                #support_label = torch.from_numpy(support_label).long().to(self.device)
-                support_label = np.zeros((m,))
+                support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
                 support_label = torch.from_numpy(support_label).long().to(self.device)
+                # support_label = np.zeros((m,))
+                # support_label = torch.from_numpy(support_label).long().to(self.device)
                 
                 local_model, output_weight, output_bias = self.inner_loop(support_data, proto, support_label, mode = 'test')
                 prob_all = []
@@ -252,8 +261,9 @@ class ProtoMAML(BaseModel):
         
         best_res = None
         best_f1 = 0
-        for threshold in np.arange(0.95, 1, 0.05):
-            threshold = 0.99
+        best_report = {}
+        for threshold in np.arange(0.6, 1, 0.1):
+            report_f1 = {}
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
@@ -262,16 +272,16 @@ class ProtoMAML(BaseModel):
                 # 计算分类报告
                 y_pred = prob^1
                 y_true =  np.array(all_meta[wav_file]['label'])
-                report = classification_report(y_true, y_pred,zero_division=0, digits=5)
-                # print(os.path.basename(wav_file))
+ 
+                # print(all_meta[wav_file]['seg_hop'])
+                # print(all_meta[wav_file]['seg_len'])
                 # 输出分类报告
-                # print("Classification report:")
-                # print(report)
 
+                report_f1[os.path.basename(wav_file)] = classification_report(y_true, y_pred,zero_division=0, digits=5)
                 # 计算各个类别的F1分数
                 # f1_scores = f1_score(y_true, y_pred, average=None)
 
-                # # 输出各个类别的F1分数
+                # 输出各个类别的F1分数
                 # print("F1 scores for each class:")
                 # print(f1_scores)
                 # print(len(prob))
@@ -302,8 +312,7 @@ class ProtoMAML(BaseModel):
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
-
-            if not os.path.dirname(pred_path):
+            if not os.path.exists(os.path.dirname(pred_path)):
                 os.makedirs(os.path.dirname(pred_path))
             df_all_time.to_csv(pred_path, index=False)
             
@@ -313,7 +322,13 @@ class ProtoMAML(BaseModel):
             if report['overall_scores']['fmeasure (percentage)'] > best_f1:
                 best_f1 = report['overall_scores']['fmeasure (percentage)']
                 best_res = report
+                best_report = report_f1
+        for i in best_report.keys():
+            print(i)
+            print(best_report[i])
+            print('~~~~~~~~~~~~~~~')
         print(best_res)
+        print('~~~~~~~~~~~~~~~')
         return df_all_time, best_res
     
     
@@ -321,3 +336,4 @@ class ProtoMAML(BaseModel):
     
     def test_loop_task(self, test_loader):
         self.outer_loop( test_loader, mode = 'test')
+    

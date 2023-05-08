@@ -29,7 +29,7 @@ train:
   n_way: 10
   n_support: 5
   n_query: 5
-  backbone: resnet
+  backbone: convnet
   model_type: protonet
   epoches: 100
   lr: 0.001
@@ -37,8 +37,7 @@ train:
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
-
-  task_batch_size: 1
+  task_batch_size: 20
 
 
 val:
@@ -56,7 +55,7 @@ checkpoint:
   best_model_dir: ${path.model_dir}/model_best.pth.tar
   start_epoch: 0
   #experiment_name: expMAML
-  experiment_name: exp2
+  experiment_name: protoMAMLCNN
   exp_dir: ${path.root_dir}/Checkpoints/${checkpoint.experiment_name}
   model_dir: ${checkpoint.exp_dir}/Model
   pred_dir: ${checkpoint.exp_dir}/Predictions
