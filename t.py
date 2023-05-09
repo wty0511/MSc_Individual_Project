@@ -12,6 +12,15 @@ from hydra.core.global_hydra import GlobalHydra
 from src.utils.class_dataset import *
 from src.utils.file_dataset import *
 from src.training_pipeline import train
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
+SEED = 42
+set_seed(SEED)
 
 
 
@@ -50,4 +59,5 @@ for epoch in range(100):
     if f1 > best_f1:
         best_f1 = f1
         save_file = os.path.join(model_dir, 'best_model.pth')
-        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
+        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'model_name':'ProtoMAML'}, save_file)
+        print("best model! save...")

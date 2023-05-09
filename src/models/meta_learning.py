@@ -25,7 +25,6 @@ class BaseModel(nn.Module):
             self.feature_extractor = ConvNet()
         else:
             raise ValueError('Unsupported feature extractor: {}'.format(config.train.backbone))
-        
     def forward(self,x):
         out  = self.feature_extractor(x)
         return out

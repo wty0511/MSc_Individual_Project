@@ -48,7 +48,9 @@ class FileDataset(Dataset):
     
 
     def __getitem__(self, idx):
+
         class_name = self.classes[idx]
+        print(class_name)
         selected_class_neg = class_name + '_neg'
         pos = self.get_pos_sample(class_name)
         neg = self.get_neg_sample(selected_class_neg)
@@ -251,7 +253,7 @@ class FileDataset(Dataset):
 
         # Adaptive segment length based on the audio file.
         max_len = max(duration_list)
-        print('max_len', max_len)
+        
         # Choosing the segment length based on the maximum size in the 5-shot.
         # Logic was based on fitment on 12GB GPU since some segments are quite long.
         if max_len < 8:

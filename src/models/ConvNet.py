@@ -18,10 +18,13 @@ class ConvNet(nn.Module):
             conv_block(64,64),
             # conv_block(64,64)
         )
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
     def forward(self,x):
         (num_samples,seq_len,mel_bins) = x.shape
         x = x.view(-1,1,seq_len,mel_bins)
         x = self.encoder(x)
+        # print('x_shape ',x.shape)
+        x = self.avgpool(x)
         # x = nn.MaxPool2d(2)(x)
         x = x.view(x.size(0),-1)
         return x

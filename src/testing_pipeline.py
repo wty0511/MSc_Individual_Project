@@ -13,7 +13,8 @@ if not GlobalHydra().is_initialized():
 # Compose the configuration
 cfg = compose(config_name="config.yaml")
 model_dir = cfg.checkpoint.model_dir
-save_file = os.path.join(model_dir, 'best_model.pth')
+# save_file = os.path.join(model_dir, 'best_model.pth')
+save_file = '/root/task5_2023/Checkpoints/protoMAMLRes2/Model/best_model.pth'
 print(save_file)
 
 # 加载模型
@@ -37,4 +38,3 @@ val_dataset = FileDataset(cfg,val=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 df_all_time, report = model.test_loop(val_loader)
 acc = report['overall_scores']['fmeasure (percentage)']
-        
