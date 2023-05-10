@@ -55,7 +55,7 @@ checkpoint:
   best_model_dir: ${path.model_dir}/model_best.pth.tar
   start_epoch: 0
   #experiment_name: expMAML
-  experiment_name: protoResnet
+  experiment_name: protoMAMLResnet3
   exp_dir: ${path.root_dir}/Checkpoints/${checkpoint.experiment_name}
   model_dir: ${checkpoint.exp_dir}/Model
   pred_dir: ${checkpoint.exp_dir}/Predictions

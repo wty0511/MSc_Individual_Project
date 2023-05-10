@@ -46,7 +46,7 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 32, 2, stride=2)
         self.layer3 = self._make_layer(block, 32, 2, stride=2)
         self.layer4 = self._make_layer(block, 512, 2, stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d((8,4))
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     def _make_layer(self, block, output_channels, n_layers,stride=1):
         layers = []
