@@ -1,0 +1,5 @@
+inner loop 10个epoch 训练的
+test 的时候是200个epoch
+val f1大约30%
+test 大约 53%
+略低于inner loop 200个epoch的结果，这种大约有56%的f1

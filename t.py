@@ -54,10 +54,16 @@ for epoch in range(100):
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     val_dataset = FileDataset(cfg,val=True)
     val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-    df_all_time, report = model.test_loop(val_loader)
+    df_all_time, report, threshold = model.test_loop(val_loader)
     f1 = report['overall_scores']['fmeasure (percentage)']
     if f1 > best_f1:
         best_f1 = f1
         save_file = os.path.join(model_dir, 'best_model.pth')
-        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'model_name':'ProtoMAML'}, save_file)
+        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'model_name':'ProtoMAML', 'threshold' : threshold}, save_file)
         print("best model! save...")
+        report_dir = normalize_path(cfg.checkpoint.report_dir)
+        report_dir = os.path.join(report_dir,'val_report_best.json')
+        if not os.path.exists(os.path.dirname(report_dir)):
+            os.makedirs(os.path.dirname(report_dir))
+        with open(report_dir, 'w') as outfile:
+            json.dump(report, outfile)

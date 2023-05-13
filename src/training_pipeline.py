@@ -13,7 +13,7 @@ from hydra import initialize, compose
 from hydra.core.global_hydra import GlobalHydra
 from src.utils.class_dataset import *
 from src.utils.file_dataset import *
-
+import json
 # GPT
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -66,6 +66,12 @@ def train(train_loader, val_loader, config):
             best_acc = acc
             save_file = os.path.join(model_dir, 'best_model.pth')
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
+            report_dir = normalize_path(config.checkpoint.report_dir)
+            report_dir = os.path.join(report_dir,'val_report_best.json')
+            if not os.path.exists(os.path.dirname(report_dir)):
+                os.makedirs(os.path.dirname(report_dir))
+            with open(report_dir, 'w') as outfile:
+                json.dump(report, outfile)
 
         if (epoch % config.checkpoint.save_freq==0) or (epoch==epoches-1):
             save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))

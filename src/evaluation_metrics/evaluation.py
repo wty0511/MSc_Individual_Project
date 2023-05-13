@@ -159,12 +159,12 @@ def build_report(main_set_scores, scores_per_miniset, scores_per_audiofile, save
     }
     if "scores_per_class" in kwargs.keys():
         report["scores_per_class"] = kwargs['scores_per_class']
-    save_path = os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json')
-    if not os.path.exists(os.path.dirname(save_path)):
-        os.makedirs(os.path.dirname(save_path))
+    # save_path = os.path.join(save_path,"Evaluation_report_" + team_name + "_" + main_set_name + '_' + date_string + '.json')
+    # if not os.path.exists(os.path.dirname(save_path)):
+    #     os.makedirs(os.path.dirname(save_path))
             
-    with open(save_path, 'w') as outfile:
-        json.dump(report, outfile)
+    # with open(save_path, 'w') as outfile:
+    #     json.dump(report, outfile)
 
     return report
 

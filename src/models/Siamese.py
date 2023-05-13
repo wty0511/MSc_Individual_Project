@@ -12,15 +12,45 @@ import time
 from sklearn.metrics import classification_report, f1_score
 from src.utils.post_processing import *
 from src.evaluation_metrics.evaluation_confidence_intervals import *
+from copy import deepcopy
+import random
 
-class ProtoNet(BaseModel):
+class ContrastiveLoss(nn.Module):
+    def __init__(self, margin):
+        super(ContrastiveLoss, self).__init__()
+        self.margin = margin
+    
+    def forward(self, output1, output2, label):
+        euclidean_distance = nn.PairwiseDistance(p=2)  # 欧氏距离计算
+        distances = euclidean_distance(output1, output2)
+        losses = 0.5 * (1 - label) * torch.pow(distances, 2) + \
+                 0.5 * label * torch.pow(torch.clamp(self.margin - distances, min=0.0), 2)
+        loss = torch.mean(losses)
+        return loss
+    
+    
+class SNN(BaseModel):
     def __init__(self, config):
-        super(ProtoNet, self).__init__(config)
+        super(SNN, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
+        self.loss_fn = ContrastiveLoss(margin=10.0)
 
-
-    def inner_loop(self,support, query):
+    def inner_loop(self,pos_support, neg_support):
+        local_model = deepcopy(self.feature_extractor)
+        for i in range(10):
+            label = random.randint(0, 1)
+            if label == 1:
+                index = random.randint(0, len(pos_support)-1)
+                sampl1 = pos_support[index[0]]
+                sampl2 = pos_support[index[1]]
+            else:
+                index1= random.randint(0, len(pos_support)-1)
+                index2 = random.randint(0, len(neg_support)-1)
+                sampl1 = pos_support[index1[0]]
+                sampl2 = neg_support[index2[0]]
+            
+            
         # print(support['label'].view(self.n_support, self.n_way * 2, -1 ))
         prototype     = support.mean(0).squeeze()
         # query['label'] = query['label'].to(self.device)
@@ -58,9 +88,8 @@ class ProtoNet(BaseModel):
                 _, data_neg, _ =neg_data
                 support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
             else:
-                pos_data = data[0]
-                _, data_pos, _ =pos_data
-                support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
+                raise ValueError('neg_prototype must be True')
+            
             optimizer.zero_grad()
             loss, acc = self.inner_loop(support_feat, query_feat)
             loss.backward()
@@ -153,7 +182,6 @@ class ProtoNet(BaseModel):
         
         best_res = None
         best_f1 = 0
-        best_threshold = 0
         for threshold in np.arange(0.4, 1.0, 0.05):
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
@@ -202,11 +230,9 @@ class ProtoNet(BaseModel):
             if report['overall_scores']['fmeasure (percentage)'] > best_f1:
                 best_f1 = report['overall_scores']['fmeasure (percentage)']
                 best_res = report
-                best_threshold = threshold
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(best_res)
-        print('best_threshold:{}'.format(best_threshold))
-        return df_all_time, best_res, best_threshold
+        return df_all_time, best_res
         
     
     def euclidean_dist(self,query, support):

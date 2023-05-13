@@ -69,7 +69,7 @@ class ProtoMAML(BaseModel):
         output_bias = init_bias.detach().requires_grad_()
         
         # Optimize inner loop model on support set
-        for i in range(100):
+        for i in range(200):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
             
@@ -359,7 +359,7 @@ class ProtoMAML(BaseModel):
         print(best_res)
         print('best_threshold', best_threshold)
         print('~~~~~~~~~~~~~~~')
-        return df_all_time, best_res
+        return df_all_time, best_res, best_threshold
     
     
     
