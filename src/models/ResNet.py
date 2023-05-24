@@ -7,10 +7,10 @@ class ResBlock(nn.Module):
     def __init__(self, input_channels, output_channels, stride=1):
         super(ResBlock, self).__init__()
         
-        self.conv1 = nn.Conv2d(input_channels, output_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(input_channels, output_channels, kernel_size=3, stride=stride, padding=1, bias=False, groups=8)
         self.bn1 = nn.BatchNorm2d(output_channels)
         
-        self.conv2 = nn.Conv2d(output_channels, output_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(output_channels, output_channels, kernel_size=3, stride=1, padding=1, bias=False, groups=8)
         self.bn2 = nn.BatchNorm2d(output_channels)
         
         self.relu = nn.LeakyReLU(inplace=True)
@@ -19,7 +19,7 @@ class ResBlock(nn.Module):
         
         if stride != 1 or input_channels != output_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(input_channels, output_channels, kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(input_channels, output_channels, kernel_size=1, stride=stride, bias=False, groups=8),
                 nn.BatchNorm2d(output_channels)
             )
     
@@ -61,9 +61,9 @@ class ResNet(nn.Module):
         x = x.to(self.device)
         x = x.unsqueeze(1)
 
-        #x = self.conv1(x)
-        #x = self.bn1(x)
-        #x = self.relu(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
         x = self.layer1(x)
         
         x = self.layer2(x)

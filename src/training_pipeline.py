@@ -58,8 +58,8 @@ def train(train_loader, val_loader, config):
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
 
-        df_all_time, report = model.test_loop(val_loader)
-        acc = report['overall_scores']['fmeasure (percentage)']
+        df_all_time, best_res, best_threshold = model.test_loop(val_loader)
+        acc = best_res['overall_scores']['fmeasure (percentage)']
         
         if acc > best_acc :
             print("best model! save...")
@@ -71,7 +71,7 @@ def train(train_loader, val_loader, config):
             if not os.path.exists(os.path.dirname(report_dir)):
                 os.makedirs(os.path.dirname(report_dir))
             with open(report_dir, 'w') as outfile:
-                json.dump(report, outfile)
+                json.dump(best_res, outfile)
 
         if (epoch % config.checkpoint.save_freq==0) or (epoch==epoches-1):
             save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
