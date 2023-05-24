@@ -15,15 +15,15 @@ from src.training_pipeline import train
 
     
 if __name__ == "__main__":
-
+    debug = True
     if not GlobalHydra().is_initialized():
         initialize(config_path="./")
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
     print('preparing training dataset')
-    train_dataset = ClassDataset(cfg, mode='train', same_class_in_different_file=True)
+    train_dataset = ClassDataset(cfg, mode='train', same_class_in_different_file=True, debug=debug)
     print('preparing val dataset')
-    val_dataset = FileDataset(cfg)
+    val_dataset = FileDataset(cfg, val=True, debug=debug)
     train_loader = DataLoader(train_dataset, batch_sampler=BatchSampler(cfg, train_dataset.classes, len(train_dataset)))
     val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
     model = train(train_loader, val_loader, cfg)

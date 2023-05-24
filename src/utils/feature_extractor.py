@@ -83,16 +83,35 @@ def normalize_path(path=''):
         # print("Current operating system is Linux")
     else:
         # print("Current operating system is Windows")
+        print(path)
         drive = path[1].upper() + ':' +os.sep
         path = os.path.join(drive, *path[2:])
     path = os.path.normpath(path)
+    print(path)
     return path
 
 # walk files
-def walk_files(file,  file_extension = ('.wav', '.csv', '.npy')):
+def walk_files(file, debug, file_extension = ('.wav', '.csv', '.npy')):
+    classes = {'BV':0, 
+               'HT':0, 
+               'JD':0, 
+               'MT':0,
+               'HV':0,
+               'DC':0,
+               'ME':0,
+               'ML':0,
+               'HV':0,
+               'PB':0}
     for path, subdirs, files in os.walk(file):
         for name in files:
             if name.endswith(file_extension):
+                c = path.split(os.sep)[-1]
+                if debug:
+                    if classes[c] ==1:
+                        continue
+                    else:
+                        classes[c] = 1
+                print(path, name)
                 yield os.path.join(path, name)
 
 

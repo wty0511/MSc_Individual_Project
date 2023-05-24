@@ -40,7 +40,7 @@ def meta_learning_collate_fn(batch):
 #     }
 
 class ClassDataset(Dataset):
-    def __init__(self, config, mode='train',same_class_in_different_file=False):
+    def __init__(self, config, mode,same_class_in_different_file, debug):
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
         if mode == 'train':
@@ -51,6 +51,7 @@ class ClassDataset(Dataset):
             self.data_dir = normalize_path(config.path.test_dir)
         else:
             raise ValueError('Unknown mode')
+        self.debug = debug
         self.feature_per_file = {}
         self.classes = set()
         self.seg_meta = {}
@@ -61,7 +62,7 @@ class ClassDataset(Dataset):
         self.process_labels(same_class_in_different_file)
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.length = int(0.3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):
@@ -101,7 +102,7 @@ class ClassDataset(Dataset):
         return(self.length )
     def collect_features(self):
         print("Collecting training set features...")
-        for file in tqdm(walk_files(self.data_dir, file_extension = ('.wav'))):
+        for file in tqdm(walk_files(self.data_dir,debug= self.debug, file_extension = ('.wav'))):
             for feature in self.feature_list:
                 self.feature_per_file[file] = self.feature_per_file.get(file, {})
                 self.feature_per_file[file]['duration'] = librosa.get_duration(filename = file)
@@ -111,7 +112,7 @@ class ClassDataset(Dataset):
     
     def process_labels(self, same_label):
         print("Processing labels...")
-        for file in tqdm(walk_files(self.data_dir, file_extension = ('.csv'))):
+        for file in tqdm(walk_files(self.data_dir,debug= self.debug, file_extension = ('.csv'))):
 
             df = pd.read_csv(file)
             df = df.sort_values(by='Starttime', ascending=True)

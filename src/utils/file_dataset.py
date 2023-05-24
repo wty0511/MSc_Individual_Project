@@ -20,13 +20,13 @@ from intervaltree import IntervalTree
 
 
 class FileDataset(Dataset):
-    def __init__(self, config, val=True):
+    def __init__(self, config, val, debug):
         self.is_val = val
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
         self.val_dir = normalize_path(config.path.val_dir) if val else normalize_path(config.path.test_dir)
         # self.val_dir = normalize_path(config.path.train_dir)
-        
+        self.debug = debug
         # for each csv file, we have a list of features
         self.feature_per_file = {}
         self.classes = set()
@@ -78,7 +78,7 @@ class FileDataset(Dataset):
             print("Collecting val set features...")
         else:
             print("Collecting test set features...")
-        for file in tqdm(walk_files(self.val_dir, file_extension = ('.wav'))):
+        for file in tqdm(walk_files(self.val_dir, debug = self.debug, file_extension = ('.wav'))):
             for feature in self.feature_list:
                 save_path = audio2feature(file, feature)
                 self.feature_per_file[file] = self.feature_per_file.get(file, {})
@@ -90,7 +90,7 @@ class FileDataset(Dataset):
             print("Processing val labels...")
         else:
             print("Processing test labels...")
-        for file in tqdm(walk_files(self.val_dir, file_extension = ('.csv'))):
+        for file in tqdm(walk_files(self.val_dir, debug = self.debug, file_extension = ('.csv'))):
             df = pd.read_csv(file)
             file = file.replace('.csv','.wav')
             # class name starts from the 4th column(only one class in this case)

@@ -23,6 +23,9 @@ class BaseModel(nn.Module):
             self.feature_extractor  = ResNet2()
         elif config.train.backbone == 'convnet':
             self.feature_extractor = ConvNet()
+        elif config.train.backbone == 'convclassifier':
+            self.feature_extractor = ConvClassifier()
+        
         else:
             raise ValueError('Unsupported feature extractor: {}'.format(config.train.backbone))
     def forward(self,x):

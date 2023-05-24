@@ -189,7 +189,8 @@ class ProtoNet(BaseModel):
             print(os.path.dirname(pred_path))
             df_all_time.to_csv(pred_path, index=False)
 
-            ref_files_path = normalize_path(test_loader.dataset.val_dir)
+            ref_files_path = test_loader.dataset.val_dir
+            print(ref_files_path)
             report_dir = normalize_path(self.config.checkpoint.report_dir)
             # evaluate_bootstrapped
             # reports = evaluate_bootstrapped(df_all_time, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
