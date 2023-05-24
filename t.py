@@ -1,6 +1,7 @@
 # from src.models.ProtoMAML import *
 from src.models.ProtoMAMLcopy import *
 from src.models.MAML import *
+from src.models.Siamese import *
 import os
 import sys
 
@@ -25,7 +26,7 @@ SEED = 42
 set_seed(SEED)
 
 
-debug = True
+debug = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
@@ -38,11 +39,13 @@ val_dataset = FileDataset(cfg,val=True, debug= debug)
 print(val_dataset.seg_meta.keys())
 best_f1 = 0
 batch_sampler = TaskBatchSampler(cfg, train_dataset.classes, len(train_dataset))
+
 train_loader = DataLoader(train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-# model = ProtoMAML(cfg)
-model = MAML(cfg)
-
+model = ProtoMAML(cfg)
+# model = SNN(cfg)
+# model = MAML(cfg)
+print(len(train_loader))
 model = model.cuda()
 model_dir = cfg.checkpoint.model_dir
 if not os.path.exists(model_dir):

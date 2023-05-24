@@ -49,8 +49,6 @@ class BaseModel(nn.Module):
     
     def split2nway_1d(self, data):
         
-        
-        
         class_data, data, label = data
         class_data = np.array(class_data)
         class_data = class_data.reshape(-1, self.n_way)

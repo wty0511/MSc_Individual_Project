@@ -111,7 +111,6 @@ def walk_files(file, debug, file_extension = ('.wav', '.csv', '.npy')):
                         continue
                     else:
                         classes[c] = 1
-                print(path, name)
                 yield os.path.join(path, name)
 
 

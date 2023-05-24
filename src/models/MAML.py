@@ -13,16 +13,6 @@ from src.utils.post_processing import *
 from sklearn.metrics import classification_report, f1_score
 
 
-class ContrastiveLoss(nn.Module):
-    def __init__(self, margin):
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-
-    def forward(self, embeddings1, embeddings2, labels):
-        euclidean_distance = torch.sqrt(torch.sum(torch.pow(embeddings1 - embeddings2, 2), dim=0))
-        loss = (labels * torch.pow(euclidean_distance, 2) +
-                (1 - labels) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
-        return torch.mean(loss) * 0.5
 
 
 
@@ -42,12 +32,13 @@ class MAML(BaseModel):
         super(MAML, self).__init__(config)
         self.config = config
         self.approx = False
+        self.n_way = 1
+        self.feature_extractor = ConvClassifier()
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.contrastive_loss = ContrastiveLoss(20)
         
     def inner_loop(self, support_data, support_label, mode = 'train'):
         
-        
+
         local_model = deepcopy(self.feature_extractor)
         local_model.train()
         fast_parameters = list(local_model.parameters())
@@ -77,7 +68,6 @@ class MAML(BaseModel):
     def feed_forward(self, local_model, data, labels, mode):
         # Execute a model with given output layer weights and inputs
         preds = local_model(data)
-        c_loss = torch.tensor(0.0).to(self.device)
         # feats_pos = torch.mean(feats[(labels == 0)], dim=0)
         # for i in feats[(labels == 1)]:
         #     c_loss+=self.contrastive_loss(feats_pos, i, torch.tensor(0).to(self.device))
@@ -99,7 +89,8 @@ class MAML(BaseModel):
         labels = labels.cpu().numpy()
         preds = preds.argmax(dim=1).detach().cpu().numpy()
         report = classification_report(labels, preds,zero_division=0, digits=3)
-        loss+=c_loss
+
+        
 
         return loss, report, acc
     
@@ -227,7 +218,9 @@ class MAML(BaseModel):
                 n = neg_seg_sample.shape[0]
                 
                 support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
+
                 support_label = torch.from_numpy(support_label).long().to(self.device)
+
                 # support_label = np.zeros((m,))
                 # support_label = torch.from_numpy(support_label).long().to(self.device)
 

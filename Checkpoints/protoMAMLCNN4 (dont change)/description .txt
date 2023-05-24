@@ -3,3 +3,4 @@ test 的时候是200个epoch
 val f1大约30%
 test 大约 53%
 略低于inner loop 200个epoch的结果，这种大约有56%的f1
+test的时候10也有50%的f1

@@ -62,7 +62,7 @@ class ClassDataset(Dataset):
         self.process_labels(same_class_in_different_file)
         self.class2index = self._class2index()
         self.index2class = self._index2class()
-        self.length = int(0.3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+        self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):

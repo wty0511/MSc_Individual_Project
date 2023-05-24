@@ -44,7 +44,68 @@ class ProtoMAML(BaseModel):
         self.approx = False
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
+    
+    # def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
+        
+    #     prototypes     = support_feature.mean(0).squeeze()
+    #     norms = torch.norm(prototypes, dim=1, keepdim=True)
+    #     expanded_norms = norms.expand_as(prototypes)
+    #     prototypes = prototypes / expanded_norms
+        
+    #     # Create inner-loop model and optimizer
+    #     local_model = deepcopy(self.feature_extractor)
+    #     local_model.train()
+    #     # local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+    #     # local_optim.zero_grad()
+    #     # Create output layer weights with prototype-based initialization
+    #     # init_weight = 2 * prototypes
+    #     # init_bias = -torch.norm(prototypes, dim=1)**2
+    #     init_weight = 2 * prototypes
+    #     init_bias = -torch.norm(prototypes, dim=1)**2
+
+
+        
+    #     output_weight = init_weight.detach().requires_grad_()
+    #     output_bias = init_bias.detach().requires_grad_()
+    #     fast_parameters = list(local_model.parameters()) + [output_weight, output_bias]
+    #     # Optimize inner loop model on support set
+    #     for i in range(10):
+    #         # Determine loss on the support set
+    #         loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
+    #         # grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
+    #         if self.approx:
+    #             grad = torch.autograd.grad(loss, fast_parameters)
+    #         else:
+    #             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
+    #         # Calculate gradients and perform inner loop update
+    #         # loss.backward()
+    #         # local_optim.step()
+    #         # Update output layer via SGD
+    #         output_weight.data -= self.config.train.lr_inner * grad[-2]
+    #         output_bias.data -= self.config.train.lr_inner * grad[-1]
+    #         for k, weight in enumerate(local_model.parameters()):
+    #             #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+    #             weight.data = weight.data - self.config.train.lr_inner  * grad[k] #create weight.fast 
+
+    #         # Reset gradients
+    #         # local_optim.zero_grad()
+    #         # output_weight.grad.fill_(0)
+    #         # output_bias.grad.fill_(0)
+    #         loss = loss.detach()
+    #         acc = torch.mean(acc).detach()
+    #     if mode != 'train':
+    #         print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
+    #         print(preds)
+    #     if mode != 'train':    
+    #         print('!!!!!!!!!')
+    #     # Re-attach computation graph of prototypes
+    #     output_weight = (output_weight - init_weight).detach() + init_weight
+    #     output_bias = (output_bias - init_bias).detach() + init_bias
+        
+    #     return local_model, output_weight, output_bias
+    
+    
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
         
@@ -56,9 +117,8 @@ class ProtoMAML(BaseModel):
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
         local_model.train()
-        fast_parameters = list(local_model.parameters())
-        # local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
-        # local_optim.zero_grad()
+        local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+        local_optim.zero_grad()
         # Create output layer weights with prototype-based initialization
         # init_weight = 2 * prototypes
         # init_bias = -torch.norm(prototypes, dim=1)**2
@@ -74,21 +134,26 @@ class ProtoMAML(BaseModel):
         for i in range(10):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
-            grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
             if self.approx:
-                grad = [ g.detach()  for g in grad ]
+                grad = torch.autograd.grad(loss, fast_parameters, create_graph=False)
+            else:
+                grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
             # Calculate gradients and perform inner loop update
             # loss.backward()
-            # local_optim.step()
+
             # Update output layer via SGD
             output_weight.data -= self.config.train.lr_inner * grad[-2]
             output_bias.data -= self.config.train.lr_inner * grad[-1]
             for k, weight in enumerate(local_model.parameters()):
                 #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                weight.data = weight.data - self.config.train.lr_inner  * grad[k] #create weight.fast 
-
+                weight.grad = grad[k]
+            
+            local_optim.step()
+            local_optim.zero_grad()
             # Reset gradients
-            # local_optim.zero_grad()
+            # for param in local_model.parameters():
+            #     param.grad.zero_()
+            
             # output_weight.grad.fill_(0)
             # output_bias.grad.fill_(0)
             loss = loss.detach()
@@ -103,7 +168,6 @@ class ProtoMAML(BaseModel):
         output_bias = (output_bias - init_bias).detach() + init_bias
         
         return local_model, output_weight, output_bias
-    
     
     def feed_forward(self, local_model, output_weight, output_bias, data, labels, mode):
         # Execute a model with given output layer weights and inputs
@@ -138,10 +202,7 @@ class ProtoMAML(BaseModel):
         preds = preds.argmax(dim=1).detach().cpu().numpy()
         report = classification_report(labels, preds,zero_division=0, digits=3)
         loss+=c_loss
-
         return loss, report, acc
-
-    
     
     def feed_forward_test(self, local_model, output_weight, output_bias, data):
         # Execute a model with given output layer weights and inputs
@@ -194,6 +255,11 @@ class ProtoMAML(BaseModel):
                 # print("loss: ", loss, "acc: ", acc)
                 accuracies.append(acc)
                 losses.append(loss)
+
+                # print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
+
+
+
             if i % 1 == 0:
                 print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
             if mode == "train":
@@ -244,7 +310,7 @@ class ProtoMAML(BaseModel):
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
             prob_mean = []
-            for i in range(10):
+            for i in range(1):
                 test_loop_neg_sample = self.config.val.test_loop_neg_sample
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
@@ -297,7 +363,7 @@ class ProtoMAML(BaseModel):
         best_f1 = 0
         best_report = {}
         best_threshold = 0
-        for threshold in np.arange(0.5, 1, 0.1):
+        for threshold in np.arange(0.5, 1, 0.05):
             report_f1 = {}
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
