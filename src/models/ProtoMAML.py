@@ -69,7 +69,7 @@ class ProtoMAML(BaseModel):
         output_bias = init_bias.detach().requires_grad_()
         
         # Optimize inner loop model on support set
-        for i in range(200):
+        for i in range(10):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
             
@@ -196,7 +196,7 @@ class ProtoMAML(BaseModel):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
-    def test_loop(self, test_loader):
+    def test_loop(self, test_loader,fix_shreshold = None):
         all_prob = {}
         all_meta = {}
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -290,6 +290,9 @@ class ProtoMAML(BaseModel):
         best_report = {}
         best_threshold = 0
         for threshold in np.arange(0.5, 1, 0.1):
+            if fix_shreshold is not None:
+                threshold = fix_shreshold
+                
             report_f1 = {}
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
@@ -352,6 +355,8 @@ class ProtoMAML(BaseModel):
                 best_res = report
                 best_report = report_f1
                 best_threshold = threshold
+            if fix_shreshold is not None:
+                break
         for i in best_report.keys():
             print(i)
             print(best_report[i])

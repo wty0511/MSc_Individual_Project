@@ -17,7 +17,7 @@ save_file = os.path.join(model_dir, 'best_model.pth')
 
 
 # 加载模型
-checkpoint = torch.load('/root/task5_2023/Checkpoints/protoMAMLCNN4/Model/best_model.pth')
+checkpoint = torch.load('/root/task5_2023/Checkpoints/protoMAMLCNN6/Model/best_model.pth')
 print(checkpoint.keys())
 # 从checkpoint中获取模型的状态和配置信息
 model_state = checkpoint['state']
@@ -35,9 +35,9 @@ model.load_state_dict(model_state)
 
 val_dataset = FileDataset(cfg,val=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-df_all_time, report,best_threshold = model.test_loop(val_loader)
+df_all_time, report,best_threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'])
 acc = report['overall_scores']['fmeasure (percentage)']
-        
+
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))

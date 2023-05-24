@@ -112,7 +112,7 @@ class ProtoNet(BaseModel):
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
             prob_mean = []
-            for i in range(1):
+            for i in range(10):
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
                 if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
