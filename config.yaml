@@ -1,6 +1,6 @@
 path:
-  root_dir: /root/task5_2023
-  # root_dir: /d/individual_project/task5_2023
+  # root_dir: /root/task5_2023
+  root_dir: /d/individual_project/task5_2023
   data_dir: ${path.root_dir}/Data_Set
   train_dir: ${path.data_dir}/Training_Set
   val_dir: ${path.data_dir}/Validation_Set
@@ -25,7 +25,7 @@ features:
 
 
 train:
-  neg_prototype: false
+  neg_prototype: False
   n_way: 10
   n_support: 5
   n_query: 5
@@ -55,7 +55,7 @@ checkpoint:
   best_model_dir: ${path.model_dir}/model_best.pth.tar
   start_epoch: 0
   #experiment_name: expMAML
-  experiment_name: protoMAMLCNN_withFO
+  experiment_name: test
   exp_dir: ${path.root_dir}/Checkpoints/${checkpoint.experiment_name}
   model_dir: ${checkpoint.exp_dir}/Model
   pred_dir: ${checkpoint.exp_dir}/Predictions

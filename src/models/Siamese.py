@@ -43,7 +43,7 @@ class SNN(BaseModel):
         fast_parameters = list(local_model.parameters())
         if mode == 'test':
             support_label = support_label.cpu().numpy()
-        for i in range(100):
+        for i in range(10):
             if mode == 'train':
                 label = random.randint(0, 1)
                 # same class

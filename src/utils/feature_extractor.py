@@ -106,6 +106,7 @@ def walk_files(file, debug, file_extension = ('.wav', '.csv', '.npy')):
         for name in files:
             if name.endswith(file_extension):
                 c = path.split(os.sep)[-1]
+                
                 if debug:
                     if classes[c] ==1:
                         continue

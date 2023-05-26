@@ -48,14 +48,15 @@ model = ProtoMAML(cfg)
 print(len(train_loader))
 model = model.cuda()
 model_dir = cfg.checkpoint.model_dir
+model_dir = normalize_path(model_dir)
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
 for epoch in range(100):
     model.train_loop(train_loader, optimizer)
-    model_dir = cfg.checkpoint.model_dir
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
+        
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
     if epoch % 10 == 0:
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
@@ -64,6 +65,7 @@ for epoch in range(100):
     if f1 > best_f1:
         best_f1 = f1
         save_file = os.path.join(model_dir, 'best_model.pth')
+        print(save_file)
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'model_name':'ProtoMAML', 'threshold' : threshold}, save_file)
         print("best model! save...")
         report_dir = normalize_path(cfg.checkpoint.report_dir)

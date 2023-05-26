@@ -44,7 +44,7 @@ class ProtoMAML(BaseModel):
         self.approx = False
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
-    
+        
     # def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
         
@@ -142,11 +142,11 @@ class ProtoMAML(BaseModel):
             # loss.backward()
 
             # Update output layer via SGD
-            output_weight.data -= self.config.train.lr_inner * grad[-2]
-            output_bias.data -= self.config.train.lr_inner * grad[-1]
+            output_weight.data = output_weight.data - self.config.train.lr_inner * grad[-2]
+            output_bias.data = output_bias.data - self.config.train.lr_inner * grad[-1]
             for k, weight in enumerate(local_model.parameters()):
-                #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                weight.grad = grad[k]
+                # for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py
+                weight.grad = grad[k].clone()
             
             local_optim.step()
             local_optim.zero_grad()
@@ -270,7 +270,7 @@ class ProtoMAML(BaseModel):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
-    def test_loop(self, test_loader):
+    def test_loop(self, test_loader,fix_shreshold = None):
         all_prob = {}
         all_meta = {}
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -364,6 +364,8 @@ class ProtoMAML(BaseModel):
         best_report = {}
         best_threshold = 0
         for threshold in np.arange(0.5, 1, 0.05):
+            if fix_shreshold is not None:
+                threshold = fix_shreshold
             report_f1 = {}
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
@@ -426,6 +428,8 @@ class ProtoMAML(BaseModel):
                 best_res = report
                 best_report = report_f1
                 best_threshold = threshold
+            if fix_shreshold is not None:
+                break
         for i in best_report.keys():
             print(i)
             print(best_report[i])
