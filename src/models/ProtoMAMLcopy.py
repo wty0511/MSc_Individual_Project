@@ -11,6 +11,7 @@ from src.utils.feature_extractor import *
 from src.evaluation_metrics.evaluation import *
 from src.utils.post_processing import *
 from sklearn.metrics import classification_report, f1_score
+from sklearn.metrics import silhouette_score
 
 
 class ContrastiveLoss(nn.Module):
@@ -41,7 +42,7 @@ class ProtoMAML(BaseModel):
         
         super(ProtoMAML, self).__init__(config)
         self.config = config
-        self.approx = False
+        self.approx = True
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
         
@@ -146,7 +147,7 @@ class ProtoMAML(BaseModel):
             output_bias.data = output_bias.data - self.config.train.lr_inner * grad[-1]
             for k, weight in enumerate(local_model.parameters()):
                 # for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py
-                weight.grad = grad[k].clone()
+                weight.grad = grad[k]
             
             local_optim.step()
             local_optim.zero_grad()

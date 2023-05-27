@@ -26,7 +26,7 @@ SEED = 42
 set_seed(SEED)
 
 
-debug = False
+debug = True
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration

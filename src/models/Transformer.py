@@ -13,10 +13,9 @@ class Transformer(nn.Module):
         
     def forward(self, src):
 
-        src = src.permute(0,2,1)
+        src = src.permute(0,2,1).contiguous()
         # print('src shape ',src.shape)
-        embedded = src
-        output = self.transformer_encoder(embedded)
-        output = output.permute(0,2,1)
+        output = self.transformer_encoder(src)
+        output = output.permute(0,2,1).contiguous()
         output = self.conv(output)
         return output

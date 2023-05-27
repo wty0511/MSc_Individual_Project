@@ -6,8 +6,8 @@ src_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
 sys.path.append(src_dir)
 
 import torch
-# from src.models.ProtoMAML import ProtoMAML
-from src.models.ProtoMAMLcopy import *
+from src.models.ProtoMAML import ProtoMAML
+# from src.models.ProtoMAMLcopy import *
 from utils.file_dataset import *
 if not GlobalHydra().is_initialized():
     initialize(config_path="../")
@@ -18,7 +18,7 @@ save_file = os.path.join(model_dir, 'best_model.pth')
 
 
 # 加载模型
-checkpoint = torch.load(r"D:\individual_project\task5_2023\Checkpoints\test\Model\best_model.pth")
+checkpoint = torch.load(r"/root/task5_2023/Checkpoints/test/Model/best_model.pth")
 print(checkpoint.keys())
 # 从checkpoint中获取模型的状态和配置信息
 model_state = checkpoint['state']

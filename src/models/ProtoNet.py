@@ -77,7 +77,7 @@ class ProtoNet(BaseModel):
         avg_loss = avg_loss / len(data_loader)
         return avg_loss
     
-    def test_loop(self, test_loader):
+    def test_loop(self, test_loader, fix_shreshold = None):
         all_prob = {}
         all_meta = {}
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -154,7 +154,9 @@ class ProtoNet(BaseModel):
         best_res = None
         best_f1 = 0
         best_threshold = 0
-        for threshold in np.arange(0.4, 1.0, 0.05):
+        for threshold in np.arange(0.5, 1.0, 0.05):
+            if fix_shreshold is not None:
+                threshold = fix_shreshold
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
             for wav_file in all_prob.keys():
                 prob = np.where(all_prob[wav_file]>threshold, 1, 0)
@@ -204,6 +206,8 @@ class ProtoNet(BaseModel):
                 best_f1 = report['overall_scores']['fmeasure (percentage)']
                 best_res = report
                 best_threshold = threshold
+            if fix_shreshold is not None:
+                break
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(best_res)
         print('best_threshold:{}'.format(best_threshold))

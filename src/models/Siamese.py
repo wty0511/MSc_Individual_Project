@@ -14,7 +14,7 @@ from src.utils.post_processing import *
 from src.evaluation_metrics.evaluation_confidence_intervals import *
 from copy import deepcopy
 import random
-
+import torch.optim as optim
 class ContrastiveLoss(nn.Module):
     def __init__(self, margin):
         super(ContrastiveLoss, self).__init__()
@@ -34,16 +34,18 @@ class SNN(BaseModel):
         super(SNN, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = ContrastiveLoss(margin=5.0)
+        self.loss_fn = ContrastiveLoss(margin=10.0)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
         local_model = deepcopy(self.feature_extractor)
         local_model.train()
+        local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+        local_optim.zero_grad()
         fast_parameters = list(local_model.parameters())
         if mode == 'test':
             support_label = support_label.cpu().numpy()
-        for i in range(10):
+        for i in range(100):
             if mode == 'train':
                 label = random.randint(0, 1)
                 # same class
@@ -110,8 +112,10 @@ class SNN(BaseModel):
             else:
                 grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
             for k, weight in enumerate(local_model.parameters()):
-                #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-                weight.data = weight.data - self.config.train.lr_inner  * grad[k] #create weight.fast 
+                # for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py
+                weight.grad = grad[k]
+            local_optim.step()
+            local_optim.zero_grad()
             loss = loss.detach()
         if mode != 'train':
             print('inner loop: loss:{:.3f}'.format(loss.item()))
@@ -129,25 +133,62 @@ class SNN(BaseModel):
 
 
     def feed_forward(self, local_model, support_data, query_data):
-        # Execute a model with given output layer weights and inputs
-        support_feat = local_model(support_data)
-        # nway 不是2nway要注意
-        support_feat = self.split_1d(support_feat)
-        prototype = support_feat.mean(0)
-        query_feat = local_model(query_data)
-        dists = self.euclidean_dist(query_feat, prototype)
+        # # Execute a model with given output layer weights and inputs
+        # support_feat = local_model(support_data)
+        # # nway 不是2nway要注意
+        # support_feat = self.split_1d(support_feat)
+        # prototype = support_feat.mean(0)
+        # query_feat = local_model(query_data)
+        # dists = self.euclidean_dist(query_feat, prototype)
 
-        scores = -dists
+        # scores = -dists
 
-        preds = scores.argmax(dim=1)
-        y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-        acc = torch.eq(preds, y_query).float().mean()
+        # preds = scores.argmax(dim=1)
+        # y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
+        # acc = torch.eq(preds, y_query).float().mean()
 
         
-        loss = self.ce(scores, y_query)
-        y_query = y_query.cpu().numpy()
-        preds = preds.detach().cpu().numpy()
-        report = classification_report(y_query, preds,zero_division=0, digits=3)
+        # loss = self.ce(scores, y_query)
+        # y_query = y_query.cpu().numpy()
+        # preds = preds.detach().cpu().numpy()
+        # report = classification_report(y_query, preds,zero_division=0, digits=3)
+        # print(report)
+        loss = 0
+        for i in range(100):
+            label = random.randint(0, 1)
+            # same class
+            if label == 0:               
+                class1 = random.randint(0, self.n_way - 1)
+                indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
+                index1, index2 = random.sample(indices1, 2)
+
+                sampl1 = query_data[index1]
+                sampl2 = query_data[index2]
+
+            else:
+                class1, class2 = random.sample(range(self.n_way), 2)
+                
+                indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
+                indices2 = [i for i in range(len(query_data)) if i % self.n_way == class2]
+                
+                # Randomly select two different indices
+                index1 = random.sample(indices1, 1)
+                index2 = random.sample(indices2, 1)
+                
+                sampl1 = query_data[index1[0]]
+                sampl2 = query_data[index2[0]]
+            sampl1 = sampl1.unsqueeze(0)
+            sampl2 = sampl2.unsqueeze(0)
+            # print('label:{}'.format(label))
+            # print(sampl1.shape)
+            # print(sampl2.shape)
+            # print('~~~~~~~~~~~')
+            feat1 = local_model(sampl1)
+            feat2 = local_model(sampl2)
+            loss += self.loss_fn(feat1, feat2, label)
+        loss /= 100
+        report = None
+        acc = torch.tensor(0.0).to(self.device)
         return loss, report, acc
     
     

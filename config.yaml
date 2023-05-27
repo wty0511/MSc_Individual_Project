@@ -1,6 +1,6 @@
 path:
-  # root_dir: /root/task5_2023
-  root_dir: /d/individual_project/task5_2023
+  root_dir: /root/task5_2023
+  # root_dir: /d/individual_project/task5_2023
   data_dir: ${path.root_dir}/Data_Set
   train_dir: ${path.data_dir}/Training_Set
   val_dir: ${path.data_dir}/Validation_Set
