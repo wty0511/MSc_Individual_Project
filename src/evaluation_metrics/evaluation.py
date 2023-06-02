@@ -127,7 +127,7 @@ def compute_scores_from_counts(counts):
     tp = counts["TP"]
     fp = counts["FP"]
     fn = counts["FN"]
-
+    
     # to compute the harmonic mean we need to have all entries as non zero
     precision = tp/(tp+fp) if tp+fp != 0 else MIN_EVAL_VALUE  # case where no predictions were made 
     if precision < MIN_EVAL_VALUE:
@@ -254,6 +254,9 @@ def evaluate(pred_csv, ref_file_path, team_name, dataset, savepath, metadata=[])
     counts_per_set = {}
     scores_per_set = {}
     scores_per_audiofile = {}
+    tp_all = 0
+    fn_all = 0
+    fp_all = 0
     for data_set in list_sets_in_mainset:
         # print(data_set)
         
@@ -308,8 +311,15 @@ def evaluate(pred_csv, ref_file_path, team_name, dataset, savepath, metadata=[])
                 fp = fp + counts_per_audiofile[audiofile]["FP"]
                 total_n_pos_events_this_set = total_n_pos_events_this_set + counts_per_audiofile[audiofile]["total_n_pos_events"]
                 counts_per_set[data_set] = {"TP": tp, "FN": fn, "FP": fp, "total_n_pos_events_this_set": total_n_pos_events_this_set}
-            
+                # if 'DC' in audiofile:
+                    
+                #     print(audiofile,counts_per_audiofile[audiofile])
+                #     print(audiofile, counts_per_set[data_set])
+                
             #  compute scores per subset
+            tp_all = tp_all + tp
+            fn_all = fn_all + fn
+            fp_all = fp_all + fp
             scores_per_set[data_set] = compute_scores_from_counts(counts_per_set[data_set])
                     
     overall_scores = {"precision" : stats.hmean([scores_per_set[dt]["precision"] for dt in scores_per_set.keys()]), 
@@ -317,6 +327,7 @@ def evaluate(pred_csv, ref_file_path, team_name, dataset, savepath, metadata=[])
                     "fmeasure (percentage)": np.round(stats.hmean([scores_per_set[dt]["f-measure"] for dt in scores_per_set.keys()])*100, 3)
                     }
     
+    print("\nall_scores:",   tp_all/(tp_all+0.5*(fp_all+fn_all)))
     print("\nOverall_scores:",  overall_scores)
     # print("\nwriting report")
     if metadata:

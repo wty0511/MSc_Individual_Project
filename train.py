@@ -15,7 +15,7 @@ from src.training_pipeline import train
 
     
 if __name__ == "__main__":
-    debug = True
+    debug = False
     if not GlobalHydra().is_initialized():
         initialize(config_path="./")
     # Compose the configuration

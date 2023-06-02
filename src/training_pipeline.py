@@ -65,7 +65,7 @@ def train(train_loader, val_loader, config):
             print("best model! save...")
             best_acc = acc
             save_file = os.path.join(model_dir, 'best_model.pth')
-            torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
+            torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config, 'threshold':best_threshold}, save_file)
             report_dir = normalize_path(config.checkpoint.report_dir)
             report_dir = os.path.join(report_dir,'val_report_best.json')
             if not os.path.exists(os.path.dirname(report_dir)):

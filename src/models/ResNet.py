@@ -7,10 +7,10 @@ class ResBlock(nn.Module):
     def __init__(self, input_channels, output_channels, stride=1):
         super(ResBlock, self).__init__()
         
-        self.conv1 = nn.Conv2d(input_channels, output_channels, kernel_size=3, stride=stride, padding=1, bias=False, groups=8)
+        self.conv1 = nn.Conv2d(input_channels, output_channels, kernel_size=3, stride=stride, padding=1, bias=False, groups=1)
         self.bn1 = nn.BatchNorm2d(output_channels)
         
-        self.conv2 = nn.Conv2d(output_channels, output_channels, kernel_size=3, stride=1, padding=1, bias=False, groups=8)
+        self.conv2 = nn.Conv2d(output_channels, output_channels, kernel_size=3, stride=1, padding=1, bias=False, groups=1)
         self.bn2 = nn.BatchNorm2d(output_channels)
         
         self.relu = nn.LeakyReLU(inplace=True)
@@ -19,7 +19,7 @@ class ResBlock(nn.Module):
         
         if stride != 1 or input_channels != output_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(input_channels, output_channels, kernel_size=1, stride=stride, bias=False, groups=8),
+                nn.Conv2d(input_channels, output_channels, kernel_size=1, stride=stride, bias=False, groups=1),
                 nn.BatchNorm2d(output_channels)
             )
     
@@ -42,10 +42,10 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(1, input_channels, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(input_channels)
         self.relu = nn.LeakyReLU(inplace=True)
-        self.layer1 = self._make_layer(block, 32, 2, stride=1)
-        self.layer2 = self._make_layer(block, 32, 2, stride=2)
-        self.layer3 = self._make_layer(block, 64, 2, stride=2)
-        self.layer4 = self._make_layer(block, 512, 2, stride=2)
+        self.layer1 = self._make_layer(block, 64, 2, stride=1)
+        self.layer2 = self._make_layer(block, 64, 2, stride=2)
+        self.layer3 = self._make_layer(block, 128, 2, stride=2)
+        # self.layer4 = self._make_layer(block, 512, 2, stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((8,1))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     def _make_layer(self, block, output_channels, n_layers,stride=1):

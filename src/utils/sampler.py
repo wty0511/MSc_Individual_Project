@@ -18,6 +18,35 @@ class BatchSampler(Sampler):
             
     def __len__(self):
         return self.n_episode
+
+
+class ClassSampler(Sampler):
+    def __init__(self, config, classes, data_set_len):
+        self.config = config
+        self.class_list = list(classes)
+        self.len = data_set_len
+    def __iter__(self):
+        for _ in range(self.len):
+            # randomly select n_way classes
+            selected_classes = np.random.choice(self.class_list, 1, replace=False)
+            yield selected_classes[0]
+            
+    def __len__(self):
+        return self.len
+
+class IntClassSampler(Sampler):
+    def __init__(self, config, classes, data_set_len):
+        self.config = config
+        self.class_list = list(classes)
+        self.len = data_set_len
+    def __iter__(self):
+        for _ in range(self.len):
+            # randomly select n_way classes
+            selected_classes = np.random.choice(self.class_list, 1, replace=False)
+            yield int(selected_classes[0])
+            
+    def __len__(self):
+        return self.len
     
 class TaskBatchSampler(Sampler):
     

@@ -27,6 +27,47 @@ class ContrastiveLoss(nn.Module):
 
 
 
+def get_silhouette_score(feats, labels):
+    labels = torch.from_numpy(labels).to(feats.device)
+    device, dtype = feats.device, feats.dtype
+    unique_labels = torch.unique(labels)
+    num_samples = len(feats)
+    if not (1 < len(unique_labels) < num_samples):
+        raise ValueError("num unique labels must be > 1 and < num samples")
+    scores = []
+    for L in unique_labels:
+        curr_cluster = feats[labels == L]
+        num_elements = len(curr_cluster)
+        if num_elements > 1:
+            intra_cluster_dists = torch.cdist(curr_cluster, curr_cluster)
+            mean_intra_dists = torch.sum(intra_cluster_dists, dim=1) / (
+                num_elements - 1
+            )  # minus 1 to exclude self distance
+            dists_to_other_clusters = []
+            for otherL in unique_labels:
+                if otherL != L:
+                    other_cluster = feats[labels == otherL]
+                    inter_cluster_dists = torch.cdist(curr_cluster, other_cluster)
+                    mean_inter_dists = torch.sum(inter_cluster_dists, dim=1) / (
+                        len(other_cluster)
+                    )
+                    dists_to_other_clusters.append(mean_inter_dists)
+            dists_to_other_clusters = torch.stack(dists_to_other_clusters, dim=1)
+            min_dists, _ = torch.min(dists_to_other_clusters, dim=1)
+            curr_scores = (min_dists - mean_intra_dists) / (
+                torch.maximum(min_dists, mean_intra_dists)
+            )
+        else:
+            curr_scores = torch.tensor([0], device=device, dtype=dtype)
+
+        scores.append(curr_scores)
+
+    scores = torch.cat(scores, dim=0)
+    if len(scores) != num_samples:
+        raise ValueError(
+            f"scores (shape {scores.shape}) should have same length as feats (shape {feats.shape})"
+        )
+    return torch.sum(scores)
 
 class ProtoMAML(BaseModel):
     
@@ -42,7 +83,7 @@ class ProtoMAML(BaseModel):
         
         super(ProtoMAML, self).__init__(config)
         self.config = config
-        self.approx = True
+        self.approx = False
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
         
@@ -111,9 +152,9 @@ class ProtoMAML(BaseModel):
         
         
         prototypes     = support_feature.mean(0).squeeze()
-        norms = torch.norm(prototypes, dim=1, keepdim=True)
-        expanded_norms = norms.expand_as(prototypes)
-        prototypes = prototypes / expanded_norms
+        # norms = torch.norm(prototypes, dim=1, keepdim=True)
+        # expanded_norms = norms.expand_as(prototypes)
+        # prototypes = prototypes / expanded_norms
         
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
@@ -123,6 +164,7 @@ class ProtoMAML(BaseModel):
         # Create output layer weights with prototype-based initialization
         # init_weight = 2 * prototypes
         # init_bias = -torch.norm(prototypes, dim=1)**2
+        # init_weight = 2 * prototypes
         init_weight = 2 * prototypes
         init_bias = -torch.norm(prototypes, dim=1)**2
 
@@ -136,18 +178,21 @@ class ProtoMAML(BaseModel):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
             if self.approx:
-                grad = torch.autograd.grad(loss, fast_parameters, create_graph=False)
+                grad = torch.autograd.grad(loss, fast_parameters, create_graph=False, allow_unused=True)
             else:
-                grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
+                grad = torch.autograd.grad(loss, fast_parameters, create_graph=True, allow_unused=True)
             # Calculate gradients and perform inner loop update
             # loss.backward()
 
             # Update output layer via SGD
-            output_weight.data = output_weight.data - self.config.train.lr_inner * grad[-2]
-            output_bias.data = output_bias.data - self.config.train.lr_inner * grad[-1]
+            if grad[-2] is not None:
+                output_weight.data = output_weight.data - self.config.train.lr_inner * grad[-2]
+            if grad[-1] is not None:
+                output_bias.data = output_bias.data - self.config.train.lr_inner * grad[-1]
             for k, weight in enumerate(local_model.parameters()):
                 # for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py
                 weight.grad = grad[k]
+                # print(weight.grad)
             
             local_optim.step()
             local_optim.zero_grad()
@@ -159,6 +204,7 @@ class ProtoMAML(BaseModel):
             # output_bias.grad.fill_(0)
             loss = loss.detach()
             acc = torch.mean(acc).detach()
+        # print('!!!!!!!!!!!!!!!!!!')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -182,14 +228,17 @@ class ProtoMAML(BaseModel):
         dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
         data_loader = DataLoader(dataset, batch_size=self.test_loop_batch_size, shuffle=False)
         preds_all = []
+        
         for batch in data_loader:
             data, _ = batch
             preds = F.linear(data, output_weight, output_bias)
+            # preds = F.linear(data, output_weight, bias=None)
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
         half_size = output_weight.shape[0] // 2
-        temperature = 2.0
-        preds = preds / temperature
+        # temperature = local_model.temperature_param
+        # temperature = nn.functional.relu(temperature)
+        preds = preds / 2.0
         if self.config.train.neg_prototype or mode == 'test':
             weights = torch.cat((torch.full((half_size,), 3, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
@@ -203,6 +252,7 @@ class ProtoMAML(BaseModel):
         preds = preds.argmax(dim=1).detach().cpu().numpy()
         report = classification_report(labels, preds,zero_division=0, digits=3)
         loss+=c_loss
+        
         return loss, report, acc
     
     def feed_forward_test(self, local_model, output_weight, output_bias, data):
@@ -214,11 +264,11 @@ class ProtoMAML(BaseModel):
         return preds
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
-
-
+        # self.feature_extractor.train()
         for i, task_batch in tqdm(enumerate(data_loader)):
             accuracies = []
             losses = []
+            
             self.feature_extractor.zero_grad()
             for task in task_batch:
                 if self.config.train.neg_prototype:
@@ -247,8 +297,11 @@ class ProtoMAML(BaseModel):
                 
                 if mode == 'train':
                     loss.backward()
+                    
                     for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
+                        
                         if p_global.grad is None or p_local.grad is None:
+                            print("None")
                             continue
                         p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
                 loss = loss.detach().cpu().item()

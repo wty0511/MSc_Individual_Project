@@ -12,7 +12,6 @@ class Transformer(nn.Module):
         # Fully Connected Layer for Classification
         
     def forward(self, src):
-
         src = src.permute(0,2,1).contiguous()
         # print('src shape ',src.shape)
         output = self.transformer_encoder(src)

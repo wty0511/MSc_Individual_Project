@@ -112,26 +112,32 @@ class ProtoNet(BaseModel):
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
             prob_mean = []
-            for i in range(10):
+            for i in range(1):
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
-                if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
-                    neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
-                    neg_seg_sample = neg_sup[1][neg_indices]
-                else:
-                    neg_seg_sample = neg_sup[1]
+                # if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
+                #     neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
+                #     neg_seg_sample = neg_sup[1][neg_indices]
+                # else:
+                #     neg_seg_sample = neg_sup[1]
+                neg_seg_sample = neg_sup[1]
                 neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                 neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 neg_feat = []
-                for batch in neg_loader:
-                    neg_data, _ = batch
-                    # print(neg_data.shape)
-                    feat = self.forward(neg_data)
-                    # print(feat.shape)
-                    neg_feat.append(feat.mean(0))
+                with torch.no_grad():
+                    for batch in neg_loader:
+                        neg_data, _ = batch
+                        # print(neg_data.shape)
+                        feat = self.forward(neg_data)
+                        # print(feat.shape)
+                        neg_feat.append(feat.mean(0))
+                        # print("Allocated Memory:", torch.cuda.memory_allocated(self.device) / 1024 ** 3, "GB")
+
                 neg_feat = torch.stack(neg_feat, dim=0).mean(0)
                 ##############################################################################
-                
+                del neg_dataset
+                del neg_loader
+                del neg_seg_sample
                 proto = torch.stack([pos_feat,neg_feat], dim=0)
                 prob_all = []
                 for batch in query_loader:
@@ -154,7 +160,7 @@ class ProtoNet(BaseModel):
         best_res = None
         best_f1 = 0
         best_threshold = 0
-        for threshold in np.arange(0.5, 1.0, 0.05):
+        for threshold in np.arange(0.5, 1.0, 0.1):
             if fix_shreshold is not None:
                 threshold = fix_shreshold
             all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
