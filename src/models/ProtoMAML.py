@@ -327,7 +327,7 @@ class ProtoMAML(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(1):
+        for i in range(10):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):

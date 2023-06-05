@@ -29,7 +29,7 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 42
+SEED = 8383
 set_seed(SEED)
 
 
@@ -49,10 +49,10 @@ batch_sampler = TaskBatchSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-model = ProtoMAML(cfg)
+# model = ProtoMAML(cfg)
 # model = SNNMAML(cfg)
 # model = MAML(cfg)
-# model = TNNMAML(cfg)
+model = TNNMAML(cfg)
 # model = ProtoMAMLfw(cfg)
 print(len(train_loader))
 model = model.cuda()
@@ -62,6 +62,9 @@ if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
 model.train()
+
+no_imporve = 0
+
 for epoch in range(50):
     model.train()
     model.train_loop(train_loader, optimizer)
@@ -74,7 +77,11 @@ for epoch in range(50):
     model.eval()
     df_all_time, report, threshold = model.test_loop(val_loader)
     f1 = report['overall_scores']['fmeasure (percentage)']
+    no_imporve +=1
+    if no_imporve == 15:
+        break
     if f1 > best_f1:
+        no_imporve = 0
         best_f1 = f1
         save_file = os.path.join(model_dir, 'best_model.pth')
         print(save_file)

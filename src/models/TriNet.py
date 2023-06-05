@@ -43,7 +43,7 @@ class TripletLoss(nn.Module):
         # print(distance_negative)
         # print('~~~~~~~~~~~~~')
         losses = F.relu(distance_positive - distance_negative + self.margin)
-        return losses.mean()
+        return losses.sum()
 
 class TriNet(BaseModel):
     def __init__(self, config):
@@ -252,6 +252,8 @@ class TriNet(BaseModel):
             # loss = self.cosloss(anchor_feat, pos_feat, torch.ones(anchor.shape[0]).to(self.device)) + self.cosloss(anchor_feat, neg_feat, -torch.ones(anchor.shape[0]).to(self.device))
             loss = self.loss_fn(anchor_feat, pos_feat, neg_feat)
             loss.backward()
+            # for i in self.parameters():
+            #     print(i.grad)
             optimizer.step()
             print('loss:{:.3f}'.format(loss.item()))
 
@@ -315,18 +317,19 @@ class TriNet(BaseModel):
                     # print(feat.shape)
                     pos_feat.append(feat.mean(0))
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
-            
                 neg_feat = []
-                for batch in neg_loader:
-                    n_data, _ = batch
-                    # print(neg_data.shape)
-                    feat = self.feature_extractor.forward(n_data)
-                    # print(feat.shape)
-                    neg_feat.append(feat.mean(0))
-                neg_feat = torch.stack(neg_feat, dim=0).mean(0) 
-                proto = torch.stack([pos_feat,neg_feat], dim=0)
-                
-                
+
+                with torch.no_grad():
+                    for batch in neg_loader:
+                        n_data, _ = batch
+                        # print(neg_data.shape)
+                        feat = self.feature_extractor.forward(n_data)
+                        # print(feat.shape)
+                        neg_feat.append(feat.mean(0))
+                    neg_feat = torch.stack(neg_feat, dim=0).mean(0) 
+                    proto = torch.stack([pos_feat,neg_feat], dim=0)
+                    
+                    
                 
                 prob_all = []
                 for batch in tqdm(query_loader):
@@ -346,7 +349,7 @@ class TriNet(BaseModel):
         best_f1 = 0
         best_report = {}
         best_threshold = 0
-        for threshold in np.arange(0.5, 1, 0.05):
+        for threshold in np.arange(0.5, 1, 0.1):
             if fix_shreshold is not None:
                 threshold = fix_shreshold
             report_f1 = {}

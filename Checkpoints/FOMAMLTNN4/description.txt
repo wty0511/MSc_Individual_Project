@@ -1,0 +1,5 @@
+data loader 50
+batch size 50
+inner_loop 5
+inner_loop loss是sum
+feed forward 是 mean

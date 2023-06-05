@@ -32,7 +32,7 @@ set_seed(SEED)
 # cfg = compose(config_name="config.yaml")
 # model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
-save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNet/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/test/Model/best_model.pth"
 
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -49,17 +49,18 @@ print(config)
 epoch = checkpoint['epoch']
 print('epoch:', epoch)
 print('threshold:', checkpoint['threshold'])
-print('f1', checkpoint['f1'])
+
+# print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
-model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
-# model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
 model.load_state_dict(model_state)
-# model.eval()
+model.eval()
 val_dataset = FileDataset(cfg,val=False,debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 

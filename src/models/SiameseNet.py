@@ -25,7 +25,7 @@ class ContrastiveLoss(nn.Module):
         distances = euclidean_distance(output1, output2)
         losses = 0.5 * (1 - label) * torch.pow(distances, 2) + \
                  0.5 * label * torch.pow(torch.clamp(self.margin - distances, min=0.0), 2)
-        loss = torch.mean(losses)
+        loss = torch.sum(losses)
         return loss
     
     
@@ -271,11 +271,11 @@ class SNN(BaseModel):
                 test_loop_neg_sample = self.config.val.test_loop_neg_sample
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
-                if neg_sup[1].shape[0] > test_loop_neg_sample:
-                    neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
-                    neg_seg_sample = neg_sup[1][neg_indices]
-                else:
-                    neg_seg_sample = neg_sup[1]
+                # if neg_sup[1].shape[0] > test_loop_neg_sample:
+                #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
+                #     neg_seg_sample = neg_sup[1][neg_indices]
+                # else:
+                neg_seg_sample = neg_sup[1]
 
                 neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                 neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
@@ -299,14 +299,15 @@ class SNN(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
             
                 neg_feat = []
-                for batch in neg_loader:
-                    n_data, _ = batch
-                    # print(neg_data.shape)
-                    feat = self.feature_extractor.forward(n_data)
-                    # print(feat.shape)
-                    neg_feat.append(feat.mean(0))
-                neg_feat = torch.stack(neg_feat, dim=0).mean(0) 
-                proto = torch.stack([pos_feat,neg_feat], dim=0)
+                with torch.no_grad():
+                    for batch in neg_loader:
+                        n_data, _ = batch
+                        # print(neg_data.shape)
+                        feat = self.feature_extractor.forward(n_data)
+                        # print(feat.shape)
+                        neg_feat.append(feat.mean(0))
+                    neg_feat = torch.stack(neg_feat, dim=0).mean(0) 
+                    proto = torch.stack([pos_feat,neg_feat], dim=0)
                 
                 
                 
@@ -328,7 +329,7 @@ class SNN(BaseModel):
         best_f1 = 0
         best_report = {}
         best_threshold = 0
-        for threshold in np.arange(0.5, 1, 0.05):
+        for threshold in np.arange(0.5, 1, 0.1):
             if fix_shreshold is not None:
                 threshold = fix_shreshold
             report_f1 = {}

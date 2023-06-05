@@ -97,7 +97,7 @@ class ProtoMAML(BaseModel):
             weight.fast = None
 
         # Optimize inner loop model on support set
-        for i in range(10):
+        for i in range(100):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(support_data, support_label, mode = mode, query_data = query_data)
             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
