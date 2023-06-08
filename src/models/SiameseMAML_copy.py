@@ -47,11 +47,11 @@ class SNNMAML(BaseModel):
             weight.fast = None
         self.feature_extractor.zero_grad()
         
-        sampler = IntClassSampler(self.config, support_label, 50)
+        sampler = IntClassSampler(self.config, support_label, 500)
         dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
-        
-        for i in range(5):
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 10)
+        # self.config.train.lr_inner = 0.01
+        for i in range(1):
             for batch in dataloader:
                 data, lable = batch
                 anchor, pos, neg = data
@@ -202,7 +202,7 @@ class SNNMAML(BaseModel):
     def test_loop(self, test_loader ,fix_shreshold= None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(10):
+        for i in range(1):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -226,7 +226,7 @@ class SNNMAML(BaseModel):
                 pos_data = pos_sup[1].squeeze()
                 query = query.squeeze()
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
-                query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                query_loader = DataLoader(query_dataset, batch_size=256, shuffle=False)
                 pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 
@@ -235,12 +235,12 @@ class SNNMAML(BaseModel):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     
-                    if neg_sup[1].shape[0] > test_loop_neg_sample:
-                        neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
-                        neg_seg_sample = neg_sup[1][neg_indices]
-                    else:
-                        neg_seg_sample = neg_sup[1]
-
+                    # if neg_sup[1].shape[0] > test_loop_neg_sample:
+                    #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
+                    #     neg_seg_sample = neg_sup[1][neg_indices]
+                    # else:
+                    #     neg_seg_sample = neg_sup[1]
+                    neg_seg_sample = neg_sup[1]
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                     

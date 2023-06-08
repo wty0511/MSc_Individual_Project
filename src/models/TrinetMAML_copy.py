@@ -68,19 +68,19 @@ class TNNMAML(BaseModel):
         for weight in self.feature_extractor.parameters():
             weight.fast = None
         self.feature_extractor.zero_grad()
-        # self.config.train.lr_inner = 0.0001
         sampler = IntClassSampler(self.config, support_label, 50)
         dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
-        for i in range(1):
-            for batch in dataloader:
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 10)
+        
+        for batch in dataloader:
+            for i in range(1):
                 data, lable = batch
                 anchor, pos, neg = data
 
                 anchor_feat = self.feature_extractor(anchor)
                 pos_feat = self.feature_extractor(pos)
                 neg_feat = self.feature_extractor(neg)
- 
+
                 loss = self.loss_fn(anchor_feat, pos_feat, neg_feat)
                 # for name, parameter in self.feature_extractor.named_parameters():
                 #     print(name)
@@ -93,13 +93,14 @@ class TNNMAML(BaseModel):
                 for k, weight in enumerate(self.parameters()):
                     #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                     if weight.fast is None:
-                        # print(grad[k])
+                        
                         weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
                     else:
+                        # print(grad[k])
                         weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                     fast_parameters.append(weight.fast) # update the fast_parameters
                 loss = loss.detach()
-                print('inner loop: loss:{:.3f}'.format(loss.item()))
+                # print('inner loop: loss:{:.3f}'.format(loss.item()))
                 
         # print('!!!!!!!')
         if mode != 'train':
@@ -119,25 +120,26 @@ class TNNMAML(BaseModel):
 
 
     def feed_forward(self, support_data, query_data):
-        # # Execute a model with given output layer weights and inputs
-        # support_feat = self.feature_extractor(support_data)
-        # # nway 不是2nway要注意
-        # support_feat = self.split_1d(support_feat)
-        # prototype = support_feat.mean(0)
-        # query_feat = self.feature_extractor(query_data)
-        # dists = self.euclidean_dist(query_feat, prototype)
+        # Execute a model with given output layer weights and inputs
+        support_feat = self.feature_extractor(support_data)
+        # nway 不是2nway要注意
+        support_feat = self.split_1d(support_feat)
+        prototype = support_feat.mean(0)
+        query_feat = self.feature_extractor(query_data)
+        dists = self.euclidean_dist(query_feat, prototype)
 
-        # scores = -dists
+        scores = -dists
         
-        # preds = scores.argmax(dim=1)
-        # # print(dists)
-        # y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-        # acc = torch.eq(preds, y_query).float().mean()
-        # # print(acc)
-        # loss = self.ce(scores, y_query)
-        # y_query = y_query.cpu().numpy()
-        # preds = preds.detach().cpu().numpy()
-        # report = classification_report(y_query, preds,zero_division=0, digits=3)
+        preds = scores.argmax(dim=1)
+        # print(dists)
+        y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
+        acc = torch.eq(preds, y_query).float().mean()
+        # print(acc)
+        loss = self.ce(scores, y_query)
+        # print(loss)
+        y_query = y_query.cpu().numpy()
+        preds = preds.detach().cpu().numpy()
+        report = classification_report(y_query, preds,zero_division=0, digits=3)
         
         query_label = np.tile(np.arange(self.n_way),self.n_query)
         sampler = IntClassSampler(self.config, query_label, 50)
@@ -157,6 +159,7 @@ class TNNMAML(BaseModel):
             # print('inner loop: loss:{:.3f}'.format(loss[-1].item()))
             # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
         
+        
         loss = torch.mean(torch.stack(loss))
         report = None
         acc = torch.tensor(0.0).to(self.device)
@@ -171,11 +174,33 @@ class TNNMAML(BaseModel):
         dists = self.euclidean_dist(query_feat, prototype)
 
         pred = dists.argmin(-1)
-        
+        # print(dists)
         scores = -dists
         preds = F.softmax(scores, dim = 1)
         preds = preds.detach().cpu().numpy()
         return preds, query_feat
+    
+    
+    
+    # def feed_forward_test(self,  pos, neg, query_data):
+    #     # Execute a model with given output layer weights and inputs
+        
+    #     query_feat = self.feature_extractor(query_data)
+    #     # print(query_feat.shape)
+    #     dists_pos = self.euclidean_dist(query_feat, pos).mean(1)
+    #     # print(dists_pos.shape)
+    #     dists_neg = self.euclidean_dist(query_feat, neg).mean(1)
+    #     # print(dists_neg.shape)
+    #     dists = torch.stack([dists_pos, dists_neg], dim=1)
+    #     # print(dists.shape)
+    #     # print('~~~~~~~~~~~~~~~')
+    #     pred = dists.argmin(-1)
+    #     # print(dists)
+    #     scores = -dists
+    #     preds = F.softmax(scores, dim = 1)
+    #     preds = preds.detach().cpu().numpy()
+    #     return preds, query_feat
+    
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
     
@@ -193,7 +218,12 @@ class TNNMAML(BaseModel):
                     support_label = np.tile(np.arange(self.n_way),self.n_support)
 
                 else:
-                    raise ValueError('neg_prototype must be False')
+                    pos_data, neg_data = task 
+                    classes, data_pos, _ =pos_data
+                    _, data_neg, _ =neg_data
+                    # support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+                    support_data, query_data = self.split_support_query_data(data_pos, data_neg)
+                    support_label = np.tile(np.arange(self.n_way*2),self.n_support)
                 # print(support_data.shape)
                 # print(support_label)
                 self.inner_loop(support_data, support_label, mode = 'train')
@@ -222,20 +252,20 @@ class TNNMAML(BaseModel):
     def get_topk_sim(self, pos, neg):
         # 最不相似的k个
         
-        distances = torch.sqrt(torch.sum((neg - pos.mean(dim=0).unsqueeze(0))**2, dim=(-1,)))
+        distances = torch.sqrt(torch.sum((neg - pos.mean(dim=0).unsqueeze(0))**2, dim=(-1,-2)))
         similarity_scores = 1.0 / (1.0 + distances)  # 加1是为了防止除以零
-        k= min(pos.size(0), neg.size(0))
-        _, indices = torch.topk(similarity_scores, k= neg.size(0))
+        k= np.min([pos.size(0), neg.size(0)])
+        _, indices = torch.topk(similarity_scores, k= k)
         
-        # neg[indices[torch.linspace(0, indices.size(0) - 1, k).long()]]
-        # neg[indices[-k:]]
-        
+        # indices[torch.linspace(0, indices.size(0) - 1, k).long()]
+        # indices[-k:]
+        # indices[:k]
         return  indices[torch.linspace(0, indices.size(0) - 1, k).long()]
     
     def test_loop(self, test_loader, fix_shreshold=None): 
         best_res_all = []
         best_threshold_all = []
-        for i in range(1):
+        for i in range(5):
             
             all_prob = {}
             all_meta = {}
@@ -266,14 +296,16 @@ class TNNMAML(BaseModel):
                 
                 prob_mean = []
                 for i in range(1):
-                    # if neg_sup[1].shape[0] > test_loop_neg_sample:
-                    #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:int(neg_sup[1].shape[0] * 0.1)]
-                    #     neg_seg_sample = neg_sup[1][neg_indices]
-                    # else:
-                    neg_sup[1] = neg_sup[1].squeeze() 
+                    test_loop_neg_sample = self.config.val.test_loop_neg_sample
+                    if neg_sup[1].shape[0] > test_loop_neg_sample:
+                        neg_indices = torch.randperm(neg_sup[1].shape[0])[:50]
+                        neg_seg_sample = neg_sup[1][neg_indices]
+                    else:
+                        neg_sup[1] = neg_sup[1].squeeze() 
+                    # neg_sup[1] = neg_sup[1].squeeze() 
                     
                     neg_seg_sample = neg_sup[1]
-                    
+                    print(pos_data.shape)
                     print(neg_seg_sample.shape)
                     
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
@@ -290,29 +322,26 @@ class TNNMAML(BaseModel):
                     directory = os.path.dirname(feat_file)
                     if not os.path.exists(directory):
                         os.makedirs(directory)
-                    with h5py.File(feat_file, 'w') as f:
-                        dset = f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                        labels_dset = f.create_dataset("labels", data=label)
                         
-                    test_loop_neg_sample = self.config.val.test_loop_neg_sample
+                    
 
-                    pos_feat  = []
-                    for batch in pos_loader:
-                        p_data, _ = batch
-                        feat = self.feature_extractor(p_data)
-                        # print(feat.shape)
-                        pos_feat.append(feat)
-                    pos_feat = torch.cat(pos_feat, dim=0)
-                    neg_feat = []
-                    with torch.no_grad():
-                        for batch in neg_loader:
-                            n_data, _ = batch
-                            # print(neg_data.shape)
-                            feat = self.feature_extractor.forward(n_data)
-                            # print(feat.shape)
-                            neg_feat.append(feat)
+                    # pos_feat  = []
+                    # for batch in pos_loader:
+                    #     p_data, _ = batch
+                    #     feat = self.feature_extractor(p_data)
+                    #     # print(feat.shape)
+                    #     pos_feat.append(feat)
+                    # pos_feat = torch.cat(pos_feat, dim=0)
+                    # neg_feat = []
+                    # with torch.no_grad():
+                    #     for batch in neg_loader:
+                    #         n_data, _ = batch
+                    #         # print(neg_data.shape)
+                    #         feat = self.feature_extractor.forward(n_data)
+                    #         # print(feat.shape)
+                    #         neg_feat.append(feat)
 
-                    neg_feat = torch.cat(neg_feat, dim=0)
+                    # neg_feat = torch.cat(neg_feat, dim=0)
                     # print('pos',len(pos_feat))
                     # print('neg',len(neg_feat))
                                         
@@ -320,16 +349,22 @@ class TNNMAML(BaseModel):
                     # print('neg',neg_feat.shape)
  
                     
-                    neg_seg_sample_index = self.get_topk_sim(pos_feat, neg_feat)
+                    neg_seg_sample_index = self.get_topk_sim(pos_data, neg_seg_sample)
+
+
+
+                    # neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
                     
-
-  
-
-
-                    neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
+                    
                     # pos_data = pos_data[:5]
                     # neg_seg_sample = neg_seg_sample[:5]
                     support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
+                    # support_dataset = TensorDataset(support_data, torch.zeros(support_data.shape[0]))
+                    # support_loader = DataLoader(support_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                    
+                    
+                
+                    # support_feats = self.feature_extractor(support_data)
                     # support_data = pos_data
                     m = pos_data.shape[0]
                     n = neg_seg_sample.shape[0]
@@ -337,13 +372,24 @@ class TNNMAML(BaseModel):
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
                     # support_label = np.zeros((m,))
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
+                    
+                    with h5py.File(feat_file, 'w') as f:
+                        f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                        f.create_dataset("labels", data=label.squeeze(0).numpy())
+                        # f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                        # f.create_dataset("labels_t", data=support_label)
+                        # support_data
+                        
                     self.inner_loop(support_data, support_label, mode = 'test')
+
                     pos_feat  = []
                     for batch in pos_loader:
                         p_data, _ = batch
                         feat = self.feature_extractor(p_data)
                         # print(feat.shape)
                         pos_feat.append(feat.mean(0))
+                    # pos = torch.cat(pos_feat, dim=0)
+                    # print('pos',pos.shape)
                     pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                     neg_feat = []
                     with torch.no_grad():
@@ -353,7 +399,8 @@ class TNNMAML(BaseModel):
                             feat = self.feature_extractor.forward(n_data)
                             # print(feat.shape)
                             neg_feat.append(feat.mean(0))
-
+                    # neg = torch.cat(neg_feat, dim=0)
+                    # print('neg',neg.shape)
                     neg_feat = torch.stack(neg_feat, dim=0).mean(0) 
                     proto = torch.stack([pos_feat,neg_feat], dim=0)
                     
@@ -393,6 +440,9 @@ class TNNMAML(BaseModel):
                 all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
                 for wav_file in all_prob.keys():
                     
+                    # if '21-ML_176488' not in wav_file:
+                    #     continue
+                    # print(wav_file)
                     prob = np.where(all_prob[wav_file]>threshold, 1, 0)
 
                     # acc = np.sum(prob^1 == np.array(all_meta[wav_file]['label']))/len(prob)
@@ -414,7 +464,7 @@ class TNNMAML(BaseModel):
                     # print(len(prob))
                     # print(np.sum(prob))
                     # print(np.sum(prob)/len(prob))
-
+                    # print(report_f1[os.path.basename(wav_file)])
 
                     on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                     off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
@@ -439,9 +489,9 @@ class TNNMAML(BaseModel):
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 print('pred_path')
-                print(pred_path)
-                pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
                 
+                pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
+                print(pred_path)
                 if not os.path.exists(os.path.dirname(pred_path)):
                     os.makedirs(os.path.dirname(pred_path))
                 df_all_time.to_csv(pred_path, index=False)

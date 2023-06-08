@@ -86,7 +86,7 @@ class ProtoMAMLfw(BaseModel):
 
         # Create output layer weights 
         # Optimize inner loop model on support set
-        for i in range(10):
+        for i in range(5):
             # Determine loss on the support set
             loss = self.feed_forward(support_data, support_label)
 

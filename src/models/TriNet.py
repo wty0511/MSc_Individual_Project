@@ -15,6 +15,8 @@ from src.evaluation_metrics.evaluation_confidence_intervals import *
 from copy import deepcopy
 import random
 import torch.optim as optim
+import h5py
+
 class ContrastiveLoss(nn.Module):
     def __init__(self, margin):
         super(ContrastiveLoss, self).__init__()
@@ -223,14 +225,14 @@ class TriNet(BaseModel):
         query_feat = self.feature_extractor(query_data)
         dists = self.euclidean_dist(query_feat, prototype)
         # dists = self.cossim(query_feat, prototype)
-
+        # print(dists)
         pred = dists.argmin(-1)
         
         scores = -dists
         preds = F.softmax(scores, dim = 1)
         preds = preds.detach().cpu().numpy()
 
-        return preds
+        return preds, query_feat
     
 
 
@@ -261,6 +263,8 @@ class TriNet(BaseModel):
         self.feature_extractor.eval()
         all_prob = {}
         all_meta = {}
+
+                        
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
             seg_hop = seg_hop.item()
             query_start = query_start.item()
@@ -277,12 +281,23 @@ class TriNet(BaseModel):
             all_meta[wav_file]['seg_len'] = seg_len
             
             all_meta[wav_file]['label'] = label[0]
+            
+            feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
+            feat_file = os.path.join('/root/task5_2023/latent_feature/TNN_noMAML', feat_file)
+            if os.path.isfile(feat_file):
+                os.remove(feat_file)
+        
+            
+            directory = os.path.dirname(feat_file)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            
             # print(wav_file)
             # print(query_start)
             pos_data = pos_sup[1].squeeze()
             query = query.squeeze()
             query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
-            query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+            query_loader = DataLoader(query_dataset, batch_size=128, shuffle=False)
             pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             
@@ -300,15 +315,25 @@ class TriNet(BaseModel):
                 neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                 neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 
-
-                
                 support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
-                # support_data = pos_data
+                
+                #  support_data = pos_data
                 m = pos_data.shape[0]
                 n = neg_seg_sample.shape[0]
                 support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
                 support_label = torch.from_numpy(support_label).long().to(self.device)
                 
+                
+                support_feats = self.feature_extractor(support_data)
+                with h5py.File(feat_file, 'w') as f:
+                    f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                    f.create_dataset("labels", data=label.squeeze(0).numpy())
+                    f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                    f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                            
+                
+                
+      
                 
                 pos_feat  = []
                 for batch in pos_loader:
@@ -334,8 +359,16 @@ class TriNet(BaseModel):
                 prob_all = []
                 for batch in tqdm(query_loader):
                     query_data, _ = batch
-                    prob = self.feed_forward_test(proto, query_data)
+                    prob, feats  = self.feed_forward_test(proto, query_data)
                     prob_all.append(prob)
+                    with h5py.File(feat_file, 'a') as f:
+                            
+                            size = f['features'].shape[0]
+                            nwe_size = f['features'].shape[0] + feats.shape[0]
+
+                            f['features'].resize((nwe_size, 512))
+
+                            f['features'][size:nwe_size] = feats.detach().cpu().numpy()
                 prob_all = np.concatenate(prob_all, axis=0)
                 #########################################################################
                   

@@ -165,7 +165,7 @@ class ProtoMAML(BaseModel):
         local_model = deepcopy(self.feature_extractor)
         local_model.train() #
         # local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay)
-        local_optim = optim.SGD(local_model.parameters(), 0.0005, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+        local_optim = optim.SGD(local_model.parameters(), 0.01, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
         local_optim.zero_grad()
         # Create output layer weights with prototype-based initialization
         # init_weight = 2 * prototypes
@@ -174,12 +174,13 @@ class ProtoMAML(BaseModel):
         # init_weight =  prototypes
         init_bias = -torch.norm(prototypes, dim=1)**2
 
+        
 
 
         output_weight = init_weight.detach().requires_grad_()
         output_bias = init_bias.detach().requires_grad_()
         # Optimize inner loop model on support set
-        for i in range(10):
+        for i in range(1000):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
@@ -327,7 +328,7 @@ class ProtoMAML(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(10):
+        for i in range(1):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -418,7 +419,7 @@ class ProtoMAML(BaseModel):
                     local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, proto, support_label, mode = 'test')
                     with h5py.File(feat_file, 'w') as f:
                         f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                        f.create_dataset("labels", data=label)
+                        f.create_dataset("labels", data=label.squeeze().cpu().numpy())
                         f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
                         f.create_dataset("labels_t", data=support_label.cpu().numpy())
                     prob_all = []
