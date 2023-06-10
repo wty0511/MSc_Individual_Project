@@ -59,7 +59,7 @@ class TNNMAML(BaseModel):
         super(TNNMAML, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = TripletLoss(margin=10.0)
+        self.loss_fn = TripletLoss(margin=10)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
@@ -68,9 +68,9 @@ class TNNMAML(BaseModel):
         for weight in self.feature_extractor.parameters():
             weight.fast = None
         self.feature_extractor.zero_grad()
-        sampler = IntClassSampler(self.config, support_label, 50)
+        sampler = IntClassSampler(self.config, support_label, 5000)
         dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 10)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
         
         for batch in dataloader:
             for i in range(1):
@@ -100,7 +100,7 @@ class TNNMAML(BaseModel):
                         weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                     fast_parameters.append(weight.fast) # update the fast_parameters
                 loss = loss.detach()
-                # print('inner loop: loss:{:.3f}'.format(loss.item()))
+        print('inner loop: loss:{:.3f}'.format(loss.item()))
                 
         # print('!!!!!!!')
         if mode != 'train':
@@ -141,28 +141,28 @@ class TNNMAML(BaseModel):
         preds = preds.detach().cpu().numpy()
         report = classification_report(y_query, preds,zero_division=0, digits=3)
         
-        query_label = np.tile(np.arange(self.n_way),self.n_query)
-        sampler = IntClassSampler(self.config, query_label, 50)
-        dataset =  PairDataset(self.config, query_data, query_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
-        loss = []
-        for batch in dataloader:
-            data, lable = batch
-            anchor, pos, neg = data
-            # print(anchor.shape)
-            # print(pos.shape)
-            # print(neg.shape)
-            anchor_feat = self.feature_extractor(anchor)
-            pos_feat = self.feature_extractor(pos)
-            neg_feat = self.feature_extractor(neg)
-            loss.append(self.loss_fn(anchor_feat, pos_feat, neg_feat))
-            # print('inner loop: loss:{:.3f}'.format(loss[-1].item()))
-            # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
+        # query_label = np.tile(np.arange(self.n_way),self.n_query)
+        # sampler = IntClassSampler(self.config, query_label, 50)
+        # dataset =  PairDataset(self.config, query_data, query_label, debug = False)
+        # dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        # loss = []
+        # for batch in dataloader:
+        #     data, lable = batch
+        #     anchor, pos, neg = data
+        #     # print(anchor.shape)
+        #     # print(pos.shape)
+        #     # print(neg.shape)
+        #     anchor_feat = self.feature_extractor(anchor)
+        #     pos_feat = self.feature_extractor(pos)
+        #     neg_feat = self.feature_extractor(neg)
+        #     loss.append(self.loss_fn(anchor_feat, pos_feat, neg_feat))
+        #     # print('inner loop: loss:{:.3f}'.format(loss[-1].item()))
+        #     # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
         
         
-        loss = torch.mean(torch.stack(loss))
-        report = None
-        acc = torch.tensor(0.0).to(self.device)
+        # loss = torch.mean(torch.stack(loss))
+        # report = None
+        # acc = torch.tensor(0.0).to(self.device)
         return loss, report, acc
         
     
@@ -229,6 +229,7 @@ class TNNMAML(BaseModel):
                 self.inner_loop(support_data, support_label, mode = 'train')
                 
                 loss, _, acc = self.feed_forward(support_data, query_data)
+                accuracies.append(acc)
                 # print(acc)
                 # print('test: loss:{:.3f}'.format(loss.item()))
                 loss_all.append(loss)
@@ -237,6 +238,7 @@ class TNNMAML(BaseModel):
                 # print('outer loop: loss:{:.3f}'.format(loss.item()))
             loss_q = torch.stack(loss_all).sum(0)
             loss_q.backward()
+            print('outer loop: acc:{:.3f}'.format(torch.stack(accuracies).mean().item()))
             # for i in self.parameters():
             #     print(i.grad)
             # for name, param in self.feature_extractor.named_parameters():
@@ -265,7 +267,7 @@ class TNNMAML(BaseModel):
     def test_loop(self, test_loader, fix_shreshold=None): 
         best_res_all = []
         best_threshold_all = []
-        for i in range(5):
+        for i in range(1):
             
             all_prob = {}
             all_meta = {}
@@ -297,12 +299,12 @@ class TNNMAML(BaseModel):
                 prob_mean = []
                 for i in range(1):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
-                    if neg_sup[1].shape[0] > test_loop_neg_sample:
-                        neg_indices = torch.randperm(neg_sup[1].shape[0])[:50]
-                        neg_seg_sample = neg_sup[1][neg_indices]
-                    else:
-                        neg_sup[1] = neg_sup[1].squeeze() 
-                    # neg_sup[1] = neg_sup[1].squeeze() 
+                    # if neg_sup[1].shape[0] > test_loop_neg_sample:
+                    #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:50]
+                    #     neg_seg_sample = neg_sup[1][neg_indices]
+                    # else:
+                    #     neg_sup[1] = neg_sup[1].squeeze() 
+                    neg_sup[1] = neg_sup[1].squeeze() 
                     
                     neg_seg_sample = neg_sup[1]
                     print(pos_data.shape)
@@ -364,7 +366,7 @@ class TNNMAML(BaseModel):
                     
                     
                 
-                    # support_feats = self.feature_extractor(support_data)
+                    support_feats = self.feature_extractor(support_data)
                     # support_data = pos_data
                     m = pos_data.shape[0]
                     n = neg_seg_sample.shape[0]
@@ -376,8 +378,8 @@ class TNNMAML(BaseModel):
                     with h5py.File(feat_file, 'w') as f:
                         f.create_dataset("features", (0, 512), maxshape=(None, 512))
                         f.create_dataset("labels", data=label.squeeze(0).numpy())
-                        # f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
-                        # f.create_dataset("labels_t", data=support_label)
+                        f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                        f.create_dataset("labels_t", data=support_label)
                         # support_data
                         
                     self.inner_loop(support_data, support_label, mode = 'test')
@@ -444,12 +446,16 @@ class TNNMAML(BaseModel):
                     #     continue
                     # print(wav_file)
                     prob = np.where(all_prob[wav_file]>threshold, 1, 0)
-
+                    
+            
                     # acc = np.sum(prob^1 == np.array(all_meta[wav_file]['label']))/len(prob)
                     # 计算分类报告
                     y_pred = prob^1
+ 
+                    
                     y_true =  np.array(all_meta[wav_file]['label'])
-    
+
+                    
                     # print(all_meta[wav_file]['seg_hop'])
                     # print(all_meta[wav_file]['seg_len'])
                     # 输出分类报告
@@ -465,7 +471,9 @@ class TNNMAML(BaseModel):
                     # print(np.sum(prob))
                     # print(np.sum(prob)/len(prob))
                     # print(report_f1[os.path.basename(wav_file)])
-
+                    if 'DCASE2021-ML_190099' in wav_file:
+                        print(all_prob[wav_file])
+                        print(prob)
                     on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                     off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
                     # for i, j in zip(on_set, off_set):
@@ -490,7 +498,7 @@ class TNNMAML(BaseModel):
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 print('pred_path')
                 
-                pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
+                pred_path = os.path.join(pred_path, 'pred_test{:.2f}.csv'.format(threshold))
                 print(pred_path)
                 if not os.path.exists(os.path.dirname(pred_path)):
                     os.makedirs(os.path.dirname(pred_path))

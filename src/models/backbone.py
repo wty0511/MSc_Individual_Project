@@ -275,6 +275,55 @@ class ConvNetfw(nn.Module):
         out = self.avgpool(out)
         out = out.view(x.size(0),-1)
         return out
+    
+class SNNfw(nn.Module):
+    def __init__(self, depth = 3):
+        super(SNNfw,self).__init__()
+        trunk = []
+        for i in range(depth):
+            indim = 1 if i == 0 else 64
+            outdim = 64
+            B = ConvBlock(indim, outdim, pool = ( i < 4 ) ) #only pooling for fist 4 layers
+            trunk.append(B)
+        self.trunk = nn.Sequential(*trunk)
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.fc1 = Linear_fw(512, 256)
+        self.fc2 = Linear_fw(256, 1)
+        self.fc1.bias.data.fill_(0)
+        self.fc2.bias.data.fill_(0)
+        self.activation = nn.Sigmoid()
+        
+
+    
+    def forward(self,*args):
+        if len(args) == 1:
+            x = args[0]
+            (num_samples,seq_len,mel_bins) = x.shape
+            x = x.view(-1,1,seq_len,mel_bins)
+            out = self.trunk(x)
+            out = self.avgpool(out)
+            out = out.view(x.size(0),-1)
+            return out
+        if len(args) == 2:
+            x1,x2 = args
+            (num_samples,seq_len,mel_bins) = x1.shape
+            
+            x1 = x1.view(-1,1,seq_len,mel_bins)
+            x2 = x2.view(-1,1,seq_len,mel_bins)
+            
+            out1 = self.trunk(x1)
+            out1 = self.avgpool(out1)
+
+            out2 = self.trunk(x2)
+            out2 = self.avgpool(out2)
+            
+            out = torch.abs(out1 - out2)
+            out = out.view(x1.size(0),-1)
+            out = self.fc1(out)
+            out = self.fc2(out)
+            out = self.activation(out)
+
+            return out
 
 class ConvNetNopool(nn.Module): #Relation net use a 4 layer conv with pooling in only first two layers, else no pooling
     def __init__(self, depth):

@@ -10,7 +10,7 @@ from src.models.ProtoMAML import ProtoMAML
 # from src.models.ProtoMAMLcopy import *
 # from src.models.ProtoMAML_loss import *
 # from src.models.SiameseMAML import *
-from src.models.SiameseMAML_copy import *
+from src.models.SiameseMAML_copy2 import *
 from src.models.ProtoMAMLfw import *
 from src.models.MAML import *
 # from src.models.TrinetMAML import *
@@ -26,13 +26,13 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 42
+SEED = 12
 set_seed(SEED)
 
 # cfg = compose(config_name="config.yaml")
 # model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
-save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNet_no_neg_2way/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNetresnet/Model/best_model.pth"
 
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -57,7 +57,7 @@ model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
 model.load_state_dict(model_state)
 model.eval()
@@ -72,8 +72,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))

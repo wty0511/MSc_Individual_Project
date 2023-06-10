@@ -4,7 +4,7 @@ from src.models.ProtoMAML import *
 
 from src.models.MAML import *
 # from src.models.SiameseMAML import *
-from src.models.SiameseMAML_copy import *
+from src.models.SiameseMAML_copy2 import *
 # from src.models.SiameseMAML_sigmoid import *
 import os
 import sys
@@ -49,10 +49,10 @@ batch_sampler = TaskBatchSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-# model = ProtoMAML(cfg)
+model = ProtoMAML(cfg)
 # model = SNNMAML(cfg)
 # model = MAML(cfg)
-model = TNNMAML(cfg)
+# model = TNNMAML(cfg)
 # model = ProtoMAMLfw(cfg)
 print(len(train_loader))
 model = model.cuda()
@@ -65,7 +65,7 @@ model.train()
 
 no_imporve = 0
 
-for epoch in range(50):
+for epoch in range(250):
     model.train()
     model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):
@@ -78,7 +78,7 @@ for epoch in range(50):
     df_all_time, report, threshold = model.test_loop(val_loader)
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
-    if no_imporve == 15:
+    if no_imporve == 30:
         break
     if f1 > best_f1:
         no_imporve = 0

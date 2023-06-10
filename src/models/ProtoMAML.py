@@ -163,9 +163,9 @@ class ProtoMAML(BaseModel):
         
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
-        local_model.train() #
-        # local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay)
-        local_optim = optim.SGD(local_model.parameters(), 0.01, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+        local_model.train()
+        local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay)
+        # local_optim = optim.SGD(local_model.parameters(), 0.01, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
         local_optim.zero_grad()
         # Create output layer weights with prototype-based initialization
         # init_weight = 2 * prototypes
@@ -176,11 +176,13 @@ class ProtoMAML(BaseModel):
 
         
 
-
+        
         output_weight = init_weight.detach().requires_grad_()
         output_bias = init_bias.detach().requires_grad_()
+
+        # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(1000):
+        for i in range(200):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
@@ -190,14 +192,16 @@ class ProtoMAML(BaseModel):
             local_optim.step()
             # Update output layer via SGD
             
-            # output_weight.data -= self.config.train.lr_inner * output_weight.grad
-            # output_bias.data -= self.config.train.lr_inner * output_bias.grad
+            output_weight.data -= self.config.train.lr_inner * output_weight.grad
+            output_bias.data -= self.config.train.lr_inner * output_bias.grad
             # Reset gradients
             local_optim.zero_grad()
-            # output_weight.grad.fill_(0)
-            # output_bias.grad.fill_(0)
+            output_weight.grad.fill_(0)
+            output_bias.grad.fill_(0)
             loss = loss.detach()
+            # print('loss', loss)
             acc = torch.mean(acc).detach()
+        # print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -207,11 +211,13 @@ class ProtoMAML(BaseModel):
         output_weight = (output_weight - init_weight).detach() + init_weight
         output_bias = (output_bias - init_bias).detach() + init_bias
         support_feat = local_model(support_data)
+        # print('end inner loop')
         return local_model, output_weight, output_bias, support_feat
     
     
     def feed_forward(self, local_model, output_weight, output_bias, data, labels, mode):
         # Execute a model with given output layer weights and inputs
+        # print('feed_forward')
         feats = local_model(data)
         c_loss = torch.tensor(0.0).to(self.device)
         # feats_pos = torch.mean(feats[(labels == 0)], dim=0)
@@ -220,7 +226,7 @@ class ProtoMAML(BaseModel):
         # c_loss = c_loss/feats[(labels == 1)].shape[0]
 
         dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
-        data_loader = DataLoader(dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+        data_loader = DataLoader(dataset, batch_size=64, shuffle=False)
         preds_all = []
         for batch in data_loader:
             data, _ = batch
@@ -249,14 +255,15 @@ class ProtoMAML(BaseModel):
         labels = labels.cpu().numpy()
         preds = preds.argmax(dim=1).detach().cpu().numpy()
         report = classification_report(labels, preds,zero_division=0, digits=3)
+        # print(report)
         loss+=c_loss
-        
         return loss, report, acc
 
     
     
     def feed_forward_test(self, local_model, output_weight, output_bias, data):
         # Execute a model with given output layer weights and inputs
+        local_model.eval()
         feats = local_model(data)
         preds = F.linear(feats, output_weight, output_bias)
         preds = F.softmax(preds, dim = 1)
@@ -295,7 +302,8 @@ class ProtoMAML(BaseModel):
                 local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, support_feat, support_label)
                 
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-                loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label, mode = 'train')
+                # print('after inner loop')
+                loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label, mode = 'test')
                 
                 if mode == 'train':
                     # for g in self.feature_extractor.parameters():
@@ -417,24 +425,24 @@ class ProtoMAML(BaseModel):
 
                     
                     local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, proto, support_label, mode = 'test')
-                    with h5py.File(feat_file, 'w') as f:
-                        f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                        f.create_dataset("labels", data=label.squeeze().cpu().numpy())
-                        f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
-                        f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                    # with h5py.File(feat_file, 'w') as f:
+                    #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                    #     f.create_dataset("labels", data=label.squeeze().cpu().numpy())
+                    #     f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                    #     f.create_dataset("labels_t", data=support_label.cpu().numpy())
                     prob_all = []
                     for batch in tqdm(query_loader):
                         query_data, _ = batch
                         prob, feats = self.feed_forward_test(local_model, output_weight, output_bias, query_data)
                         feats = feats.detach().cpu().numpy()
-                        with h5py.File(feat_file, 'a') as f:
+                        # with h5py.File(feat_file, 'a') as f:
                             
-                            size = f['features'].shape[0]
-                            nwe_size = f['features'].shape[0] + feats.shape[0]
+                        #     size = f['features'].shape[0]
+                        #     nwe_size = f['features'].shape[0] + feats.shape[0]
 
-                            f['features'].resize((nwe_size, 512))
+                        #     f['features'].resize((nwe_size, 512))
 
-                            f['features'][size:nwe_size] = feats
+                        #     f['features'][size:nwe_size] = feats
                         prob_all.append(prob)
                     prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################

@@ -13,7 +13,7 @@ def post_processing(df):
     '''
     new_df = pd.DataFrame(columns=['Audiofilename', 'Starttime', 'Endtime'])
     for i, row in df.iterrows():
-        if row['Endtime'] - row['Starttime'] > 0.200:
+        if row['Endtime'] - row['Starttime'] > 0.099:
             new_df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
 
         

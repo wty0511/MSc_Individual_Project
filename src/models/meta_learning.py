@@ -5,7 +5,7 @@ from src.models.ResNet2 import *
 from abc import abstractmethod
 from src.models.ConvNet import *
 from src.models.Transformer import *
-from src.models.backbone import ConvNetfw, ConvNetClassifierfw
+from src.models.backbone import ConvNetfw, ConvNetClassifierfw, SNNfw
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 class BaseModel(nn.Module):
@@ -30,11 +30,13 @@ class BaseModel(nn.Module):
         elif config.train.backbone == 'convclassifier':
             self.feature_extractor = ConvClassifier()
         elif config.train.backbone == 'transformer':
-            self.feature_extractor = Transformer(input_dim = 128, num_heads = 4, num_layers = 1)
+            self.feature_extractor = Transformer(input_dim = 128, num_heads = 4, num_layers = 3)
         elif config.train.backbone == 'convclassifierfw':
             self.feature_extractor = ConvNetClassifierfw()
         elif config.train.backbone == 'convsnn':
             self.feature_extractor = ConvSNN()
+        elif config.train.backbone == 'snnfw':
+            self.feature_extractor =   SNNfw()
         else:
             raise ValueError('Unsupported feature extractor: {}'.format(config.train.backbone))
     def forward(self,x):
