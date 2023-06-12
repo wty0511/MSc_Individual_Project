@@ -91,7 +91,7 @@ def get_silhouette_score(feats, labels):
     return torch.mean(scores)
 
 
-class ProtoMAML(BaseModel):
+class ProtoMAML_temp(BaseModel):
     
     def __init__(self, config):
         """
@@ -103,11 +103,17 @@ class ProtoMAML(BaseModel):
             num_inner_steps - Number of inner loop updates to perform
         """
         
-        super(ProtoMAML, self).__init__(config)
+        super(ProtoMAML_temp, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
         self.tri_loss = TripletLoss(margin = 1)
+        self.regularizer = nn.Sequential(
+                nn.Linear(1024, 512),
+                nn.ReLU(inplace=True),
+                nn.Linear(512, 1),
+                nn.SELU()
+            ).to(device=self.device)
     def feed_forward2(self, support_data, support_label):
         # # Execute a model with given output layer weights and inputs
         # support_feat = self.feature_extractor(support_data)
@@ -241,8 +247,14 @@ class ProtoMAML(BaseModel):
             feats.append(local_model(data))
             
         feats = torch.cat(feats, dim=0)
-        pos_num = feats[(labels == 0)].shape[0]
-        neg_num = feats[(labels == 1)].shape[0]
+        
+        pos_mean = torch.mean(feats[(labels == 0)], dim=0)
+        neg_mean = torch.mean(feats[(labels == 1)], dim=0)
+
+        temperature_input = torch.cat((pos_mean, neg_mean), dim=0)
+        # print(temperature_input.shape)
+
+        
         
         c_loss = torch.tensor(0.0).to(self.device)
         # feats_pos = torch.mean(feats[(labels == 0)], dim=0)
@@ -250,6 +262,8 @@ class ProtoMAML(BaseModel):
         #     c_loss+=self.contrastive_loss(feats_pos, i, torch.tensor(0).to(self.device))
         # c_loss = c_loss/feats[(labels == 1)].shape[0]
 
+        temp = self.regularizer(temperature_input)
+        # print(temp)
         dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
         data_loader = DataLoader(dataset, batch_size=32, shuffle=False)
         preds_all = []
@@ -260,11 +274,10 @@ class ProtoMAML(BaseModel):
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
         half_size = output_weight.shape[0] // 2
-        temperature = 1.0
-        preds = preds / temperature
+        temperature = 2.0
+        preds = preds / temp
         if self.config.train.neg_prototype or mode == 'test':
-            
-            weights = torch.cat((torch.full((half_size,), 10, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((half_size,), 5, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:
             loss = F.cross_entropy(preds, labels)
@@ -342,7 +355,7 @@ class ProtoMAML(BaseModel):
                         if p_global.grad is None or p_local.grad is None:
                             print('None')
                             continue
-                        
+                        # print(p_global.grad)
                         p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
                 loss = loss.detach().cpu().item()
                 acc = acc.mean().detach().cpu().item()
@@ -362,7 +375,7 @@ class ProtoMAML(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(5):
+        for i in range(1):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -426,6 +439,7 @@ class ProtoMAML(BaseModel):
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                     neg_feat = []
+
                     for batch in neg_loader:
                         n_data, _ = batch
                         # print(neg_data.shape)

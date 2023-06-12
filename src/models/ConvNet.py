@@ -208,6 +208,30 @@ class ConvClassifier(nn.Module):
         
         return x
 
+class PretrainClassifier(nn.Module):
+    def __init__(self):
+        super(PretrainClassifier,self).__init__()
+        self.encoder = nn.Sequential(
+            conv_block(1,64),
+            conv_block(64,64),
+            conv_block(64,64),
+            # conv_block(64,64)
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.fc = nn.Linear(512, 26)
+        
+    def forward(self,x):
+        (num_samples,seq_len,mel_bins) = x.shape
+
+        x = x.view(-1,1,seq_len,mel_bins)
+        x = self.encoder(x)
+        # print('x_shape ',x.shape)
+        x = self.avgpool(x)
+        x = x.view(x.size(0),-1)
+        # x = nn.MaxPool2d(2)(x)
+        x = self.fc(x)
+        return x
+
 
 class ConvSNN(nn.Module):
     def __init__(self):

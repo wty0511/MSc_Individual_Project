@@ -49,8 +49,11 @@ class ClassDataset(Dataset):
             self.data_dir = normalize_path(config.path.val_dir)
         elif mode == 'test':
             self.data_dir = normalize_path(config.path.test_dir)
+        elif mode == 'pretrain':
+            self.data_dir = normalize_path(config.path.pretrain_dir)
         else:
             raise ValueError('Unknown mode')
+        self.mode = mode
         self.debug = debug
         self.feature_per_file = {}
         self.classes = set()
@@ -74,8 +77,12 @@ class ClassDataset(Dataset):
             for name in class_name:
                 task_batch.append(self.get_task(name))
             return task_batch
-        elif isinstance(class_name, str):
+        elif isinstance(class_name, str) and self.mode != 'pretrain':
             return [self.get_task(class_name)]
+        elif self.mode == 'pretrain':
+            task =self.get_task(class_name)
+            
+            return task[1], torch.tensor(task[2]).to(self.device)
         else:
             raise ValueError('Unknown type')
     

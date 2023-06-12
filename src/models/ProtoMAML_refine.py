@@ -333,7 +333,7 @@ class ProtoMAML_refine(BaseModel):
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
         half_size = output_weight.shape[0] // 2
-        temperature = 2.0
+        temperature = 2
         preds = preds / temperature
         if self.config.train.neg_prototype or mode == 'test':
             weights = torch.cat((torch.full((half_size,), 3, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)

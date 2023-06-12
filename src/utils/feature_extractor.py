@@ -101,7 +101,9 @@ def walk_files(file, debug, file_extension = ('.wav', '.csv', '.npy')):
                'ME':0,
                'ML':0,
                'HV':0,
-               'PB':0}
+               'PB':0,
+               'WMW':0}
+    print(file_extension)
     for path, subdirs, files in os.walk(file):
         for name in files:
             if name.endswith(file_extension):
@@ -132,7 +134,21 @@ def preprecess(cfg):
             if not os.path.exists(os.path.dirname(save_path)):
                 os.makedirs(os.path.dirname(save_path))
             np.save(save_path, feature[feature_name])
-
+def preprecess_WMW(cfg):
+    feature_extractor = Feature_Extractor(cfg)
+    print("Extracting features...")
+    feature_list = cfg.features.feature_list.split("&")
+    # print(feature_list)
+    # print(normalize_path(cfg.path.data_dir))
+    for file in tqdm(walk_files('/root/task5_2023/Data_Set/WMW',debug = False, file_extension='.wav')):
+        feature = feature_extractor.extract_all_features(file)
+        for feature_name in feature_list:
+            save_path = audio2feature(file, feature_name)
+            if not os.path.exists(os.path.dirname(save_path)):
+                os.makedirs(os.path.dirname(save_path))
+            np.save(save_path, feature[feature_name])
+            
+            
 if __name__ == "__main__":
     if not GlobalHydra().is_initialized():
         initialize(config_path="../../")

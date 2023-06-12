@@ -23,6 +23,9 @@ class ProtoNet(BaseModel):
     def inner_loop(self,support, query):
         # print(support['label'].view(self.n_support, self.n_way * 2, -1 ))
         prototype     = support.mean(0).squeeze()
+        # norms = torch.norm(prototype, dim=1, keepdim=True)
+        # expanded_norms = norms.expand_as(prototype)
+        # prototype = prototype / expanded_norms
         # query['label'] = query['label'].to(self.device)
         dists = self.euclidean_dist(query.view(-1, query.shape[-1]), prototype)
         # print(dists)

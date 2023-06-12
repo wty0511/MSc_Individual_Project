@@ -5,10 +5,13 @@ path:
   train_dir: ${path.data_dir}/Training_Set
   val_dir: ${path.data_dir}/Validation_Set
   test_dir: ${path.data_dir}/Evaluation_Set
+  pretrain_dir: ${path.data_dir}/WMW
   feature_dir: ${path.root_dir}/Features
   train_feature_dir: ${path.feature_dir}/Training_Set
   val_feature_dir: ${path.feature_dir}/Validation_Set
   test_feature_dir: ${path.feature_dir}/Validation_Set
+  pretrain_feature_dir: ${path.feature_dir}/WMW
+  
 
 features:
   sr: 22050
@@ -26,7 +29,7 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 10
+  n_way: 2
   n_support: 5
   n_query: 5
   backbone:  convnet
@@ -42,7 +45,7 @@ train:
 val:
   seg_len_base: 30
   hop_len_frac: 3
-  test_loop_batch_size: 64
+  test_loop_batch_size: 512
   test_loop_neg_sample: 50
   threshold: 0.5
 
@@ -54,7 +57,7 @@ checkpoint:
   best_model_dir: ${path.model_dir}/model_best.pth.tar
   start_epoch: 0
   #experiment_name: expMAML
-  experiment_name: FOMAMLProtoNetAttention5
+  experiment_name: FOMAMLProtoNet_no_neg_2way_lr0.01_5setp3
   exp_dir: ${path.root_dir}/Checkpoints/${checkpoint.experiment_name}
   model_dir: ${checkpoint.exp_dir}/Model
   pred_dir: ${checkpoint.exp_dir}/Predictions

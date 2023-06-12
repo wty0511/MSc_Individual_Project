@@ -1,7 +1,7 @@
 from src.models.ProtoMAML import *
 # from src.models.ProtoMAMLcopy import *
 # from src.models.ProtoMAML_loss import *
-
+from src.models.ProtoMAML_temperature import *
 from src.models.MAML import *
 # from src.models.SiameseMAML import *
 from src.models.SiameseMAML_copy2 import *
@@ -49,11 +49,18 @@ batch_sampler = TaskBatchSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
+pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain/Model/best_model.pth')
+pretrain_dict = pretrain_model['state']
+pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
+# model = ProtoMAML_temp(cfg)
 model = ProtoMAML(cfg)
 # model = SNNMAML(cfg)
 # model = MAML(cfg)
 # model = TNNMAML(cfg)
 # model = ProtoMAMLfw(cfg)
+print(pretrain_model['state'].keys())
+# model.feature_extractor.load_state_dict(pretrain_dict)
+
 print(len(train_loader))
 model = model.cuda()
 model_dir = cfg.checkpoint.model_dir
