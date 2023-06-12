@@ -29,7 +29,7 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 8383
+SEED = 42
 set_seed(SEED)
 
 
@@ -65,7 +65,7 @@ model.train()
 
 no_imporve = 0
 
-for epoch in range(250):
+for epoch in range(50):
     model.train()
     model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):

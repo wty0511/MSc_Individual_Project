@@ -16,6 +16,7 @@ from src.models.MAML import *
 # from src.models.TrinetMAML import *
 from src.models.TrinetMAML_copy import *
 from src.utils.file_dataset import *
+from src.models.ProtoMAML_refine import *
 if not GlobalHydra().is_initialized():
     initialize(config_path="../")
 # Compose the configuration
@@ -32,7 +33,7 @@ set_seed(SEED)
 # cfg = compose(config_name="config.yaml")
 # model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
-save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNetresnet/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNet_no_neg_2way_lr0.01_5setp2/Model/best_model.pth"
 
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -42,6 +43,7 @@ print(checkpoint.keys())
 model_state = checkpoint['state']
 config = checkpoint['config']
 cfg = config
+# print(model_state.keys())
 # checkpoint['config']['checkpoint']['experiment_name'] = 'FOMAMLProtoNet'
 # torch.save(checkpoint, save_file)
 # config = cfg
@@ -52,7 +54,8 @@ print('threshold:', checkpoint['threshold'])
 
 # print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
-model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = ProtoMAML_refine(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')

@@ -91,7 +91,7 @@ def get_silhouette_score(feats, labels):
     return torch.mean(scores)
 
 
-class ProtoMAML(BaseModel):
+class ProtoMAML_refine(BaseModel):
     
     def __init__(self, config):
         """
@@ -103,7 +103,7 @@ class ProtoMAML(BaseModel):
             num_inner_steps - Number of inner loop updates to perform
         """
         
-        super(ProtoMAML, self).__init__(config)
+        super(ProtoMAML_refine, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
@@ -186,6 +186,81 @@ class ProtoMAML(BaseModel):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
+            
+            # Calculate gradients and perform inner loop update
+            loss.backward()
+            local_optim.step()
+            # Update output layer via SGD
+            
+            output_weight.data -= self.config.train.lr_inner * output_weight.grad
+            output_bias.data -= self.config.train.lr_inner * output_bias.grad
+            # Reset gradients
+            local_optim.zero_grad()
+            output_weight.grad.fill_(0)
+            output_bias.grad.fill_(0)
+            loss = loss.detach()
+            # print('loss', loss)
+            acc = torch.mean(acc).detach()
+        # print('~~~~~~~')
+        if mode != 'train':
+            print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
+            print(preds)
+        if mode != 'train':    
+            print('!!!!!!!!!')
+        # Re-attach computation graph of prototypes
+        output_weight = (output_weight - init_weight).detach() + init_weight
+        output_bias = (output_bias - init_bias).detach() + init_bias
+
+        # support_feat = local_model(support_data)
+        support_dataset = TensorDataset(support_data, torch.zeros(support_data.shape[0]))
+        support_data_loader = DataLoader(support_dataset, batch_size=1, shuffle=False)
+        
+        # support_feat = []
+        # for batch in support_data_loader:
+        #     data, _ = batch
+        #     support_feat.append(local_model(data))
+            
+        # support_feat = torch.cat(support_feat, dim=0)
+        support_feat = torch.empty(1, 512)
+        # print('end inner loop')
+        return local_model, output_weight, output_bias, support_feat
+    
+    def inner_loop_test(self, support_data, support_feature, support_label, query_data, mode = 'train'):
+        
+        
+        prototypes     = support_feature.mean(0).squeeze()
+        norms = torch.norm(prototypes, dim=1, keepdim=True)
+        expanded_norms = norms.expand_as(prototypes)
+        prototypes = prototypes / expanded_norms
+        
+        # Create inner-loop model and optimizer
+        local_model = deepcopy(self.feature_extractor)
+        local_model.train()
+        local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay)
+        # local_optim = optim.SGD(local_model.parameters(), 0.0, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+        local_optim.zero_grad()
+        # Create output layer weights with prototype-based initialization
+        # init_weight = 2 * prototypes
+        # init_bias = -torch.norm(prototypes, dim=1)**2
+        init_weight = 2 * prototypes
+        # init_weight =  prototypes
+        init_bias = -torch.norm(prototypes, dim=1)**2
+
+        
+
+        
+        output_weight = init_weight.detach().requires_grad_()
+        output_bias = init_bias.detach().requires_grad_()
+
+        # print('inner loop')
+        # Optimize inner loop model on support set
+        for i in range(10):
+            # Determine loss on the support set
+            aux_pos, aux_neg = self.get_topk_confident_samples(local_model, output_weight, output_bias, query_data, k = 20)
+            aux_support = torch.cat((support_data, aux_pos, aux_neg), dim=0)
+            aux_support_label = torch.cat((support_label, torch.zeros(aux_pos.shape[0]).long().to(self.device), torch.ones(aux_neg.shape[0]).long().to(self.device)), dim=0)
+            
+            loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, aux_support, aux_support_label, mode = mode)
             
             # Calculate gradients and perform inner loop update
             loss.backward()
@@ -359,7 +434,7 @@ class ProtoMAML(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(5):
+        for i in range(1):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -447,7 +522,7 @@ class ProtoMAML(BaseModel):
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
 
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
-                    local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, proto, support_label, mode = 'test')
+                    local_model, output_weight, output_bias, support_feats = self.inner_loop_test(support_data, proto, support_label, query, mode = 'test')
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
                     # with h5py.File(feat_file, 'w') as f:
                     #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
@@ -602,3 +677,30 @@ class ProtoMAML(BaseModel):
     def test_loop_task(self, test_loader):
         self.outer_loop( test_loader, mode = 'test')
     
+    def get_topk_confident_samples(self, local_model, output_weight, output_bias, query, k = 5):
+
+        query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
+
+        query_loader = DataLoader(query_dataset, batch_size=16, shuffle=False)
+        prob_all = []
+        for batch in tqdm(query_loader):
+            query_data, _ = batch
+            prob, feats = self.feed_forward_test(local_model, output_weight, output_bias, query_data)
+            feats = feats.detach().cpu().numpy()
+            # with h5py.File(feat_file, 'a') as f:
+                
+            #     size = f['features'].shape[0]
+            #     nwe_size = f['features'].shape[0] + feats.shape[0]
+
+            #     f['features'].resize((nwe_size, 512))
+
+            #     f['features'][size:nwe_size] = feats
+            prob_all.append(prob)
+        prob_all = np.concatenate(prob_all, axis=0)
+        #########################################################################
+        
+        prob_all = prob_all[:,0]
+        indices_top = np.argpartition(prob_all, -k)[-k:] 
+        indices_rare = np.argpartition(prob_all, k)[:k]  
+        
+        return query[indices_top], query[indices_rare]
