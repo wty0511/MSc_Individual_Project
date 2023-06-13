@@ -17,6 +17,152 @@ from src.utils.class_pair_dataset import *
 
 
 
+class CriticNetwork(nn.Module):
+    def __init__(self,  logit_shape):
+        """
+        Builds a multilayer convolutional network. It also provides functionality for passing external parameters to be
+        used at inference time. Enables inner loop optimization readily.
+        :param im_shape: The input image batch shape.
+        :param num_output_classes: The number of output classes of the network.
+        :param args: A named tuple containing the system's hyperparameters.
+        :param device: The device to run this on.
+        :param meta_classifier: A flag indicating whether the system's meta-learning (inner-loop) functionalities should
+        be enabled.
+        """
+        super(CriticNetwork, self).__init__()
+
+        self.layer_dict = nn.ModuleDict()
+        self.logit_shape = logit_shape
+        self.build_network()
+
+    def build_network(self):
+        """
+        Builds the network before inference is required by creating some dummy inputs with the same input as the
+        self.im_shape tuple. Then passes that through the network and dynamically computes input shapes and
+        sets output shapes for each layer.
+        """
+        processed_feature_list = []
+
+        logits = torch.ones(self.logit_shape)
+        logits_abs_diff_targets = torch.abs(logits)
+
+        logits_square_diff_targets = logits ** 2
+
+        sign_logits = torch.sign(logits)
+
+        logit_targets_features = torch.cat(
+            [logits, logits_abs_diff_targets, logits_square_diff_targets, sign_logits], dim=1)
+
+        logit_targets_features = logit_targets_features.view(logit_targets_features.shape[0], 1,
+                                                                logit_targets_features.shape[1])
+        processed_feature_list.append(logit_targets_features)
+
+
+        mixed_features = torch.cat(processed_feature_list, dim=2)
+
+        feature_sets = [mixed_features]
+        # print(feature_sets.shape)
+        for i in range(5):
+            dilation = 2 ** i
+            cur = torch.cat(feature_sets, dim=1)
+            self.layer_dict['dilated_conv1d_{}'.format(i)] = nn.Conv1d(in_channels=cur.shape[1],
+                                                                       out_channels=8, kernel_size=3,
+                                                                       dilation=dilation, padding=dilation)
+            cur = self.layer_dict['dilated_conv1d_{}'.format(i)](cur)
+            self.layer_dict['norm_layer_{}'.format(i)] = nn.BatchNorm1d(num_features=cur.shape[1])
+            cur = self.layer_dict['norm_layer_{}'.format(i)](cur)
+            cur = F.relu(cur)
+            feature_sets.append(cur)
+
+        out = torch.cat(feature_sets, dim=1)
+
+        out = out.view(out.shape[0], -1)
+
+        self.layer_dict['linear_0'] = nn.Linear(in_features=out.shape[1],
+                                                out_features=16, bias=False)
+
+        out = self.layer_dict['linear_0'](out)
+        out = F.relu(out)
+
+        self.layer_dict['linear_1'] = nn.Linear(in_features=out.shape[1],
+                                                out_features=16, bias=False)
+
+        out = self.layer_dict['linear_1'](out)
+        out = F.relu(out)
+
+        self.layer_dict['linear_preds'] = nn.Linear(in_features=out.shape[1],
+                                                    out_features=1, bias=False)
+
+        out = self.layer_dict['linear_preds'](out)
+
+        out = out.sum()
+        print("VGGNetwork build", out.shape)
+
+    def forward(self, logits, return_sum=True):
+        """
+        Forward propages through the network. If any params are passed then they are used instead of stored params.
+        :param x: Input image batch.
+        :param num_step: The current inner loop step number
+        :param params: If params are None then internal parameters are used. If params are a dictionary with keys the
+         same as the layer names then they will be used instead.
+        :param training: Whether this is training (True) or eval time.
+        :param backup_running_statistics: Whether to backup the running statistics in their backup store. Which is
+        then used to reset the stats back to a previous state (usually after an eval loop, when we want to throw away stored statistics)
+        :return: Logits of shape b, num_output_classes.
+        """
+
+        # print(logits.shape, task_embedding.shape, support_set_features.shape, target_set_features.shape,
+        #       support_set_classifier_pre_last_layer.shape, target_set_classifier_pre_last_layer.shape,
+        #       support_set_labels.shape)
+
+        processed_feature_list = []
+
+        logits_abs_diff_targets = torch.abs(logits)
+
+        logits_square_diff_targets = logits ** 2
+
+        sign_logits = torch.sign(logits)
+
+        logit_targets_features = torch.cat(
+            [logits, logits_abs_diff_targets, logits_square_diff_targets, sign_logits], dim=1)
+
+        logit_targets_features = logit_targets_features.view(logit_targets_features.shape[0], 1,
+                                                                logit_targets_features.shape[1])
+        processed_feature_list.append(logit_targets_features)
+
+
+
+        mixed_features = torch.cat(processed_feature_list, dim=2)
+
+        feature_sets = [mixed_features]
+        for i in range(5):
+            dilation = 2 ** i
+            cur = torch.cat(feature_sets, dim=1)
+
+            cur = self.layer_dict['dilated_conv1d_{}'.format(i)](cur)
+
+            cur = self.layer_dict['norm_layer_{}'.format(i)](cur)
+            cur = F.relu(cur)
+            feature_sets.append(cur)
+
+        out = torch.cat(feature_sets, dim=1)
+
+        out = out.view(out.shape[0], -1)
+
+        out = self.layer_dict['linear_0'](out)
+        out = F.relu(out)
+
+        out = self.layer_dict['linear_1'](out)
+        out = F.relu(out)
+
+        out = self.layer_dict['linear_preds'](out)
+
+        if return_sum:
+            out = out.sum()
+
+        return out
+
+
 class ContrastiveLoss(nn.Module):
     def __init__(self, margin):
         super(ContrastiveLoss, self).__init__()
@@ -91,7 +237,7 @@ def get_silhouette_score(feats, labels):
     return torch.mean(scores)
 
 
-class ProtoMAML(BaseModel):
+class ProtoMAML_query(BaseModel):
     
     def __init__(self, config):
         """
@@ -103,11 +249,18 @@ class ProtoMAML(BaseModel):
             num_inner_steps - Number of inner loop updates to perform
         """
         
-        super(ProtoMAML, self).__init__(config)
+        super(ProtoMAML_query, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
         self.tri_loss = TripletLoss(margin = 1)
+        self.regularizer = nn.Sequential(
+                nn.Linear(8, 16),
+                nn.ReLU(inplace=True),
+                nn.Linear(16, 1),
+                nn.ReLU(inplace=True),
+                # nn.Hardtanh(0.5, 50)
+            ).to(device=self.device)
     def feed_forward2(self, support_data, support_label):
         # # Execute a model with given output layer weights and inputs
         # support_feat = self.feature_extractor(support_data)
@@ -148,12 +301,12 @@ class ProtoMAML(BaseModel):
             # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
         
         loss = torch.sum(torch.stack(loss))
-        print(loss)
+        # print(loss)
         report = None
         acc = torch.tensor(0.0).to(self.device)
         return loss, report, acc
     
-    def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
+    def inner_loop(self, support_data, support_feature, support_label, query_data, mode = 'train'):
         
         
         prototypes     = support_feature.mean(0).squeeze()
@@ -165,7 +318,7 @@ class ProtoMAML(BaseModel):
         local_model = deepcopy(self.feature_extractor)
         local_model.train()
         local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay)
-        # local_optim = optim.SGD(local_model.parameters(), 0.001, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+        # local_optim = optim.SGD(local_model.parameters(), 0.0, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
         local_optim.zero_grad()
         # Create output layer weights with prototype-based initialization
         # init_weight = 2 * prototypes
@@ -179,12 +332,10 @@ class ProtoMAML(BaseModel):
         
         output_weight = init_weight.detach().requires_grad_()
         output_bias = init_bias.detach().requires_grad_()
-        # support_feat = torch.empty(1, 512)
-        # # print('end inner loop')
-        # return local_model, output_weight, output_bias, support_feat
+
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(15):
+        for i in range(1):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
@@ -203,6 +354,21 @@ class ProtoMAML(BaseModel):
             loss = loss.detach()
             # print('loss', loss)
             acc = torch.mean(acc).detach()
+        
+        for i in range(10):
+            loss = self.feed_forward_query(local_model, output_weight, output_bias, query_data, mode = mode)
+            print(loss)
+            # Calculate gradients and perform inner loop update
+            loss.backward()
+            local_optim.step()
+            # Update output layer via SGD
+            output_weight.data -= self.config.train.lr_inner * output_weight.grad
+            output_bias.data -= self.config.train.lr_inner * output_bias.grad
+            # Reset gradients
+            local_optim.zero_grad()
+            output_weight.grad.fill_(0)
+            output_bias.grad.fill_(0)
+            
         # print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
@@ -226,6 +392,7 @@ class ProtoMAML(BaseModel):
         support_feat = torch.empty(1, 512)
         # print('end inner loop')
         return local_model, output_weight, output_bias, support_feat
+
     
     
     def feed_forward(self, local_model, output_weight, output_bias, data, labels, mode):
@@ -243,14 +410,24 @@ class ProtoMAML(BaseModel):
             feats.append(local_model(data))
             
         feats = torch.cat(feats, dim=0)
-        pos_num = feats[(labels == 0)].shape[0]
-        neg_num = feats[(labels == 1)].shape[0]
+        # print(feats.shape)
+        # print(labels.shape)
+        # pos_mean = torch.mean(feats[(labels == 0)], dim=0)
+        # neg_mean = torch.mean(feats[(labels == 1)], dim=0)
+
+        # temperature_input = torch.cat((pos_mean, neg_mean), dim=0)
+        # print(temperature_input.shape)
+
+        
         
         c_loss = torch.tensor(0.0).to(self.device)
         # feats_pos = torch.mean(feats[(labels == 0)], dim=0)
         # for i in feats[(labels == 1)]:
         #     c_loss+=self.contrastive_loss(feats_pos, i, torch.tensor(0).to(self.device))
         # c_loss = c_loss/feats[(labels == 1)].shape[0]
+        pos_num = feats[(labels == 0)].shape[0]
+        neg_num = feats[(labels == 1)].shape[0]
+        
 
         dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
         data_loader = DataLoader(dataset, batch_size=32, shuffle=False)
@@ -261,9 +438,15 @@ class ProtoMAML(BaseModel):
             # preds = F.linear(data, output_weight, bias=None)
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
+        # print(preds)
         half_size = output_weight.shape[0] // 2
-        temperature = 1
-        preds = preds / temperature
+        temperature = 2.0
+
+        # print(preds)
+        # print(temp)
+        # print(temp.shape)
+
+        # print(preds)
         if self.config.train.neg_prototype or mode == 'test':
             
             weights = torch.cat((torch.full((half_size,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
@@ -271,9 +454,12 @@ class ProtoMAML(BaseModel):
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:
             loss = F.cross_entropy(preds, labels)
+        # print(loss)
         # print(preds.argmax(dim=1))
         # print(labels)
         # print('!!!!!!')
+        # print('pred', preds.shape)
+        # print('loss', loss.unsqueeze(1).shape)
         acc = (preds.argmax(dim=1) == labels).float()
         # aux_loss = (get_silhouette_score(feats, labels) + torch.tensor(1.).to(self.device)) / 2
         # print('aux_loss', aux_loss)
@@ -288,6 +474,40 @@ class ProtoMAML(BaseModel):
         loss+=c_loss
         return loss, report, acc
 
+
+    def feed_forward_query(self, local_model, output_weight, output_bias, data, mode):
+        # Execute a model with given output layer weights and inputs
+        # print('feed_forward')
+        # print(len(data))
+        
+        # print('data', data.shape)
+        feat_dataset = TensorDataset(data, torch.zeros(data.shape[0]))
+        feat_data_loader = DataLoader(feat_dataset, batch_size=32, shuffle=False)
+        
+        feats = []
+        for batch in feat_data_loader:
+            data, _ = batch
+            feats.append(local_model(data))
+            
+        feats = torch.cat(feats, dim=0)
+        
+        # print(feats)
+    
+
+        dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
+        data_loader = DataLoader(dataset, batch_size=32, shuffle=False)
+        preds_all = []
+        for batch in data_loader:
+            data, _ = batch
+            preds = F.linear(data, output_weight, output_bias)
+            # preds = F.linear(data, output_weight, bias=None)
+            preds_all.append(preds)
+        preds = torch.cat(preds_all, dim=0)
+        # print(preds)
+        # preds = F.softmax(preds, dim = 1)
+        print(torch.cat([preds,torch.abs(preds),preds**2,torch.sign(preds)],dim = 1).shape)
+        loss = self.regularizer(torch.cat([preds,torch.abs(preds),preds**2,torch.sign(preds)],dim = 1)).mean()
+        return loss
     
     
     def feed_forward_test(self, local_model, output_weight, output_bias, data):
@@ -328,7 +548,7 @@ class ProtoMAML(BaseModel):
                 # print(data_pos.shape)
                 # print(data_neg.shape)
 
-                local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, support_feat, support_label)
+                local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, support_feat, support_label, query_data)
                 
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
                 # print('after inner loop')
@@ -345,7 +565,7 @@ class ProtoMAML(BaseModel):
                         if p_global.grad is None or p_local.grad is None:
                             print('None')
                             continue
-                        
+                        # print(p_global.grad)
                         p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
                 loss = loss.detach().cpu().item()
                 acc = acc.mean().detach().cpu().item()
@@ -429,6 +649,7 @@ class ProtoMAML(BaseModel):
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                     neg_feat = []
+
                     for batch in neg_loader:
                         n_data, _ = batch
                         # print(neg_data.shape)
@@ -451,7 +672,7 @@ class ProtoMAML(BaseModel):
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
 
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
-                    local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, proto, support_label, mode = 'test')
+                    local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, proto, support_label, query, mode = 'test')
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
                     # with h5py.File(feat_file, 'w') as f:
                     #     f.create_dataset("features", (0, 512), maxshape=(None, 512))

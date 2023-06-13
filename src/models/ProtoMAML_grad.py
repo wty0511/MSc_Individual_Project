@@ -91,7 +91,7 @@ def get_silhouette_score(feats, labels):
     return torch.mean(scores)
 
 
-class ProtoMAML(BaseModel):
+class ProtoMAML_grad(BaseModel):
     
     def __init__(self, config):
         """
@@ -103,11 +103,18 @@ class ProtoMAML(BaseModel):
             num_inner_steps - Number of inner loop updates to perform
         """
         
-        super(ProtoMAML, self).__init__(config)
+        super(ProtoMAML_grad, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
         self.tri_loss = TripletLoss(margin = 1)
+        self.num_layer = len(list(self.feature_extractor.parameters()))
+        input_dim = self.num_layer * 2
+        self.regularizer = nn.Sequential(
+                nn.Linear(input_dim, input_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(input_dim, input_dim)
+            ).to(device=self.device)
     def feed_forward2(self, support_data, support_label):
         # # Execute a model with given output layer weights and inputs
         # support_feat = self.feature_extractor(support_data)
@@ -184,14 +191,27 @@ class ProtoMAML(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(15):
+        for i in range(5):
             # Determine loss on the support set
 
+            
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
             
             # Calculate gradients and perform inner loop update
             loss.backward()
-            local_optim.step()
+            
+            per_step_task_embedding = []
+            for k, v in local_model.named_parameters():
+                per_step_task_embedding.append(v.data.mean())
+                per_step_task_embedding.append(v.grad.mean())
+
+            per_step_task_embedding = torch.stack(per_step_task_embedding)
+            num_layers = len(per_step_task_embedding) // 2
+            generated_params = self.regularizer(per_step_task_embedding)
+            generated_alpha, generated_beta = torch.split(generated_params, split_size_or_sections=num_layers)
+            for j, (k, v) in enumerate(local_model.named_parameters()):
+                v.data = generated_beta[j] * v.data - generated_alpha[j] * v.grad
+            # local_optim.step()
             # Update output layer via SGD
             
             output_weight.data -= self.config.train.lr_inner * output_weight.grad
@@ -335,11 +355,12 @@ class ProtoMAML(BaseModel):
                 loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label, mode = 'train')
                 
                 if mode == 'train':
-                    # for g in self.feature_extractor.parameters():
-                    #     print(g.grad)
+                    grad_regularizer = torch.autograd.grad(loss, self.regularizer.parameters(), create_graph=True)
+                    for p, g in zip(self.regularizer.parameters(), grad_regularizer):
+                        p.grad = g
+                        # print(p.grad)
                     # return
                     loss.backward()
-
                     for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
                         
                         if p_global.grad is None or p_local.grad is None:

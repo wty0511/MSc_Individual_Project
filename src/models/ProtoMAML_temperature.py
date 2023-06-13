@@ -74,10 +74,10 @@ def get_silhouette_score(feats, labels):
                     dists_to_other_clusters.append(mean_inter_dists)
             dists_to_other_clusters = torch.stack(dists_to_other_clusters, dim=1)
             min_dists, _ = torch.min(dists_to_other_clusters, dim=1)
-            # curr_scores = (min_dists - mean_intra_dists) / (
-            #     torch.maximum(min_dists, mean_intra_dists)
-            # )
-            curr_scores = (min_dists - mean_intra_dists)
+            curr_scores = (min_dists - mean_intra_dists) / (
+                torch.maximum(min_dists, mean_intra_dists)
+            )
+            # curr_scores = (min_dists - mean_intra_dists)
         else:
             curr_scores = torch.tensor([0], device=device, dtype=dtype)
 
@@ -109,11 +109,14 @@ class ProtoMAML_temp(BaseModel):
         self.contrastive_loss = ContrastiveLoss(20)
         self.tri_loss = TripletLoss(margin = 1)
         self.regularizer = nn.Sequential(
-                nn.Linear(1024, 512),
-                nn.ReLU(inplace=True),
-                nn.Linear(512, 1),
-                nn.SELU()
+                nn.Linear(8, 16),
+                nn.Sigmoid(),
+                # nn.ReLU(),
+                nn.Linear(16, 1),
+                nn.Softplus(),
+                # nn.Hardtanh(0.5, 50)
             ).to(device=self.device)
+
     def feed_forward2(self, support_data, support_label):
         # # Execute a model with given output layer weights and inputs
         # support_feat = self.feature_extractor(support_data)
@@ -154,7 +157,7 @@ class ProtoMAML_temp(BaseModel):
             # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
         
         loss = torch.sum(torch.stack(loss))
-        print(loss)
+        # print(loss)
         report = None
         acc = torch.tensor(0.0).to(self.device)
         return loss, report, acc
@@ -165,7 +168,7 @@ class ProtoMAML_temp(BaseModel):
         prototypes     = support_feature.mean(0).squeeze()
         norms = torch.norm(prototypes, dim=1, keepdim=True)
         expanded_norms = norms.expand_as(prototypes)
-        prototypes = prototypes / expanded_norms
+        # prototypes = prototypes / expanded_norms
         
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
@@ -188,7 +191,7 @@ class ProtoMAML_temp(BaseModel):
 
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(5):
+        for i in range(15):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
@@ -245,14 +248,24 @@ class ProtoMAML_temp(BaseModel):
         for batch in feat_data_loader:
             data, _ = batch
             feats.append(local_model(data))
-            
         feats = torch.cat(feats, dim=0)
+        weight = []
+        
+        for name, param in local_model.named_parameters():
+            if '0.weight' in name:
+                weight.append(torch.mean(param))
+            if '0.bias' in name:
+                weight.append(torch.mean(param))
+        weight = torch.stack(weight)
+        
         
         pos_mean = torch.mean(feats[(labels == 0)], dim=0)
         neg_mean = torch.mean(feats[(labels == 1)], dim=0)
+        euclidean_distance = torch.dist(pos_mean, neg_mean)
+        cosine_similarity = F.cosine_similarity(pos_mean.unsqueeze(0), neg_mean.unsqueeze(0))
 
-        temperature_input = torch.cat((pos_mean, neg_mean), dim=0)
-        # print(temperature_input.shape)
+        # temperature_input = torch.cat((euclidean_distance), dim=0)
+        # print(temperature_input)
 
         
         
@@ -261,9 +274,10 @@ class ProtoMAML_temp(BaseModel):
         # for i in feats[(labels == 1)]:
         #     c_loss+=self.contrastive_loss(feats_pos, i, torch.tensor(0).to(self.device))
         # c_loss = c_loss/feats[(labels == 1)].shape[0]
+        pos_num = feats[(labels == 0)].shape[0]
+        neg_num = feats[(labels == 1)].shape[0]
+        
 
-        temp = self.regularizer(temperature_input)
-        # print(temp)
         dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
         data_loader = DataLoader(dataset, batch_size=32, shuffle=False)
         preds_all = []
@@ -273,17 +287,40 @@ class ProtoMAML_temp(BaseModel):
             # preds = F.linear(data, output_weight, bias=None)
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
+        # print(preds)
         half_size = output_weight.shape[0] // 2
         temperature = 2.0
+        # print('euclidean_distance', euclidean_distance)
+        # temp = self.regularizer(euclidean_distance.unsqueeze(0))
+        silhouette_score = get_silhouette_score(feats, labels).unsqueeze(0)
+        # print('silhouette_score', silhouette_score)
+        # print('silhouette_score', silhouette_score)
+        preds_softmax = F.softmax(preds, dim=1)
+        mean_probs = torch.mean(preds_softmax, dim=0) 
+        condition_entropy = -torch.sum(mean_probs * torch.log(mean_probs + 1e-9)) + torch.sum(preds_softmax * torch.log(preds_softmax + 1e-9))/preds_softmax.shape[0]
+        print(torch.cat([silhouette_score,condition_entropy.unsqueeze(0), weight]))
+        temp = self.regularizer(torch.cat([silhouette_score,condition_entropy.unsqueeze(0), weight]))
+        
+        # print('temp', temp)
+        
+        # print(preds)
+        # print(temp)
+        # print(temp.shape)
         preds = preds / temp
+        # print(preds)
         if self.config.train.neg_prototype or mode == 'test':
-            weights = torch.cat((torch.full((half_size,), 5, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            
+            weights = torch.cat((torch.full((half_size,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            # weights = torch.cat((torch.full((half_size,), 1, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:
             loss = F.cross_entropy(preds, labels)
+        # print(loss)
         # print(preds.argmax(dim=1))
         # print(labels)
         # print('!!!!!!')
+        # print('pred', preds.shape)
+        # print('loss', loss.unsqueeze(1).shape)
         acc = (preds.argmax(dim=1) == labels).float()
         # aux_loss = (get_silhouette_score(feats, labels) + torch.tensor(1.).to(self.device)) / 2
         # print('aux_loss', aux_loss)
@@ -344,12 +381,19 @@ class ProtoMAML_temp(BaseModel):
                 # print('after inner loop')
                 loss, _, acc = self.feed_forward(local_model, output_weight, output_bias, query_data , query_label, mode = 'train')
                 
+                
+                
                 if mode == 'train':
+
+                    
                     # for g in self.feature_extractor.parameters():
                     #     print(g.grad)
                     # return
                     loss.backward()
-
+                    # print('loss', loss)
+                    # for i in self.regularizer.parameters():
+                    #     print(i.grad)
+                    #     print(i.data)
                     for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
                         
                         if p_global.grad is None or p_local.grad is None:

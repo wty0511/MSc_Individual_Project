@@ -254,11 +254,11 @@ class ProtoMAML_refine(BaseModel):
 
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(10):
+        for i in range(15):
             # Determine loss on the support set
             aux_pos, aux_neg = self.get_topk_confident_samples(local_model, output_weight, output_bias, query_data, k = 20)
-            aux_support = torch.cat((support_data, aux_pos, aux_neg), dim=0)
-            aux_support_label = torch.cat((support_label, torch.zeros(aux_pos.shape[0]).long().to(self.device), torch.ones(aux_neg.shape[0]).long().to(self.device)), dim=0)
+            aux_support = torch.cat((support_data, aux_pos), dim=0)
+            aux_support_label = torch.cat((support_label, torch.zeros(aux_pos.shape[0]).long().to(self.device)), dim=0)
             
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, aux_support, aux_support_label, mode = mode)
             
@@ -316,7 +316,8 @@ class ProtoMAML_refine(BaseModel):
             feats.append(local_model(data))
             
         feats = torch.cat(feats, dim=0)
-        
+        pos_num = feats[(labels == 0)].shape[0]
+        neg_num = feats[(labels == 1)].shape[0]
         c_loss = torch.tensor(0.0).to(self.device)
         # feats_pos = torch.mean(feats[(labels == 0)], dim=0)
         # for i in feats[(labels == 1)]:
@@ -333,10 +334,12 @@ class ProtoMAML_refine(BaseModel):
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
         half_size = output_weight.shape[0] // 2
-        temperature = 2
+        temperature = 1
         preds = preds / temperature
         if self.config.train.neg_prototype or mode == 'test':
-            weights = torch.cat((torch.full((half_size,), 3, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            
+            weights = torch.cat((torch.full((half_size,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            # weights = torch.cat((torch.full((half_size,), 1, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:
             loss = F.cross_entropy(preds, labels)
@@ -434,7 +437,7 @@ class ProtoMAML_refine(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(1):
+        for i in range(5):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -700,7 +703,11 @@ class ProtoMAML_refine(BaseModel):
         #########################################################################
         
         prob_all = prob_all[:,0]
-        indices_top = np.argpartition(prob_all, -k)[-k:] 
+        indices_top = np.argpartition(prob_all, -k)[-k:]
+    
+
+        indices_top = indices_top[prob_all[indices_top] > 0.95]
+
         indices_rare = np.argpartition(prob_all, k)[:k]  
         
         return query[indices_top], query[indices_rare]

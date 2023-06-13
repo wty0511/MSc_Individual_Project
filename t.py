@@ -6,6 +6,8 @@ from src.models.MAML import *
 # from src.models.SiameseMAML import *
 from src.models.SiameseMAML_copy2 import *
 # from src.models.SiameseMAML_sigmoid import *
+from src.models.ProtoMAML_query import *
+from src.models.ProtoMAML_grad import *
 import os
 import sys
 
@@ -53,7 +55,9 @@ pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain/Model/best_mo
 pretrain_dict = pretrain_model['state']
 pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
 # model = ProtoMAML_temp(cfg)
-model = ProtoMAML(cfg)
+model = ProtoMAML_grad(cfg)
+# model = ProtoMAML_query(cfg)
+# model = ProtoMAML(cfg)
 # model = SNNMAML(cfg)
 # model = MAML(cfg)
 # model = TNNMAML(cfg)
