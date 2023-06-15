@@ -1,3 +1,7 @@
+# This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+# This code is modified from https://github.com/wyharveychen/CloserLookFewShot
+# This code is modified from https://github.com/phlippe/uvadlc_notebooks
+# 不是正确的MAML写法
 import torch
 import torch.nn as nn
 import numpy as np

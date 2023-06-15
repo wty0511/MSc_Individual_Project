@@ -1,3 +1,5 @@
+# code provided by DCASE 2022 challenge
+# https://github.com/c4dm/dcase-few-shot-bioacoustic
 import numpy as np
 import mir_eval
 import scipy

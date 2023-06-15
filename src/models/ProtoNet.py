@@ -1,3 +1,6 @@
+# This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+# This code is modified from https://github.com/wyharveychen/CloserLookFewShot
+# This code is modified from https://github.com/phlippe/uvadlc_notebooks
 import torch
 import torch.nn as nn
 import numpy as np

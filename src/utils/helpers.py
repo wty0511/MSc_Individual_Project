@@ -1,3 +1,4 @@
+# This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
 import numpy as np
 def time2frame(t, fps):
     if isinstance(t, list):

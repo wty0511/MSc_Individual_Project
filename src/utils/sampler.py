@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch.utils.data.sampler import Sampler
-
+# modified from  https://github.com/haoheliu/DCASE_2022_Task_5
 class BatchSampler(Sampler):
     def __init__(self, config, classes, data_set_len):
         self.config = config
@@ -47,7 +47,8 @@ class IntClassSampler(Sampler):
             
     def __len__(self):
         return self.len
-    
+
+# modified from https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial16/Meta_Learning.html
 class TaskBatchSampler(Sampler):
     
     def __init__(self, config, classes, data_set_len):

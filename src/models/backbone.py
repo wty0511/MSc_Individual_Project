@@ -1,5 +1,6 @@
-# This code is modified from https://github.com/facebookresearch/low-shot-shrink-hallucinate
-
+# This code is originally provided by https://github.com/facebookresearch/low-shot-shrink-hallucinate
+# And is further modified by https://github.com/wyharveychen/CloserLookFewShot
+# I have modified it to fit my project
 import torch
 from torch.autograd import Variable
 import torch.nn as nn

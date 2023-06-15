@@ -1,3 +1,4 @@
+# This code is modified from https://github.com/wyharveychen/CloserLookFewShot
 from src.models.ProtoMAML import *
 # from src.models.ProtoMAMLcopy import *
 # from src.models.ProtoMAML_loss import *
@@ -55,9 +56,9 @@ pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain/Model/best_mo
 pretrain_dict = pretrain_model['state']
 pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
 # model = ProtoMAML_temp(cfg)
-model = ProtoMAML_grad(cfg)
+# model = ProtoMAML_grad(cfg)
 # model = ProtoMAML_query(cfg)
-# model = ProtoMAML(cfg)
+model = ProtoMAML(cfg)
 # model = SNNMAML(cfg)
 # model = MAML(cfg)
 # model = TNNMAML(cfg)

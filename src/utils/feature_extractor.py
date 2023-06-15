@@ -1,4 +1,5 @@
-
+# This code is modified from https://github.com/c4dm/dcase-few-shot-bioacoustic
+# This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
 import librosa
 import os
 import numpy as np

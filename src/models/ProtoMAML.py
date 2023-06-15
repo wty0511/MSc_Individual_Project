@@ -1,3 +1,7 @@
+# This code is modified from https://github.com/KevinMusgrave/pytorch-adapt
+# This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+# This code is modified from https://github.com/wyharveychen/CloserLookFewShot
+# This code is modified from https://github.com/phlippe/uvadlc_notebooks
 from src.models.meta_learning import *
 import torch
 import numpy as np
@@ -184,7 +188,7 @@ class ProtoMAML(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(15):
+        for i in range(5):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
@@ -365,7 +369,7 @@ class ProtoMAML(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(1):
+        for i in range(5):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):

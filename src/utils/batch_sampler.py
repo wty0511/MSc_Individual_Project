@@ -4,7 +4,7 @@ import torch.utils.data as data
 
 
 ''' Episodic batch sampler adoted from https://github.com/jakesnell/prototypical-networks/'''
-
+# This code is provided by DCASE for the challenge https://github.com/c4dm/dcase-few-shot-bioacoustic
 class EpisodicBatchSampler(data.Sampler):
     def __init__(self, labels, n_episodes, n_way, n_samples):
         '''

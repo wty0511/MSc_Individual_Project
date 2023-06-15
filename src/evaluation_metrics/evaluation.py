@@ -1,3 +1,6 @@
+# code provided by DCASE 2022 challenge
+# https://github.com/c4dm/dcase-few-shot-bioacoustic
+
 import os
 import sys
 current_dir = os.path.abspath(os.path.dirname(__file__))
