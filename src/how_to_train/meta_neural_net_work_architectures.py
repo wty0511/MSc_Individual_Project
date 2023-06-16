@@ -56,17 +56,17 @@ class MetaConv2dLayer(nn.Module):
         :param use_bias: Boolean indicating whether to use a bias or not.
         """
         super(MetaConv2dLayer, self).__init__()
-        num_filters = out_channels
+        self.num_filters = out_channels
         self.stride = int(stride)
         self.padding = int(padding)
         self.dilation_rate = int(dilation_rate)
         self.use_bias = use_bias
         self.groups = int(groups)
-        self.weight = nn.Parameter(torch.empty(num_filters, in_channels, kernel_size, kernel_size))
+        self.weight = nn.Parameter(torch.empty(self.num_filters, in_channels, kernel_size, kernel_size))
         nn.init.xavier_uniform_(self.weight)
 
         if self.use_bias:
-            self.bias = nn.Parameter(torch.zeros(num_filters))
+            self.bias = nn.Parameter(torch.zeros(self.num_filters))
 
     def forward(self, x, params=None):
         """
@@ -88,7 +88,6 @@ class MetaConv2dLayer(nn.Module):
         else:
             weight = self.weight
             bias = None
-
         return F.conv2d(
             input=x,
             weight=weight,
@@ -243,7 +242,7 @@ class MetaBatchNormLayer(nn.Module):
             self.backup_running_var.data = copy(self.running_var.data)
 
         momentum = self.momentum
-
+        # print(input.shape, running_mean.shape, running_var.shape, weight.shape, bias.shape)
         return F.batch_norm(input, running_mean, running_var, weight, bias,
                               training=True, momentum=momentum, eps=self.eps)
 
@@ -368,7 +367,7 @@ class MetaConvNormLayerReLU(nn.Module):
 
 
         out = self.conv(out)
-
+        # print(self.config.train.norm_layer)
         if self.normalization:
             if self.config.train.norm_layer == "batch_norm":
                 self.norm_layer = MetaBatchNormLayer(out.shape[1], track_running_stats=True,
@@ -416,8 +415,9 @@ class MetaConvNormLayerReLU(nn.Module):
             conv_params = params['conv']
 
         out = x
-
-
+        # if params is not None:
+        #     print(out.shape)
+        #     print(params['conv']['weight'].shape)
         out = self.conv(out, params=conv_params)
 
         if self.normalization:
@@ -561,21 +561,21 @@ class Convnet(nn.Module):
         self.config = cfg
         self.num_stages = 3
         self.conv_stride = 1
-
+    
         self.meta_classifier = meta_classifier
-
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
         self.build_network()
         print("meta network params")
         for name, param in self.named_parameters():
             print(name, param.shape)
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+
     def build_network(self):
         """
         Builds the network before inference is required by creating some dummy inputs with the same input as the
         self.im_shape tuple. Then passes that through the network and dynamically computes input shapes and
         sets output shapes for each layer.
         """
-        x = torch.zeros((1, 1, 128, 8))
+        x = torch.zeros((1, 1, 8, 128))
         out = x
         self.layer_dict = nn.ModuleDict()
         self.upscale_shapes.append(x.shape)
@@ -632,10 +632,14 @@ class Convnet(nn.Module):
             layer_name = path_bits[0]
             if layer_name not in param_dict:
                 param_dict[layer_name] = None
-
+        (num_samples,seq_len,mel_bins) = x.shape
+        
+        x = x.view(-1,1,seq_len,mel_bins)
+        
         out = x
 
         for i in range(self.num_stages):
+            # print(param_dict['conv{}'.format(i)])
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
                                                       num_step=num_step)
@@ -667,7 +671,7 @@ class Convnet(nn.Module):
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            # print(param.grad)
                             param.grad.zero_()
         else:
             for name, param in params.items():

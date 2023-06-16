@@ -21,6 +21,6 @@ cfg = compose(config_name="config.yaml")
 # Combines the arguments, model, data and experiment builders to run an experiment
 model = MAMLFewShotClassifier(cfg)
 
-data = MetaLearningSystemDataLoader
+data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 maml_system.run_experiment()

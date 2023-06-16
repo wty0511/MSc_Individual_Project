@@ -54,6 +54,7 @@ class ConvNet(nn.Module):
         print('total_trainable_params:', total_trainable_params)
         # self.temperature_param = nn.Parameter(torch.tensor(1.0))
     def forward(self,x):
+        
         (num_samples,seq_len,mel_bins) = x.shape
         x = x.view(-1,1,seq_len,mel_bins)
         x = self.encoder(x)
@@ -222,8 +223,9 @@ class PretrainClassifier(nn.Module):
         self.fc = nn.Linear(512, 26)
         
     def forward(self,x):
+        
         (num_samples,seq_len,mel_bins) = x.shape
-
+        
         x = x.view(-1,1,seq_len,mel_bins)
         x = self.encoder(x)
         # print('x_shape ',x.shape)

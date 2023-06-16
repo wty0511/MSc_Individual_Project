@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 from src.models.ResNet import *
-from src.models.ResNet2 import *
+# from src.models.ResNet2 import *
 from abc import abstractmethod
 from src.models.ConvNet import *
 from src.models.Transformer import *
@@ -22,8 +22,8 @@ class BaseModel(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if config.train.backbone == 'resnet':
             self.feature_extractor = ResNet(config.features.inchannel, ResBlock)
-        elif config.train.backbone == 'resnet2':
-            self.feature_extractor  = ResNet2()
+        # elif config.train.backbone == 'resnet2':
+        #     self.feature_extractor  = ResNet2()
         elif config.train.backbone == 'convnet':
             self.feature_extractor = ConvNet()
         elif config.train.backbone == 'convnetfw':

@@ -31,12 +31,12 @@ class MetaLearningSystemDataLoader(object):
         self.batch_size = cfg.train.task_batch_size
         self.total_train_iters_produced = 0
 
-        self.full_data_length = self.dataset.data_length
+
         self.train_dataset = ClassDataset(cfg, mode='train', same_class_in_different_file=True, debug=False)
         self.val_dataset = FileDataset(cfg, val=True, debug=False)
         self.test_dataset = FileDataset(cfg, val=False, debug=False)
-        batch_sampler = TaskBatchSampler(cfg, self.train_dataset.classes, len(train_dataset))
-        self.train_loader = DataLoader(train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
+        batch_sampler = TaskBatchSampler(cfg, self.train_dataset.classes, len(self.train_dataset))
+        self.train_loader = DataLoader(self.train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
         
 
         self.val_loader = DataLoader(self.val_dataset, batch_size = 1, shuffle = False)

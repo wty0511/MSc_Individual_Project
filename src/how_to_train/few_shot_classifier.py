@@ -1,7 +1,7 @@
 # code modified how to train your maml
 # https://github.com/AntreasAntoniou/HowToTrainYourMAMLPytorch
 import os
-
+from src.models.meta_learning import *
 import numpy as np
 import torch
 import torch.nn as nn
@@ -38,17 +38,26 @@ class MAMLFewShotClassifier(nn.Module):
         self.batch_size = cfg.train.task_batch_size
         self.use_cuda = True
         self.current_epoch = 0
-
+        self.classifier_head = nn.Linear(512, cfg.train.n_way).to(device=self.device)
         self.classifier = Convnet(cfg = cfg, meta_classifier=True).to(device=self.device)
         self.task_learning_rate = cfg.train.lr_inner
+        self.n_way = cfg.train.n_way
+        self.n_support = cfg.train.n_support
+        self.n_query = cfg.train.n_query
+        # 可训练的模块类似于META SGD
+        
+        params_head = dict(self.classifier_head.named_parameters())
+        params_classifier = dict(self.classifier.named_parameters())
 
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps= cfg.train.inner_step,
                                                                     use_learnable_learning_rates= True)
+        
         self.inner_loop_optimizer.initialise(
-            names_weights_dict=self.get_inner_loop_parameter_dict(params=self.classifier.named_parameters()))
-
+            names_weights_dict=self.get_inner_loop_parameter_dict(params={**params_head, **params_classifier}))
+        # self.inner_loop_optimizer.initialise(
+            # names_weights_dict=self.get_inner_loop_parameter_dict(params=self.named_parameters()))
         # print("Inner Loop parameters")
         # for key, value in self.inner_loop_optimizer.named_parameters():
         #     print(key, value.shape)
@@ -82,14 +91,18 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A tensor to be used to compute the weighted average of the loss, useful for
         the MSL (Multi Step Loss) mechanism.
         """
+        # 开始的时候，每个step的loss权重都是一样的
         loss_weights = np.ones(shape=(self.config.train.inner_step)) * (
                 1.0 / self.config.train.inner_step)
+        # 每个epoch decay一次，decay_rate是一个step的权重，multi_step_loss_num_epochs 是使用MSL的epoch数
         decay_rate = 1.0 / self.config.train.inner_step / self.config.train.multi_step_loss_num_epochs
         min_value_for_non_final_losses = 0.03 / self.config.train.inner_step
         for i in range(len(loss_weights) - 1):
+            # 除了最后一个step，其他step的loss权重都会decay，但是不能小于min_value_for_non_final_losses
             curr_value = np.maximum(loss_weights[i] - (self.current_epoch * decay_rate), min_value_for_non_final_losses)
             loss_weights[i] = curr_value
 
+        # 最后一个step的loss权重会增加，但是不能大于 所有之前setp的权重都是最小的情况。保证他们的和为1
         curr_value = np.minimum(
             loss_weights[-1] + (self.current_epoch * (self.config.train.inner_step - 1) * decay_rate),
             1.0 - ((self.config.train.inner_step - 1) * min_value_for_non_final_losses))
@@ -103,7 +116,8 @@ class MAMLFewShotClassifier(nn.Module):
         :param params: A dictionary of the network's parameters.
         :return: A dictionary of the parameters to use for the inner loop optimization process.
         """
-        return {
+        # 必须是可以计算梯度的参数，如果bn层的参数不可训练，那么就不会被加入到inner loop的参数中
+        params_dict = {
             name: param.to(device=self.device)
             for name, param in params
             if param.requires_grad
@@ -113,6 +127,7 @@ class MAMLFewShotClassifier(nn.Module):
                 or self.config.train.enable_inner_loop_optimizable_bn_params
             )
         }
+        return params_dict
 
     def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
         """
@@ -131,23 +146,27 @@ class MAMLFewShotClassifier(nn.Module):
                                     create_graph=use_second_order, allow_unused=True)
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
 
-        names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
+        #不是多卡，所以不需要这个
+        # names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
 
-        for key, grad in names_grads_copy.items():
-            if grad is None:
-                print('Grads not found for inner loop parameter', key)
-            names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
-
+        # for key, grad in names_grads_copy.items():
+        #     if grad is None:
+        #         print('Grads not found for inner loop parameter', key)
+        #     # print('grad_shape',names_grads_copy[key].shape)
+        #     names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
+        #     print('grad_shape',names_grads_copy[key].shape)
+        #     print('weight_shape',names_weights_copy[key].shape)
 
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
                                                                      num_step=current_step_idx)
+        
+        # num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
-        num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
-        names_weights_copy = {
-            name.replace('module.', ''): value.unsqueeze(0).repeat(
-                [num_devices] + [1 for i in range(len(value.shape))]) for
-            name, value in names_weights_copy.items()}
+        # names_weights_copy = {
+        #     name.replace('module.', ''): value.unsqueeze(0).repeat(
+        #         [num_devices] + [1 for i in range(len(value.shape))]) for
+        #     name, value in names_weights_copy.items()}
 
 
         return names_weights_copy
@@ -175,7 +194,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         # [b, ncs, spc] = y_support_set.shape
 
-        self.num_classes_per_set = ncs
+        self.num_classes_per_set = self.config.train.n_way
 
         total_losses = []
         total_accuracies = []
@@ -191,28 +210,34 @@ class MAMLFewShotClassifier(nn.Module):
                 pos_data, neg_data = task 
                 classes, data_pos, _ =pos_data
                 _, data_neg, _ =neg_data
-                support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+                # support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
                 support_data, query_data = self.split_support_query_data(data_pos, data_neg)
                 support_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_support)).long().to(self.device)
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_query)).long().to(self.device)
             else:
                 pos_data = task 
                 classes, data_pos, _ =pos_data
-                support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
+                # support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
                 support_data, query_data = self.split_support_query_data(data_pos, None)
                 support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-                
+            
+            
             task_losses = []
+            
+
+            
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
-
+            # for key, value in names_weights_copy.items():
+            #     print(key, value.shape)
+            # print('~~~~')
             num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
-            names_weights_copy = {
-                name.replace('module.', ''): value.unsqueeze(0).repeat(
-                    [num_devices] + [1 for i in range(len(value.shape))]) for
-                name, value in names_weights_copy.items()}
+            # names_weights_copy = {
+            #     name.replace('module.', ''): value.unsqueeze(0).repeat(
+            #         [num_devices] + [1 for i in range(len(value.shape))]) for
+            #     name, value in names_weights_copy.items()}
 
             # n, s, c, h, w = x_target_set_task.shape
 
@@ -220,7 +245,7 @@ class MAMLFewShotClassifier(nn.Module):
             # y_support_set_task = y_support_set_task.view(-1)
             # x_target_set_task = x_target_set_task.view(-1, c, h, w)
             # y_target_set_task = y_target_set_task.view(-1)
-
+            # print('start inner loop')
             for num_step in range(num_steps):
 
                 support_loss, support_preds = self.net_forward(
@@ -232,12 +257,13 @@ class MAMLFewShotClassifier(nn.Module):
                     num_step=num_step,
                 )
 
-
+                # print('first layer before update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
-
+                # print('first layer after update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
+                # print('~~~~')
                 if use_multi_step_loss_optimization and training_phase and epoch < self.config.train.multi_step_loss_num_epochs:
                     target_loss, target_preds = self.net_forward(x=query_data,
                                                                  y=query_label, weights=names_weights_copy,
@@ -252,7 +278,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
                     task_losses.append(target_loss)
-
+            # print('end inner loop')
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
 
@@ -260,7 +286,7 @@ class MAMLFewShotClassifier(nn.Module):
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
-
+            # 在
             if not training_phase:
                 self.classifier.restore_backup_stats()
 
@@ -290,7 +316,6 @@ class MAMLFewShotClassifier(nn.Module):
         preds = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
-
         loss = F.cross_entropy(input=preds, target=y)
 
         return loss, preds
@@ -299,8 +324,9 @@ class MAMLFewShotClassifier(nn.Module):
         """
         Returns an iterator over the trainable parameters of the model.
         """
-        for param in self.parameters():
-            if param.requires_grad:
+        head_name = [name for name in self.classifier_head.named_parameters()]
+        for name, param in self.named_parameters():
+            if param.requires_grad and name not in head_name:
                 yield param
 
     def train_forward_prop(self, data_batch, epoch):
@@ -339,6 +365,12 @@ class MAMLFewShotClassifier(nn.Module):
         """
         self.optimizer.zero_grad()
         loss.backward()
+        # for name, param in self.named_parameters():
+        #     if param.requires_grad:
+        #         if param.grad is None:
+        #             print('None gradient for outer loop parameter', name)
+        #         else:
+        #             print('Outer Loop Parameter', name, param.shape)
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
@@ -359,7 +391,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         if not self.training:
             self.train()
-
+        
         # x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
         # x_support_set = torch.Tensor(x_support_set).float().to(device=self.device)
@@ -432,3 +464,100 @@ class MAMLFewShotClassifier(nn.Module):
         self.optimizer.load_state_dict(state['optimizer'])
         self.load_state_dict(state_dict=state_dict_loaded)
         return state
+
+
+    def split2nway_1d(self, data):
+        
+        class_data, data, label = data
+        class_data = np.array(class_data)
+        class_data = class_data.reshape(-1, self.n_way)
+        label = label.view(-1, self.n_way)
+        return class_data, data, label
+    
+    def split_2d(self, data):
+        if torch.is_tensor(data):
+            data = data.view(-1, self.n_way, data.size(-2), data.size(-1))
+            return data
+        else:
+            raise ValueError('Unsupported data type: {}'.format(type(data)))
+    
+    def split_1d(self, data):
+        if torch.is_tensor(data):
+            return data.view(-1, self.n_way, data.size(-1))
+        elif isinstance(data, np.ndarray):
+            return data.reshape(-1, self.n_way, data.shape[-1])
+        else:
+            raise ValueError('Unsupported data type: {}'.format(type(data)))
+
+
+
+    def split_support_query_data(self, data_pos, data_neg):
+        if self.config.train.neg_prototype:
+            data_pos = self.split_2d(data_pos)
+            data_neg = self.split_2d(data_neg)
+            data_all = torch.cat([data_pos, data_neg], dim=1)
+            data_support = data_all[:self.n_support, :, :, :]
+            data_query = data_pos[self.n_support:, :, :, :]
+        else:
+            data_pos = self.split_2d(data_pos)
+            data_support = data_pos[:self.n_support, :, :, :]
+            data_query = data_pos[self.n_support:, :, :, :]
+        data_support = data_support.view(-1, data_support.size(-2), data_support.size(-1))
+        data_query = data_query.view(-1, data_query.size(-2), data_query.size(-1))
+        return data_support, data_query
+    
+    def split_support_query_feature(self, pos_input, neg_input, is_data, model = None):
+        
+        if self.config.train.neg_prototype:
+            if is_data:
+                pos_dataset = TensorDataset(pos_input, torch.zeros(pos_input.shape[0]))
+                neg_dataset = TensorDataset(neg_input, torch.zeros(neg_input.shape[0]))
+                pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                pos_all = []
+                for batch in pos_loader:
+                    data, _ = batch
+                    if model is not None:
+                        feature_pos = model.forward(data)
+                    else:
+                        feature_pos = self.classifier(data)
+                    pos_all.append(feature_pos)
+                feature_pos = torch.cat(pos_all, dim=0)
+                
+                neg_all = []
+                for batch in neg_loader:
+                    data, _ = batch
+                    if model is not None:
+                        feature_neg = model.forward(data)
+                    else:
+                        feature_neg = self.classifier(data)
+                    neg_all.append(feature_neg)
+                feature_neg = torch.cat(neg_all, dim=0)
+            else:
+                feature_pos = pos_input
+                feature_neg = neg_input
+            
+            feature_pos = feature_pos.view(-1, self.n_way, feature_pos.size(-1))
+            feature_neg = feature_neg.view(-1, self.n_way, feature_neg.size(-1))
+            feature_all = torch.cat([feature_pos, feature_neg], dim=1)
+            
+            feature_support = feature_all[:self.n_support, :, :]
+            feature_query = feature_pos[self.n_support:, :, :]
+            
+        else:
+            if is_data:
+                if model is not None:
+                    feature_pos = model.forward(pos_input)
+                else:
+                    feature_pos = self.classifier(pos_input)
+                
+            else:
+                feature_pos = pos_input
+            
+            feature_pos = feature_pos.view(-1, self.n_way, feature_pos.size(-1))
+            feature_support = feature_pos[:self.n_support, :, :]
+            feature_query = feature_pos[self.n_support:, :, :]
+        
+        return feature_support, feature_query
+        
+        

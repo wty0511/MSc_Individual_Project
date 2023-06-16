@@ -36,7 +36,7 @@ set_seed(SEED)
 # save_file = os.path.join(model_dir, 'best_model.pth')
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNet_no_neg_2way_lr0.01_5setp3/Model/best_model.pth"
 
-save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNet_no_neg_10way_lr0.01_5setp/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/protoMAML_2way_5shot_res/Model/best_model.pth"
 
 # 加载模型
 checkpoint = torch.load(save_file)

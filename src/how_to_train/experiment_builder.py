@@ -112,14 +112,13 @@ class ExperimentBuilder(object):
         :param pbar_train: The progress bar of the training.
         :return: Updates total_losses, train_losses, current_iter
         """
-        x_support_set, x_target_set, y_support_set, y_target_set, seed = train_sample
-        data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
+        # 处理一共task batch
 
         # if sample_idx == 0:
         #     print("shape of data", x_support_set.shape, x_target_set.shape, y_support_set.shape,
         #           y_target_set.shape)
 
-        losses, _ = self.model.run_train_iter(data_batch=data_batch, epoch=epoch_idx)
+        losses, _ = self.model.run_train_iter(data_batch=train_sample, epoch=epoch_idx)
 
         for key, value in zip(list(losses.keys()), list(losses.values())):
             if key not in total_losses:
@@ -145,9 +144,7 @@ class ExperimentBuilder(object):
         :param pbar_val: The progress bar of the val stage.
         :return: The updated val_losses, total_losses
         """
-        x_support_set, x_target_set, y_support_set, y_target_set, seed = val_sample
-        data_batch = (
-            x_support_set, x_target_set, y_support_set, y_target_set)
+        data_batch =  val_sample
 
         losses, _ = self.model.run_validation_iter(data_batch=data_batch)
         for key, value in zip(list(losses.keys()), list(losses.values())):
@@ -319,3 +316,4 @@ class ExperimentBuilder(object):
                         sample_idx=self.state['current_iter'])
 
             
+                    print(train_losses)

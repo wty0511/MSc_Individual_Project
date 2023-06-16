@@ -22,7 +22,7 @@ def set_seed(seed):
 SEED = 42
 set_seed(SEED)
 
-save_file = r"/root/task5_2023/Checkpoints/ProtoNet_no_neg_2way2/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/protnnet_10way_5shot_res/Model/best_model.pth"
 checkpoint = torch.load(save_file)
 cfg = checkpoint['config']
 # cfg = compose(config_name="config.yaml")
@@ -59,6 +59,6 @@ print(report_dir)
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
     
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
     
