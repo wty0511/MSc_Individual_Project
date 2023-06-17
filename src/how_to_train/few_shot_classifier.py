@@ -6,9 +6,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from src.utils.feature_extractor import *
 import torch.optim as optim
-
-
+import itertools
+from sklearn.metrics import classification_report, f1_score
+from src.evaluation_metrics.evaluation import *
+from src.utils.post_processing import *
+from copy import deepcopy
 from src.how_to_train.meta_optimizer import LSLRGradientDescentLearningRule
 from src.how_to_train.meta_neural_net_work_architectures import Convnet
 
@@ -45,17 +49,18 @@ class MAMLFewShotClassifier(nn.Module):
         self.n_support = cfg.train.n_support
         self.n_query = cfg.train.n_query
         # 可训练的模块类似于META SGD
-        
-        params_head = dict(self.classifier_head.named_parameters())
-        params_classifier = dict(self.classifier.named_parameters())
-
+        self.test_loop_batch_size = cfg.val.test_loop_batch_size
+        params_head = self.classifier_head.named_parameters()
+        params_classifier = self.classifier.named_parameters()
+        all_params = itertools.chain(params_head, params_classifier)
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps= cfg.train.inner_step,
                                                                     use_learnable_learning_rates= True)
-        
+        self.sr = cfg.features.sr
+        self.fps = self.sr / cfg.features.hop_length
         self.inner_loop_optimizer.initialise(
-            names_weights_dict=self.get_inner_loop_parameter_dict(params={**params_head, **params_classifier}))
+            names_weights_dict=self.get_inner_loop_parameter_dict(params= all_params))
         # self.inner_loop_optimizer.initialise(
             # names_weights_dict=self.get_inner_loop_parameter_dict(params=self.named_parameters()))
         # print("Inner Loop parameters")
@@ -139,13 +144,15 @@ class MAMLFewShotClassifier(nn.Module):
         :param current_step_idx: Current step's index.
         :return: A dictionary with the updated weights (name, param)
         """
-
+        # for name, param in names_weights_copy.items():
+        #     print(name, param.grad_fn)
         self.classifier.zero_grad(params=names_weights_copy)
-
+        self.classifier_head.zero_grad()
+        # print(names_weights_copy.keys())
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
-                                    create_graph=use_second_order, allow_unused=True)
+                                    create_graph=use_second_order, allow_unused=False)
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
-
+        # print('grads',names_grads_copy)
         #不是多卡，所以不需要这个
         # names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
 
@@ -200,6 +207,7 @@ class MAMLFewShotClassifier(nn.Module):
         total_accuracies = []
         per_task_target_preds = [[] for i in range(len(data_batch))]
         self.classifier.zero_grad()
+        
         task_accuracies = []
         # for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
         #                       y_support_set,
@@ -210,25 +218,42 @@ class MAMLFewShotClassifier(nn.Module):
                 pos_data, neg_data = task 
                 classes, data_pos, _ =pos_data
                 _, data_neg, _ =neg_data
-                # support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+                support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
                 support_data, query_data = self.split_support_query_data(data_pos, data_neg)
                 support_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_support)).long().to(self.device)
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_query)).long().to(self.device)
             else:
                 pos_data = task 
                 classes, data_pos, _ =pos_data
-                # support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
+                support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
                 support_data, query_data = self.split_support_query_data(data_pos, None)
                 support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
             
-            
+            prototypes     = support_feat.mean(0).squeeze()
+            norms = torch.norm(prototypes, dim=1, keepdim=True)
+            expanded_norms = norms.expand_as(prototypes)
+            prototypes = prototypes / expanded_norms
+            init_weight = 2 * prototypes
+            init_bias = -torch.norm(prototypes, dim=1)**2
+            output_weight = init_weight.detach().requires_grad_()
+            output_bias = init_bias.detach().requires_grad_()
+            # self.classifier_head = nn.Linear(512, self.n_way).to(device=self.device)
+            # self.classifier_head.weight= nn.Parameter(output_weight, requires_grad=True)
+            # self.classifier_head.bias = nn.Parameter(output_bias, requires_grad=True)
+            # self.classifier_head.zero_grad()
             task_losses = []
             
 
             
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
-            names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
+            # names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
+            # params_head = self.classifier_head.named_parameters()
+            params_head = {'weight': output_weight, 'bias': output_bias}.items()
+            
+            params_classifier = self.classifier.named_parameters()
+            all_params = itertools.chain(params_head, params_classifier)
+            names_weights_copy = self.get_inner_loop_parameter_dict(all_params)
             # for key, value in names_weights_copy.items():
             #     print(key, value.shape)
             # print('~~~~')
@@ -258,6 +283,7 @@ class MAMLFewShotClassifier(nn.Module):
                 )
 
                 # print('first layer before update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
+                # print('step',num_step)
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
                                                                   use_second_order=use_second_order,
@@ -278,6 +304,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
                     task_losses.append(target_loss)
+                
             # print('end inner loop')
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
@@ -286,9 +313,10 @@ class MAMLFewShotClassifier(nn.Module):
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
-            # 在
             if not training_phase:
                 self.classifier.restore_backup_stats()
+            output_weight = (output_weight - init_weight).detach() + init_weight
+            output_bias = (output_bias - init_bias).detach() + init_bias
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
@@ -298,7 +326,290 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
+
+
+    def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None):
+        """
+        Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
+        :param data_batch: A data batch containing the support and target sets.
+        :param epoch: Current epoch's index
+        :param use_second_order: A boolean saying whether to use second order derivatives.
+        :param use_multi_step_loss_optimization: Whether to optimize on the outer loop using just the last step's
+        target loss (True) or whether to use multi step loss which improves the stability of the system (False)
+        :param num_steps: Number of inner loop steps.
+        :param training_phase: Whether this is a training phase (True) or an evaluation phase (False)
+        :return: A dictionary with the collected losses of the current outer forward propagation.
+        """
+        # x_support_set, x_target_set, y_support_set, y_target_set = data_batch
+
+        # [b, ncs, spc] = y_support_set.shape
+
+        best_res_all = []
+        best_threshold_all = []
+        for i in range(1):
+            all_prob = {}
+            all_meta = {}
+            for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(data_batch):
+                seg_hop = seg_hop.item()
+                query_start = query_start.item()
+                wav_file= pos_sup[0][0].split('&')[1]
+                
+                all_meta[wav_file]={}
+                all_meta[wav_file]['start'] = query_start
+
+                all_meta[wav_file]['end'] = query_end
+                all_meta[wav_file]['seg_hop'] = seg_hop
+                all_meta[wav_file]['seg_len'] = seg_len
+                
+                all_meta[wav_file]['label'] = label[0]
+                pos_data = pos_sup[1].squeeze()
+                query = query.squeeze()
+                pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
+                query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
+                pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                query_loader = DataLoader(query_dataset, batch_size=16, shuffle=False)
+                pos_feat = []
+                for batch in pos_loader:
+                    p_data, _ = batch
+                    feat = self.classifier(p_data, num_step=0, training=False, backup_running_statistics=False, output_features=False)
+                    # print(feat.shape)
+                    pos_feat.append(feat.mean(0))
+                pos_feat = torch.stack(pos_feat, dim=0).mean(0)
+                
+                prob_mean = []
+                for i in range(1):
+                    
+                    test_loop_neg_sample = self.config.val.test_loop_neg_sample
+                    neg_sup[1] = neg_sup[1].squeeze() 
+                    if neg_sup[1].shape[0] > test_loop_neg_sample:
+                        neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
+                        neg_seg_sample = neg_sup[1][neg_indices]
+                    else:
+                        neg_seg_sample = neg_sup[1]
+                    neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
+                    neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                    neg_feat = []
+                    for batch in neg_loader:
+                        n_data, _ = batch
+                        # print(neg_data.shape)
+                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics=False, output_features=False)
+                        # print(feat.shape)
+                        neg_feat.append(feat.mean(0))
+                    neg_feat = torch.stack(neg_feat, dim=0).mean(0)
+
+
+                    self.num_classes_per_set = self.config.train.n_way
+
+                    total_losses = []
+                    total_accuracies = []
+                    per_task_target_preds = [[] for i in range(len(data_batch))]
+                    self.classifier.zero_grad()
+                    task_accuracies = []
+                    # for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
+                    #                       y_support_set,
+                    #                       x_target_set,
+                    #                       y_target_set)):
+
+                    prototypes = torch.stack([pos_feat,neg_feat], dim=0)
+
+                    norms = torch.norm(prototypes, dim=1, keepdim=True)
+                    expanded_norms = norms.expand_as(prototypes)
+                    prototypes = prototypes / expanded_norms
+                    init_weight = 2 * prototypes
+                    init_bias = -torch.norm(prototypes, dim=1)**2
+                    output_weight = init_weight.detach().requires_grad_()
+                    output_bias = init_bias.detach().requires_grad_()
+                    self.classifier_head = nn.Linear(512, 2).to(device=self.device)
+                    self.classifier_head.weight = nn.Parameter(output_weight)
+                    self.classifier_head.bias = nn.Parameter(output_bias)
+                    task_losses = []
+                    support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
+                    # support_data = pos_data
+                    m = pos_data.shape[0]
+                    n = neg_seg_sample.shape[0]
+                    
+                    support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
+                    support_label = torch.from_numpy(support_label).long().to(self.device)
+                    per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
+                    
+                    params_head = {'weight': output_weight, 'bias': output_bias}.items()
+                    params_classifier = self.classifier.named_parameters()
+                    all_params = itertools.chain(params_head, params_classifier)
+                    names_weights_copy = self.get_inner_loop_parameter_dict(all_params)
+                    self.classifier.zero_grad()
+                    # self.classifier_head.zero_grad()
+                    for num_step in range(num_steps):
+
+                        support_loss, support_preds = self.net_forward(
+                            x=support_data,
+                            y=support_label,
+                            weights=names_weights_copy,
+                            backup_running_statistics=num_step == 0,
+                            training=True,
+                            num_step=num_step,
+                            test = True
+                        )
+
+                        # print('first layer before update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
+                        # print(names_weights_copy['weight'])
+                        names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
+                                                                        names_weights_copy=names_weights_copy,
+                                                                        use_second_order=use_second_order,
+                                                                        current_step_idx=num_step)
+                        # print(names_weights_copy['weight'])
+                        # print('~~~~')
+                        preds_feat = self.classifier(support_data, num_step=self.config.train.inner_step - 1, training=True, backup_running_statistics=True, output_features=False)
+                        head_weight = names_weights_copy['weight']
+                        head_bias = names_weights_copy['bias']
+                        preds = F.linear(preds_feat, head_weight, head_bias)
+                        preds = F.softmax(preds, dim = 1)
+                        preds = preds.argmax(dim=1).detach().cpu().numpy()
+    
+                        print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=5))
+                        
+                        
+                    with torch.no_grad():
+                        prob_all = []
+                        for batch in query_loader:
+                            query_data, _ = batch
+                            preds_feat = self.classifier.forward(x=query_data, params=names_weights_copy,
+                                            training=True,
+                                            backup_running_statistics=True, num_step=self.config.train.inner_step - 1)
+                            head_weight = names_weights_copy['weight']
+                            head_bias = names_weights_copy['bias']
+                            preds = F.linear(preds_feat, head_weight, head_bias)
+                            preds = F.softmax(preds, dim = 1)
+                            preds = preds.detach().cpu().numpy()
+                            # with h5py.File(feat_file, 'a') as f:
+                                
+                            #     size = f['features'].shape[0]
+                            #     nwe_size = f['features'].shape[0] + feats.shape[0]
+
+                            #     f['features'].resize((nwe_size, 512))
+
+                            #     f['features'][size:nwe_size] = feats
+                            prob_all.append(preds)
+                        prob_all = np.concatenate(prob_all, axis=0)
+                        prob_all = prob_all[:,0]
+                        prob_mean.append(prob_all)
+                prob_mean = np.stack(prob_mean, axis=0).mean(0)
+                all_prob[wav_file] = prob_mean
+            best_res = None
+            best_f1 = 0
+            best_report = {}
+            best_threshold = 0
+            for threshold in np.arange(0.5, 1, 0.1):
+                if fix_shreshold is not None:
+                    threshold = fix_shreshold
+                
+                report_f1 = {}
+                all_time = {'Audiofilename':[], 'Starttime':[], 'Endtime':[]}
+                for wav_file in all_prob.keys():
+                    
+                    prob = np.where(all_prob[wav_file]>threshold, 1, 0)
+
+                    # acc = np.sum(prob^1 == np.array(all_meta[wav_file]['label']))/len(prob)
+                    # 计算分类报告
+                    y_pred = prob^1
+                    y_true =  np.array(all_meta[wav_file]['label'])
+    
+                    # print(all_meta[wav_file]['seg_hop'])
+                    # print(all_meta[wav_file]['seg_len'])
+                    # 输出分类报告
+
+                    report_f1[os.path.basename(wav_file)] = classification_report(y_true, y_pred,zero_division=0, digits=5)
+                    # 计算各个类别的F1分数
+                    # f1_scores = f1_score(y_true, y_pred, average=None)
+
+                    # 输出各个类别的F1分数
+                    # print("F1 scores for each class:")
+                    # print(f1_scores)
+                    # print(len(prob))
+                    # print(np.sum(prob))
+                    # print(np.sum(prob)/len(prob))
+
+
+                    on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
+                    off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
+                    # for i, j in zip(on_set, off_set):
+                    #     print(i,j)
+                    
+                    
+                    on_set_time = on_set*all_meta[wav_file]['seg_hop']/self.fps + all_meta[wav_file]['start']
+                    off_set_time = off_set*all_meta[wav_file]['seg_hop']/self.fps + all_meta[wav_file]['start']
+                    all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
+                    all_time['Starttime'].extend(on_set_time)
+                    all_time['Endtime'].extend(off_set_time)
+                    # print(wav_file)
+                    # print(on_set_time[:5])
+                    # print('query_start', all_meta[wav_file]['start'])
+                    for i in range(len(off_set_time)):
+                        if off_set_time[i] > all_meta[wav_file]['end']:
+                            raise ValueError('off_set_time is larger than query_end')
+                
+                df_all_time = pd.DataFrame(all_time)
+                df_all_time = post_processing(df_all_time)
+                df_all_time = df_all_time.astype('str')
+                pred_path = normalize_path(self.config.checkpoint.pred_dir)
+                pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
+                if not os.path.exists(os.path.dirname(pred_path)):
+                    os.makedirs(os.path.dirname(pred_path))
+                df_all_time.to_csv(pred_path, index=False)
+                
+                ref_files_path = data_batch.dataset.val_dir
+                report_dir = normalize_path(self.config.checkpoint.report_dir)
+                report = evaluate(df_all_time, ref_files_path, self.config.team_name, self.config.dataset, report_dir)
+                if report['overall_scores']['fmeasure (percentage)'] > best_f1:
+                    best_f1 = report['overall_scores']['fmeasure (percentage)']
+                    best_res = report
+                    best_report = report_f1
+                    best_threshold = threshold
+                if fix_shreshold is not None:
+                    break
+            best_threshold_all.append(best_threshold)
+            best_res_all.append(best_res)
+            
+        print(self.average_res(best_res_all))
+        print(np.mean(best_threshold_all))
+        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all)
+
+    def average_res (self, res_list):
+        avg = deepcopy(res_list[0])
+    
+        for key in avg.keys():
+            if key == 'team_name' or key == 'dataset' or key == 'set_name' or key == 'report_date':
+                continue
+            if key == 'overall_scores':
+                for key2 in avg[key].keys():
+                    avg[key][key2] = 0
+            if key == 'scores_per_subset':
+                for subset in avg[key].keys():
+                    for key2 in avg[key][subset].keys():
+                        avg[key][subset][key2] = 0
+            if key == 'scores_per_audiofile':
+                for file in avg[key].keys():
+                    for key2 in avg[key][file].keys():
+                        avg[key][file][key2] = 0
+        
+        
+        for res in res_list:
+            for key in res.keys():
+                if key == 'team_name' or key == 'dataset' or key == 'set_name' or key == 'report_date':
+                    continue
+                if key == 'overall_scores':
+                    for key2 in res[key].keys():
+                        avg[key][key2] += res[key][key2]/len(res_list)
+                if key == 'scores_per_subset':
+                    for subset in res[key].keys():
+                        for key2 in res[key][subset].keys():
+                            avg[key][subset][key2] += res[key][subset][key2]/len(res_list)
+                if key == 'scores_per_audiofile':
+                    for file in res[key].keys():
+                        for key2 in res[key][file].keys():
+                            avg[key][file][key2] += res[key][file][key2]/len(res_list)
+        return avg
+            
+    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, test = False):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
         boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
@@ -313,10 +624,23 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
-        preds = self.classifier.forward(x=x, params=weights,
+        preds_feat = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
-        loss = F.cross_entropy(input=preds, target=y)
+        head_weight = weights['weight']
+        head_bias = weights['bias']
+        preds = F.linear(preds_feat, head_weight, head_bias)
+        # preds = self.classifier_head.forward(preds_feat)
+        # print(preds)
+        pos_num = x[(y == 0)].shape[0]
+        neg_num = x[(y == 1)].shape[0]
+        
+        if test:
+            weights = torch.cat((torch.full((1,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
+            loss = F.cross_entropy(input=preds, target=y,weight=weights)
+        else:
+            preds = preds
+            loss = F.cross_entropy(input=preds, target=y)
 
         return loss, preds
 
@@ -351,12 +675,12 @@ class MAMLFewShotClassifier(nn.Module):
         :param epoch: The index of the currrent epoch.
         :return: A dictionary of losses for the current step.
         """
-        losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch, use_second_order=False,
+        pred_df, best_res, threshold = self.forward_test(data_batch=data_batch, epoch=epoch, use_second_order=False,
                                                      use_multi_step_loss_optimization=True,
                                                      num_steps=self.config.train.inner_step,
                                                      training_phase=False)
-
-        return losses, per_task_target_preds
+        
+        return pred_df, best_res, threshold
 
     def meta_update(self, loss):
         """
@@ -430,13 +754,13 @@ class MAMLFewShotClassifier(nn.Module):
 
         # data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
+        pred_df, best_res, threshold = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
 
         # losses['loss'].backward() # uncomment if you get the weird memory error
         # self.zero_grad()
         # self.optimizer.zero_grad()
 
-        return losses, per_task_target_preds
+        return pred_df, best_res, threshold
 
     def save_model(self, model_save_dir, state):
         """
@@ -520,7 +844,7 @@ class MAMLFewShotClassifier(nn.Module):
                     if model is not None:
                         feature_pos = model.forward(data)
                     else:
-                        feature_pos = self.classifier(data)
+                        feature_pos = self.classifier(data, num_step=0, training=True, backup_running_statistics=False, output_features=False)
                     pos_all.append(feature_pos)
                 feature_pos = torch.cat(pos_all, dim=0)
                 
@@ -530,7 +854,7 @@ class MAMLFewShotClassifier(nn.Module):
                     if model is not None:
                         feature_neg = model.forward(data)
                     else:
-                        feature_neg = self.classifier(data)
+                        feature_neg = self.classifier(data, num_step=0, training=True, backup_running_statistics=False, output_features=False)
                     neg_all.append(feature_neg)
                 feature_neg = torch.cat(neg_all, dim=0)
             else:
@@ -549,7 +873,7 @@ class MAMLFewShotClassifier(nn.Module):
                 if model is not None:
                     feature_pos = model.forward(pos_input)
                 else:
-                    feature_pos = self.classifier(pos_input)
+                    feature_pos = self.classifier(pos_input, num_step=0, training=True, backup_running_statistics=False, output_features=False)
                 
             else:
                 feature_pos = pos_input

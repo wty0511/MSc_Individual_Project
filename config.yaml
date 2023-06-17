@@ -29,14 +29,14 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 10
+  n_way: 5
   n_support: 5
   n_query: 5
   backbone:  convnet
   model_type: protonet
   epoches: 51
   lr: 0.001
-  lr_inner: 0.001
+  lr_inner: 0.01
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
@@ -45,9 +45,9 @@ train:
   min_lr: 0.001
   multi_step_loss_num_epochs: 15
   first_order_to_second_order_epoch: 15
-  enable_inner_loop_optimizable_bn_params: True
+  enable_inner_loop_optimizable_bn_params: False
   second_order: false
-  use_multi_step_loss_optimization: True
+  use_multi_step_loss_optimization: False
   learnable_bn_gamma: True
   learnable_bn_beta: True
   per_step_bn_statistics: True
@@ -56,7 +56,7 @@ train:
 val:
   seg_len_base: 30
   hop_len_frac: 3
-  test_loop_batch_size: 512
+  test_loop_batch_size: 64
   test_loop_neg_sample: 50
   threshold: 0.5
 

@@ -75,7 +75,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 if set too small learning will proceed very slowly.
         """
         super(LSLRGradientDescentLearningRule, self).__init__()
-        print(init_learning_rate)
+        # print(init_learning_rate)
         assert init_learning_rate > 0., 'learning_rate should be positive.'
 
         self.init_learning_rate = torch.ones(1) * init_learning_rate
@@ -106,9 +106,9 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 with respect to each of the parameters passed to `initialise`
                 previously, with this list expected to be in the same order.
         """
-        print('keys',names_grads_wrt_params_dict.keys())
-        print('key',self.names_learning_rates_dict)
-        print(names_weights_dict.keys())
+        # print('keys',names_grads_wrt_params_dict)
+        # print('key',self.names_learning_rates_dict['weight'])
+        # print(names_weights_dict.keys())
         return {
             key: names_weights_dict[key]
             - self.names_learning_rates_dict[key.replace(".", "-")][num_step]

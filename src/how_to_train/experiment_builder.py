@@ -146,21 +146,21 @@ class ExperimentBuilder(object):
         """
         data_batch =  val_sample
 
-        losses, _ = self.model.run_validation_iter(data_batch=data_batch)
-        for key, value in zip(list(losses.keys()), list(losses.values())):
-            if key not in total_losses:
-                total_losses[key] = [float(value)]
-            else:
-                total_losses[key].append(float(value))
+        pred_df, best_res, threshold = self.model.run_validation_iter(data_batch=data_batch)
+        # for key, value in zip(list(losses.keys()), list(losses.values())):
+        #     if key not in total_losses:
+        #         total_losses[key] = [float(value)]
+        #     else:
+        #         total_losses[key].append(float(value))
 
-        val_losses = self.build_summary_dict(total_losses=total_losses, phase=phase)
-        val_output_update = self.build_loss_summary_string(losses)
+        # val_losses = self.build_summary_dict(total_losses=total_losses, phase=phase)
+        # val_output_update = self.build_loss_summary_string(losses)
 
-        pbar_val.update(1)
-        pbar_val.set_description(
-            "val_phase {} -> {}".format(self.epoch, val_output_update))
+        # pbar_val.update(1)
+        # pbar_val.set_description(
+        #     "val_phase {} -> {}".format(self.epoch, val_output_update))
 
-        return val_losses, total_losses
+        return pred_df, best_res, threshold
 
     # def test_evaluation_iteration(self, val_sample, model_idx, sample_idx, per_model_per_batch_preds, pbar_test):
     #     """
@@ -315,5 +315,12 @@ class ExperimentBuilder(object):
                         current_iter=self.state['current_iter'],
                         sample_idx=self.state['current_iter'])
 
-            
-                    print(train_losses)
+
+                
+                
+                pred_df, best_res, threshold = self.evaluation_iteration(val_sample=self.data.get_test_batches(),
+                                                                        total_losses=self.total_losses,
+                                                                        pbar_val=None,
+                                                                        phase="val")
+                print(best_res)
+                    
