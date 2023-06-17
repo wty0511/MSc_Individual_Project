@@ -69,7 +69,7 @@ class ClassDataset(Dataset):
         if self.debug:
             self.length = int(0.03 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         else:
-            self.length = int(3* 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+            self.length = int(0.3* 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):

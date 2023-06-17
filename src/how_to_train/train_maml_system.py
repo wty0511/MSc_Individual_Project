@@ -12,6 +12,7 @@ from src.how_to_train.few_shot_classifier import MAMLFewShotClassifier
 from omegaconf import DictConfig, OmegaConf
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
+from src.how_to_train.few_shot_classifier_TNN import *
 
 if not GlobalHydra().is_initialized():
     initialize(config_path="../../")
@@ -19,8 +20,8 @@ if not GlobalHydra().is_initialized():
 cfg = compose(config_name="config.yaml")
 
 # Combines the arguments, model, data and experiment builders to run an experiment
-model = MAMLFewShotClassifier(cfg)
-
+# model = MAMLFewShotClassifier(cfg)
+model =TNNMAMLFewShotClassifier(cfg)
 data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 maml_system.run_experiment()

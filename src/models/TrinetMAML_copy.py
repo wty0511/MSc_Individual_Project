@@ -71,9 +71,9 @@ class TNNMAML(BaseModel):
         for weight in self.feature_extractor.parameters():
             weight.fast = None
         self.feature_extractor.zero_grad()
-        sampler = IntClassSampler(self.config, support_label, 5000)
+        sampler = IntClassSampler(self.config, support_label, 50)
         dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 10)
         
         for batch in dataloader:
             for i in range(1):
@@ -259,7 +259,7 @@ class TNNMAML(BaseModel):
         
         distances = torch.sqrt(torch.sum((neg - pos.mean(dim=0).unsqueeze(0))**2, dim=(-1,-2)))
         similarity_scores = 1.0 / (1.0 + distances)  # 加1是为了防止除以零
-        k= np.min([pos.size(0), neg.size(0)])
+        k= np.min([50, neg.size(0)])
         _, indices = torch.topk(similarity_scores, k= k)
         
         # indices[torch.linspace(0, indices.size(0) - 1, k).long()]
@@ -358,7 +358,7 @@ class TNNMAML(BaseModel):
 
 
 
-                    # neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
+                    neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
                     
                     
                     # pos_data = pos_data[:5]
@@ -474,9 +474,9 @@ class TNNMAML(BaseModel):
                     # print(np.sum(prob))
                     # print(np.sum(prob)/len(prob))
                     # print(report_f1[os.path.basename(wav_file)])
-                    if 'DCASE2021-ML_190099' in wav_file:
-                        print(all_prob[wav_file])
-                        print(prob)
+                    # if 'DCASE2021-ML_190099' in wav_file:
+                    #     print(all_prob[wav_file])
+                    #     print(prob)
                     on_set = np.flatnonzero(np.diff(np.concatenate(([0],prob), axis=0))==1)
                     off_set = np.flatnonzero(np.diff(np.concatenate((prob,[0]), axis=0))==-1) + 1 #off_set is the index of the first 0 after 1
                     # for i, j in zip(on_set, off_set):
