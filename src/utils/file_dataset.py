@@ -257,23 +257,39 @@ class FileDataset(Dataset):
         
         # Choosing the segment length based on the maximum size in the 5-shot.
         # Logic was based on fitment on 12GB GPU since some segments are quite long.
+        
+        # if max_len < 8: #0.1
+        #     seg_len = 8
+        # elif max_len < 17: # 0.2
+        #     seg_len = max_len
+        # elif (
+        #     max_len >= 17
+        #     and max_len <= 30 #  0.4
+        # ):
+        #     seg_len = max_len // 2
+        # elif max_len > 30 and max_len < 90:
+        #     seg_len = max_len // 4
+        # else:
+        #     seg_len = max_len // 8
+        # # # print(f"Adaptive segment length for %s is {seg_len}" % (file))
+        # hop_seg = seg_len // self.hop_len_frac
+        # seg_len = 3
+        # hop_seg = 1
         if max_len < 8:
             seg_len = 8
-        elif max_len < self.seg_len_base:
+        elif max_len < 30:# 30 0.4
             seg_len = max_len
         elif (
-            max_len >= self.seg_len_base
-            and max_len <= self.seg_len_base * 2
+            max_len >= 30
+            and max_len <= 60# 60 0.8
         ):
             seg_len = max_len // 2
-        elif max_len > self.seg_len_base * 2 and max_len < 500:
+        elif max_len > 60 and max_len < 250:
             seg_len = max_len // 4
         else:
             seg_len = max_len // 8
         # print(f"Adaptive segment length for %s is {seg_len}" % (file))
         hop_seg = seg_len // self.hop_len_frac
-        # seg_len = 3
-        # hop_seg = 1
         return seg_len, hop_seg
         #################################################################################
         

@@ -6,6 +6,7 @@ from src.models.ProtoMAML_temperature import *
 from src.models.MAML import *
 # from src.models.SiameseMAML import *
 from src.models.SiameseMAML_copy2 import *
+from src.models.ProtoMAML_proxy import *
 # from src.models.SiameseMAML_sigmoid import *
 from src.models.ProtoMAML_query import *
 from src.models.ProtoMAML_grad import *
@@ -43,6 +44,7 @@ if not GlobalHydra().is_initialized():
 cfg = compose(config_name="config.yaml")
 print('preparing training dataset')
 train_dataset = ClassDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
+print(len(train_dataset))
 print(train_dataset.seg_meta.keys())
 print('preparing val dataset')
 val_dataset = FileDataset(cfg,val=True, debug= debug)
@@ -58,10 +60,11 @@ pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
 # model = ProtoMAML_temp(cfg)
 # model = ProtoMAML_grad(cfg)
 # model = ProtoMAML_query(cfg)
-model = ProtoMAML(cfg)
+# model = ProtoMAML(cfg)
 # model = SNNMAML(cfg)
 # model = MAML(cfg)
 # model = TNNMAML(cfg)
+model =ProtoMAML_proxy(cfg)
 # model = ProtoMAMLfw(cfg)
 print(pretrain_model['state'].keys())
 # model.feature_extractor.load_state_dict(pretrain_dict)
@@ -77,7 +80,7 @@ model.train()
 
 no_imporve = 0
 
-for epoch in range(50):
+for epoch in range(200//cfg.train.n_way):
     model.train()
     model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):

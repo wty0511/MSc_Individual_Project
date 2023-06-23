@@ -1,16 +1,22 @@
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
 import torch.nn as nn
 import torch
-def conv_block(in_channels,out_channels):
-
-    return nn.Sequential(
-        nn.Conv2d(in_channels,out_channels,3,padding=1),
-        nn.BatchNorm2d(out_channels),
-        nn.ReLU(),
-        # nn.LeakyReLU(),
-        # nn.SELU(),
-        nn.MaxPool2d(2)
-    )
+def conv_block(in_channels,out_channels, max_pool = True):
+    if max_pool:
+        return nn.Sequential(
+            nn.Conv2d(in_channels,out_channels,3,padding=1),
+            nn.BatchNorm2d(out_channels),
+            # nn.ReLU(),
+            nn.LeakyReLU(),
+            nn.MaxPool2d(2)
+        )
+    else:
+        return nn.Sequential(
+            nn.Conv2d(in_channels,out_channels,3,padding=1),
+            nn.BatchNorm2d(out_channels),
+            # nn.ReLU(),
+            nn.LeakyReLU(),
+        )
 
 def conv_block2(in_channels,out_channels):
 
@@ -45,8 +51,7 @@ class ConvNet(nn.Module):
         self.encoder = nn.Sequential(
             conv_block(1,64),
             conv_block(64,64),
-            conv_block(64,64)       
-            # conv_block(64,64)
+            conv_block(64,64),        
         )
         self.avgpool = nn.AdaptiveAvgPool2d((8,1))
         total_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)

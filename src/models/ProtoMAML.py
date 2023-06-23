@@ -197,17 +197,17 @@ class ProtoMAML(BaseModel):
             loss.backward()
             local_optim.step()
             # Update output layer via SGD
-            
             output_weight.data -= self.config.train.lr_inner * output_weight.grad
             output_bias.data -= self.config.train.lr_inner * output_bias.grad
+
             # Reset gradients
             local_optim.zero_grad()
             output_weight.grad.fill_(0)
             output_bias.grad.fill_(0)
             loss = loss.detach()
-            # print('loss', loss)
+            print('loss', loss)
             acc = torch.mean(acc).detach()
-        # print('~~~~~~~')
+        print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -343,13 +343,13 @@ class ProtoMAML(BaseModel):
                     #     print(g.grad)
                     # return
                     loss.backward()
-
+                    c = 0
                     for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
                         
                         if p_global.grad is None or p_local.grad is None:
                             print('None')
                             continue
-                        
+                        # print(p_global.grad)
                         p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
                 loss = loss.detach().cpu().item()
                 acc = acc.mean().detach().cpu().item()
@@ -369,7 +369,7 @@ class ProtoMAML(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(5):
+        for i in range(1):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):

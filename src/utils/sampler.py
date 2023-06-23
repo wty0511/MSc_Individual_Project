@@ -9,7 +9,7 @@ class BatchSampler(Sampler):
         self.n_support = config.train.n_support
         self.n_query = config.train.n_query
         self.class_list = list(classes)
-        self.n_episode = data_set_len//(self.n_way*(self.n_support+self.n_query))
+        self.n_episode = data_set_len//(self.n_query)
     def __iter__(self):
         for _ in range(self.n_episode):
             # randomly select n_way classes
@@ -35,15 +35,21 @@ class ClassSampler(Sampler):
         return self.len
 
 class IntClassSampler(Sampler):
-    def __init__(self, config, classes, data_set_len):
+    def __init__(self, config, classes, data_set_len, mode='train'):
         self.config = config
         self.class_list = list(classes)
+        # print(self.class_list)
+        self.mode = mode
         self.len = data_set_len
     def __iter__(self):
         for _ in range(self.len):
             # randomly select n_way classes
             selected_classes = np.random.choice(self.class_list, 1, replace=False)
-            yield int(selected_classes[0])
+            if self.mode == 'train':
+                yield int(selected_classes[0])
+            else:
+                yield 0
+
             
     def __len__(self):
         return self.len

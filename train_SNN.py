@@ -38,6 +38,7 @@ if not GlobalHydra().is_initialized():
 cfg = compose(config_name="config.yaml")
 print('preparing training dataset')
 train_dataset = ClassPairDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
+print(len(train_dataset))
 print(train_dataset.seg_meta.keys())
 print('preparing val dataset')
 val_dataset = FileDataset(cfg,val=True, debug= debug)
@@ -57,7 +58,7 @@ if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 print('len',len(train_dataset))
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
-for epoch in range(50):
+for epoch in range(100):
     model.train()
     model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):

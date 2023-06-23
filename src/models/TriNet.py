@@ -47,7 +47,7 @@ class TripletLoss(nn.Module):
         # print(distance_negative)
         # print('~~~~~~~~~~~~~')
         losses = F.relu(distance_positive - distance_negative + self.margin)
-        return losses.sum()
+        return losses.mean()
 
 class TriNet(BaseModel):
     def __init__(self, config):
@@ -61,7 +61,8 @@ class TriNet(BaseModel):
     # def inner_loop(self, support_data, support_label = None, mode = 'train'):
     #     local_model = deepcopy(self.feature_extractor)
     #     local_model.train()
-    #     local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
+    #     local_optim = optim.SGD(local_model.par
+    # ameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
     #     local_optim.zero_grad()
     #     fast_parameters = list(local_model.parameters())
     #     if mode == 'test':
@@ -308,12 +309,12 @@ class TriNet(BaseModel):
                 test_loop_neg_sample = self.config.val.test_loop_neg_sample
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
-                # if neg_sup[1].shape[0] > test_loop_neg_sample:
-                #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
-                #     neg_seg_sample = neg_sup[1][neg_indices]
-                # else:
-                #     neg_seg_sample = neg_sup[1]
-                neg_seg_sample = neg_sup[1]
+                if neg_sup[1].shape[0] > test_loop_neg_sample:
+                    neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
+                    neg_seg_sample = neg_sup[1][neg_indices]
+                else:
+                    neg_seg_sample = neg_sup[1]
+                # neg_seg_sample = neg_sup[1]
                 neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                 neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 

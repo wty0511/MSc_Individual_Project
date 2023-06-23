@@ -17,9 +17,6 @@ from sklearn.metrics import classification_report, f1_score
 
 
 
-
-
-
 class MAML(BaseModel):
     
     def __init__(self, config):
@@ -45,7 +42,7 @@ class MAML(BaseModel):
 
         # Create output layer weights 
         # Optimize inner loop model on support set
-        for i in range(10):
+        for i in range(5):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(support_data, support_label, mode = mode)
 
@@ -64,20 +61,8 @@ class MAML(BaseModel):
                     weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                 fast_parameters.append(weight.fast) # update the fast_parameters
             
-            
-            # print(preds)
-            
-            # preds = preds.argmax(dim=1).detach().cpu().numpy()
-            # report = classification_report(support_label.cpu().numpy(), preds,zero_division=0, digits=3)
-            # print(report)
-            # return loss, report, acc
-    
-            # print(loss)
-            
-            # loss = loss.detach()
-            
-        # print('~~~~~~~~~~~~~~~')
-
+        #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item()))
+        # print('~~~~~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -105,8 +90,10 @@ class MAML(BaseModel):
         #     loss = F.cross_entropy(preds, labels, weight=weights)
         # else:
 
-        
-        loss = F.cross_entropy(preds, labels)
+        if mode == 'train':
+            loss = F.cross_entropy(preds, labels)
+        else:
+            loss = F.cross_entropy(preds, labels, weight=torch.tensor([5, 1]).float().to(self.device))
         acc = (preds.argmax(dim=1) == labels).float()
         labels = labels.cpu().numpy()
         preds = preds.argmax(dim=1).detach().cpu().numpy()
@@ -122,11 +109,7 @@ class MAML(BaseModel):
         return preds
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
-
-
         for i, task_batch in tqdm(enumerate(data_loader)):
-            accuracies = []
-            losses = []
             loss_all = []
             self.feature_extractor.zero_grad()
             for task in task_batch:
@@ -160,6 +143,8 @@ class MAML(BaseModel):
             
             loss_q = torch.stack(loss_all).sum(0)
             loss_q.backward()
+            # for i in self.parameters():
+            #     print(i.grad)
             opt.step()
             opt.zero_grad()
             print('outer loop: loss:{:.3f}'.format(loss_q.item()))
@@ -171,7 +156,7 @@ class MAML(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None):
         best_res_all = []
         best_threshold_all = []
-        for i in range(10):
+        for i in range(1):
             all_prob = {}
             all_meta = {}
             for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):

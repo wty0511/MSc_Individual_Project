@@ -652,7 +652,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
         y = y.cpu().numpy()
-        sampler = IntClassSampler(self.config, y, 100)
+        sampler = IntClassSampler(self.config, y, 100, test)
         dataset =  PairDataset(self.config, x, y, debug = False)
         dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
         loss = torch.tensor(0.0).to(self.device)

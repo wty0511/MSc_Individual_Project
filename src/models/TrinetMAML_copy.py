@@ -22,6 +22,97 @@ import torch.optim as optim
 from src.utils.sampler import *
 import h5py
 
+
+class SupConLoss(nn.Module):
+	"""Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
+	It also supports the unsupervised contrastive loss in SimCLR"""
+	def __init__(self, temperature=0.07):
+		super(SupConLoss, self).__init__()
+		self.temperature = temperature
+        
+        
+	def forward(self, features, labels=None, mask=None):
+		"""Compute loss for model. If both `labels` and `mask` are None,
+		it degenerates to SimCLR unsupervised loss:
+		https://arxiv.org/pdf/2002.05709.pdf
+		Args:
+		features: hidden vector of shape [bsz, n_views, ...].
+		labels: ground truth of shape [bsz].
+		mask: contrastive mask of shape [bsz, bsz], mask_{i,j}=1 if sample j
+		has the same class as sample i. Can be asymmetric.
+		Returns:
+		A loss scalar.
+		"""
+		device = (torch.device('cuda')
+			if features.is_cuda
+			else torch.device('cpu'))
+
+		if len(features.shape) < 3:
+			raise ValueError('`features` needs to be [bsz, n_views, ...], at least 3 dimensions are required')
+		if len(features.shape) > 3:
+			features = features.view(features.shape[0], features.shape[1], -1)
+
+		batch_size = features.shape[0]
+		if labels is not None and mask is not None:
+			raise ValueError('Cannot define both `labels` and `mask`')
+		elif labels is None and mask is None:
+			mask = torch.eye(batch_size, dtype=torch.float32).to(device)
+            
+		elif labels is not None:
+			labels = labels.contiguous().view(-1, 1)
+			if labels.shape[0] != batch_size:
+				raise ValueError('Num of labels does not match num of features')
+            
+			#here mask is of shape [bsz, bsz] and is one for one for [i,j] where label[i]=label[j]
+			mask = torch.eq(labels, labels.T).float().to(device)
+            
+		else:
+			mask = mask.float().to(device)
+
+		contrast_count = features.shape[1] #number of positives per sample
+        
+		#contrast_features separates the features of different views of the samples and puts them in rows, so features of
+		# shape of [50, 2, 128] becomes [100, 128]. we do this to be to calculate dot-product between each two views
+		contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0) 
+        
+        
+		anchor_feature = contrast_feature
+		anchor_count = contrast_count
+        
+		# compute logits - calculates the dot product of every two vectors divided by temperature
+		anchor_dot_contrast = torch.div(torch.matmul(anchor_feature, contrast_feature.T), self.temperature)
+        
+		# for numerical stability  (some kind of normalization!)
+		logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
+		logits = anchor_dot_contrast - logits_max.detach()
+        
+        
+        
+		# tile mask as much as number of positives per sample
+		mask = mask.repeat(anchor_count, contrast_count)
+		# mask-out self-contrast cases
+		logits_mask = torch.scatter(torch.ones_like(mask), 1, 
+                                    torch.arange(batch_size * anchor_count).view(-1, 1).to(device),0)
+        
+        
+		mask = mask * logits_mask
+        
+		# compute log_prob
+		exp_logits = torch.exp(logits) * logits_mask
+		eps = 1e-30
+		log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True)+eps)
+        
+		# compute mean of log-likelihood over positive
+		mean_log_prob_pos = (mask * log_prob).sum(1) / (mask.sum(1)+eps)
+        
+		# loss
+		loss = -  mean_log_prob_pos
+			
+
+		loss = loss.view(anchor_count, batch_size).mean()
+        
+		return loss 
+
 class ContrastiveLoss(nn.Module):
     def __init__(self, margin):
         super(ContrastiveLoss, self).__init__()
@@ -65,6 +156,7 @@ class TNNMAML(BaseModel):
         self.loss_fn = TripletLoss(margin=10)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
+        self.sup_loss = SupConLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
 
         fast_parameters = list(self.feature_extractor.parameters())
@@ -73,10 +165,9 @@ class TNNMAML(BaseModel):
         self.feature_extractor.zero_grad()
         sampler = IntClassSampler(self.config, support_label, 50)
         dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 10)
-        
-        for batch in dataloader:
-            for i in range(1):
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        for i in range(10):
+            for batch in dataloader:
                 data, lable = batch
                 anchor, pos, neg = data
 
@@ -96,6 +187,64 @@ class TNNMAML(BaseModel):
                 for k, weight in enumerate(self.parameters()):
                     #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                     if weight.fast is None:
+                        weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
+                    else:
+                        weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+                    fast_parameters.append(weight.fast) # update the fast_parameters
+                loss = loss.detach()
+                # print('inner loop: loss:{:.3f}'.format(loss.item()))
+        # print('inner loop: loss:{:.3f}'.format(loss.item()))
+                
+        # print('!!!!!!!')
+        if mode != 'train':
+            print('inner loop: loss:{:.3f}'.format(loss.item()))
+        if mode != 'train':    
+            print('!!!!!!!!!')
+        return
+    
+    def inner_loop_test(self, support_data, neg_loader, support_label = None,  mode = 'train'):
+        self.config.train.lr_inner = 0.01
+        fast_parameters = list(self.feature_extractor.parameters())
+        for weight in self.feature_extractor.parameters():
+            weight.fast = None
+        self.feature_extractor.zero_grad()
+        sampler = IntClassSampler(self.config, support_label, 50, mode = 'test')
+        dataset =  PairDataset(self.config, support_data, support_label, debug = False)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        for i in range(5):
+            for batch in dataloader:
+                neg_feat = []
+
+                for b in neg_loader:
+                    n_data, _ = b
+                    # print(neg_data.shape)
+                    feat = self.feature_extractor.forward(n_data)
+                    # print(feat.shape)
+                    neg_feat.append(feat)
+                neg_feat = torch.cat(neg_feat, dim=0).mean(0).detach()
+                
+                data, lable = batch
+                anchor, pos, neg = data
+                # print(selected.shape)
+                anchor_feat = self.feature_extractor(anchor)
+                pos_feat = self.feature_extractor(pos)
+                # neg_feat = self.feature_extractor(neg_feat)
+                neg_feat = neg_feat.unsqueeze(0).expand(anchor_feat.shape[0], -1)
+                # print(neg_feat.shape)
+                loss = self.loss_fn(anchor_feat, pos_feat, neg_feat)
+                print(loss)
+                # for name, parameter in self.feature_extractor.named_parameters():
+                #     print(name)
+                # print('~~~~~~~~')
+                grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
+                if self.approx:
+                    grad = [ g.detach()  for g in grad ]
+                fast_parameters = []
+               
+                for k, weight in enumerate(self.parameters()):
+                    # print(grad[k])
+                    #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+                    if weight.fast is None:
                         
                         weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
                     else:
@@ -112,6 +261,61 @@ class TNNMAML(BaseModel):
             print('!!!!!!!!!')
         return
     
+    
+    # def inner_loop_test(self, support_data, neg_loader, support_label = None,  mode = 'train'):
+    #     # self.config.train.lr_inner = 0.00001
+    #     fast_parameters = list(self.feature_extractor.parameters())
+    #     for weight in self.feature_extractor.parameters():
+    #         weight.fast = None
+    #     self.feature_extractor.zero_grad()
+        
+    #     pos = support_data[support_label == 0]
+    #     neg = support_data[support_label == 1]
+    #     min_num = min(len(pos), len(neg))
+    #     indices1 = torch.randperm(pos.size(0))
+    #     indices2 = torch.randperm(neg.size(0))
+ 
+    #     pos = pos[indices1[:min_num]]
+    #     neg = neg[indices2[:min_num]]
+
+
+    #     for i in range(5):
+    #         pos_feat = self.feature_extractor(pos)
+    #         neg_feat = self.feature_extractor(neg)
+            
+            
+    #         input = torch.stack([pos_feat, neg_feat], dim=0)
+    #         # print(pos_feat.shape)
+    #         # print(neg_feat.shape)
+    #         # print(input.shape)
+    #         label = torch.cat([torch.zeros(1), torch.ones(1)], dim=0).long().to(self.device)
+    #         # print(label.shape)
+    #         loss = self.sup_loss(input, label)
+    #         grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
+    #         if self.approx:
+    #             grad = [ g.detach()  for g in grad ]
+    #         fast_parameters = []
+            
+    #         for k, weight in enumerate(self.parameters()):
+    #             # print(grad[k])
+    #             #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+    #             if weight.fast is None:
+                    
+    #                 weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
+    #             else:
+    #                 # print(grad[k])
+    #                 weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+    #             fast_parameters.append(weight.fast) # update the fast_parameters
+    #         loss = loss.detach()
+    #         print('inner loop: loss:{:.3f}'.format(loss.item()))
+                
+    #     # print('!!!!!!!')
+    #     if mode != 'train':
+    #         print('inner loop: loss:{:.3f}'.format(loss.item()))
+    #     if mode != 'train':    
+    #         print('!!!!!!!!!')
+    #     return
+    
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
@@ -123,49 +327,49 @@ class TNNMAML(BaseModel):
 
 
     def feed_forward(self, support_data, query_data):
-        # Execute a model with given output layer weights and inputs
-        support_feat = self.feature_extractor(support_data)
-        # nway 不是2nway要注意
-        support_feat = self.split_1d(support_feat)
-        prototype = support_feat.mean(0)
-        query_feat = self.feature_extractor(query_data)
-        dists = self.euclidean_dist(query_feat, prototype)
+        # # Execute a model with given output layer weights and inputs
+        # support_feat = self.feature_extractor(support_data)
+        # # nway 不是2nway要注意
+        # support_feat = self.split_1d(support_feat)
+        # prototype = support_feat.mean(0)
+        # query_feat = self.feature_extractor(query_data)
+        # dists = self.euclidean_dist(query_feat, prototype)
 
-        scores = -dists
+        # scores = -dists
         
-        preds = scores.argmax(dim=1)
-        # print(dists)
-        y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-        acc = torch.eq(preds, y_query).float().mean()
-        # print(acc)
-        loss = self.ce(scores, y_query)
-        # print(loss)
-        y_query = y_query.cpu().numpy()
-        preds = preds.detach().cpu().numpy()
-        report = classification_report(y_query, preds,zero_division=0, digits=3)
+        # preds = scores.argmax(dim=1)
+        # # print(dists)
+        # y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
+        # acc = torch.eq(preds, y_query).float().mean()
+        # # print(acc)
+        # loss = self.ce(scores, y_query)
+        # # print(loss)
+        # y_query = y_query.cpu().numpy()
+        # preds = preds.detach().cpu().numpy()
+        # report = classification_report(y_query, preds,zero_division=0, digits=3)
         
-        # query_label = np.tile(np.arange(self.n_way),self.n_query)
-        # sampler = IntClassSampler(self.config, query_label, 50)
-        # dataset =  PairDataset(self.config, query_data, query_label, debug = False)
-        # dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
-        # loss = []
-        # for batch in dataloader:
-        #     data, lable = batch
-        #     anchor, pos, neg = data
-        #     # print(anchor.shape)
-        #     # print(pos.shape)
-        #     # print(neg.shape)
-        #     anchor_feat = self.feature_extractor(anchor)
-        #     pos_feat = self.feature_extractor(pos)
-        #     neg_feat = self.feature_extractor(neg)
-        #     loss.append(self.loss_fn(anchor_feat, pos_feat, neg_feat))
-        #     # print('inner loop: loss:{:.3f}'.format(loss[-1].item()))
-        #     # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
+        query_label = np.tile(np.arange(self.n_way),self.n_query)
+        sampler = IntClassSampler(self.config, query_label, 50)
+        dataset =  PairDataset(self.config, query_data, query_label, debug = False)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        loss = []
+        for batch in dataloader:
+            data, lable = batch
+            anchor, pos, neg = data
+            # print(anchor.shape)
+            # print(pos.shape)
+            # print(neg.shape)
+            anchor_feat = self.feature_extractor(anchor)
+            pos_feat = self.feature_extractor(pos)
+            neg_feat = self.feature_extractor(neg)
+            loss.append(self.loss_fn(anchor_feat, pos_feat, neg_feat))
+            # print('inner loop: loss:{:.3f}'.format(loss[-1].item()))
+            # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
         
         
-        # loss = torch.mean(torch.stack(loss))
-        # report = None
-        # acc = torch.tensor(0.0).to(self.device)
+        loss = torch.mean(torch.stack(loss))
+        report = None
+        acc = torch.tensor(0.0).to(self.device)
         return loss, report, acc
         
     
@@ -302,17 +506,16 @@ class TNNMAML(BaseModel):
                 prob_mean = []
                 for i in range(1):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
-                    # if neg_sup[1].shape[0] > test_loop_neg_sample:
-                    #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:50]
-                    #     neg_seg_sample = neg_sup[1][neg_indices]
-                    # else:
-                    #     neg_sup[1] = neg_sup[1].squeeze() 
+                    # test_loop_neg_sample = 200
                     neg_sup[1] = neg_sup[1].squeeze() 
                     
-                    neg_seg_sample = neg_sup[1]
-                    print(pos_data.shape)
-                    print(neg_seg_sample.shape)
-                    
+                    if neg_sup[1].shape[0] > test_loop_neg_sample:
+                        neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
+                        neg_seg_sample = neg_sup[1][neg_indices]
+                    else:
+                        neg_seg_sample = neg_sup[1]
+                    # neg_seg_sample = neg_sup[1]
+                    # print(neg_seg_sample.shape)
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
       
@@ -358,7 +561,7 @@ class TNNMAML(BaseModel):
 
 
 
-                    neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
+                    # neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
                     
                     
                     # pos_data = pos_data[:5]
@@ -385,7 +588,7 @@ class TNNMAML(BaseModel):
                         f.create_dataset("labels_t", data=support_label)
                         # support_data
                         
-                    self.inner_loop(support_data, support_label, mode = 'test')
+                    self.inner_loop_test(support_data, neg_loader, support_label, mode = 'test')
 
                     pos_feat  = []
                     for batch in pos_loader:

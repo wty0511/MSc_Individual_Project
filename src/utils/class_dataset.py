@@ -61,25 +61,55 @@ class ClassDataset(Dataset):
         self.seg_meta = {}
         self.sr = config.features.sr
         self.fps = self.sr / config.features.hop_length
+        
         self.neg_prototype = self.config.train.neg_prototype
         self.collect_features()
         self.process_labels(same_class_in_different_file)
+        # sum = 0
+        # for key in self.seg_meta.keys():
+        #     print('key:', key, 'mean:', np.sum(self.seg_meta[key]['duration']))
+        #     sum += np.sum(self.seg_meta[key]['duration'])
+        # print('sum', sum/60)
+        
         self.class2index = self._class2index()
         self.index2class = self._index2class()
         if self.debug:
             self.length = int(0.03 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         else:
-            self.length = int(0.3* 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+            # self.length = int(3* 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+            self.length = 5000
+            
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.recent_return_sample = {}
+        for key in self.seg_meta.keys():
+            self.recent_return_sample[key] = set()
+        
+    
     
     def __getitem__(self, class_name):
         if isinstance(class_name, np.ndarray):
             task_batch = []
             for name in class_name:
-                task_batch.append(self.get_task(name))
+                if len(self.recent_return_sample[name]) == self.config.train.n_support + self.config.train.n_query:
+                    self.recent_return_sample[name] = set()
+                while True:
+                    sample = self.get_task(name)
+                    if sample not in self.recent_return_sample[name]:
+                        self.recent_return_sample[name].add(sample)
+                        break
+                sample = self.get_task(name)
+                task_batch.append(sample)
             return task_batch
         elif isinstance(class_name, str) and self.mode != 'pretrain':
-            return [self.get_task(class_name)]
+            if len(self.recent_return_sample[name]) == self.config.train.n_support + self.config.train.n_query:
+                    self.recent_return_sample[name] = set()
+            while True:
+                    sample = self.get_task(name)
+                    if sample not in self.recent_return_sample[name]:
+                        self.recent_return_sample[name].add(sample)
+                        break
+            sample = self.get_task(name)
+            return [sample]
         elif self.mode == 'pretrain':
             task =self.get_task(class_name)
             

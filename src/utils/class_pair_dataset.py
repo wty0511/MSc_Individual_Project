@@ -71,7 +71,9 @@ class ClassPairDataset(Dataset):
         if self.debug:
             self.length = int(0.03 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         else:
-            self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+            # self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
+            self.length = 5000
+            
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):
@@ -86,7 +88,7 @@ class ClassPairDataset(Dataset):
 
     
     def __len__(self):
-        return(self.length )
+        return(self.length)
     def collect_features(self):
         print("Collecting training set features...")
         for file in tqdm(walk_files(self.data_dir,debug= self.debug, file_extension = ('.wav'))):

@@ -89,6 +89,61 @@ class SNNMAML(BaseModel):
             print('!!!!!!!!!')
         return 
      
+    def inner_loop_test(self, support_data, neg_loader, support_label = None,  mode = 'train'):
+        fast_parameters = list(self.feature_extractor.parameters())
+        for weight in self.feature_extractor.parameters():
+            weight.fast = None
+        self.feature_extractor.zero_grad()
+        
+        sampler = IntClassSampler(self.config, support_label, 250, mode = 'test')
+        dataset =  PairDataset(self.config, support_data, support_label, debug = False)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        self.config.train.lr_inner = 0.01
+        for i in range(1):
+            for batch in dataloader:
+                neg_feat = []
+
+                for b in neg_loader:
+                    n_data, _ = b
+                    # print(neg_data.shape)
+                    feat = self.feature_extractor.forward(n_data)
+                    # print(feat.shape)
+                    neg_feat.append(feat)
+                neg_feat = torch.cat(neg_feat, dim=0).mean(0)
+                
+                data, lable = batch
+                anchor, pos, neg = data
+                anchor_feat = self.feature_extractor(anchor)
+                pos_feat = self.feature_extractor(pos)
+                # neg_feat = self.feature_extractor(neg)
+                loss = self.loss_fn(anchor_feat, pos_feat, torch.zeros(anchor_feat.shape[0]).long().to(self.device))
+                # print('inner loop: loss:{:.3f}'.format(loss.item()))
+                # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
+                # print(loss.item())
+                grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
+                if self.approx:
+                    grad = [ g.detach()  for g in grad ] 
+                fast_parameters = []
+                
+                for k, weight in enumerate(self.parameters()):
+                    #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+                    if weight.fast is None:
+                        weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
+                    else:
+                        weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+                    fast_parameters.append(weight.fast) # update the fast_parameters
+                loss = loss.detach()
+                # print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+        # print('~~~~~~~~~~~~~~~')
+        # loss = torch.stack(losses, dim=0).mean()
+        # print('inner loop: loss:{:.3f}'.format(loss.item()))
+        # print('~~~~~~~~~~~~~~~')
+        if mode != 'train':
+            print('inner loop: loss:{:.3f}'.format(loss.item()))
+        if mode != 'train':    
+            print('!!!!!!!!!')
+        return 
+    
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
@@ -238,12 +293,12 @@ class SNNMAML(BaseModel):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     
-                    # if neg_sup[1].shape[0] > test_loop_neg_sample:
-                    #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
-                    #     neg_seg_sample = neg_sup[1][neg_indices]
-                    # else:
-                    #     neg_seg_sample = neg_sup[1]
-                    neg_seg_sample = neg_sup[1]
+                    if neg_sup[1].shape[0] > test_loop_neg_sample:
+                        neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
+                        neg_seg_sample = neg_sup[1][neg_indices]
+                    else:
+                        neg_seg_sample = neg_sup[1]
+                    # neg_seg_sample = neg_sup[1]
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                     
@@ -257,7 +312,7 @@ class SNNMAML(BaseModel):
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
                     # support_label = np.zeros((m,))
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
-                    self.inner_loop(support_data, support_label, mode = 'test')
+                    self.inner_loop_test(support_data, neg_loader, support_label, mode = 'test')
                     pos_feat  = []
                     for batch in pos_loader:
                         p_data, _ = batch
