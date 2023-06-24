@@ -162,7 +162,10 @@ class ProtoMAML(BaseModel):
         
         prototypes     = support_feature.mean(0).squeeze()
         norms = torch.norm(prototypes, dim=1, keepdim=True)
+        # print(norms.shape)
         expanded_norms = norms.expand_as(prototypes)
+        # print(norms.shape)
+        
         prototypes = prototypes / expanded_norms
         
         # Create inner-loop model and optimizer
@@ -265,6 +268,7 @@ class ProtoMAML(BaseModel):
             # preds = F.linear(data, output_weight, bias=None)
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
+        print(preds)
         half_size = output_weight.shape[0] // 2
         temperature = 1
         preds = preds / temperature
@@ -343,7 +347,6 @@ class ProtoMAML(BaseModel):
                     #     print(g.grad)
                     # return
                     loss.backward()
-                    c = 0
                     for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
                         
                         if p_global.grad is None or p_local.grad is None:
@@ -359,9 +362,15 @@ class ProtoMAML(BaseModel):
             if i % 1 == 0:
                 print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
             if mode == "train":
+                # for name, parameter in self.feature_extractor.named_parameters():
+                #     print(name, parameter[0])
+                #     break
+                          
                 opt.step()
                 opt.zero_grad()
-
+                # for name, parameter in self.feature_extractor.named_parameters():
+                #     print(name, parameter[0])
+                #     break
     def train_loop(self, data_loader, optimizer):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)

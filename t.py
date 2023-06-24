@@ -76,6 +76,7 @@ model_dir = normalize_path(model_dir)
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
+# optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr)
 model.train()
 
 no_imporve = 0

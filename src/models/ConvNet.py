@@ -51,7 +51,10 @@ class ConvNet(nn.Module):
         self.encoder = nn.Sequential(
             conv_block(1,64),
             conv_block(64,64),
-            conv_block(64,64),        
+            conv_block(64,64),
+            # conv_block(64,64,False),
+            # conv_block(64,64,False),
+                    
         )
         self.avgpool = nn.AdaptiveAvgPool2d((8,1))
         total_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -281,3 +284,5 @@ class ConvSNN(nn.Module):
         x = self.activ(x)
         
         return x
+    
+    

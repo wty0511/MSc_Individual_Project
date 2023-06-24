@@ -114,37 +114,21 @@ class ProtoMAML_proxy(BaseModel):
         self.tri_loss = TripletLoss(margin = 1)
     
     
-    def euclidean_dist(self,query, support):
-        n = query.size(0)
-        m = support.size(0)
-        query = query.unsqueeze(1).expand(n, m, -1)
-        support = support.unsqueeze(0).expand(n, m, -1)
-
-        return torch.pow(query - support, 2).sum(2)
-
-
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         if mode == 'train':
-            loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 8, margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
+            loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 8, distance = LpDistance(power = 2, p =2) ).to(torch.device('cuda'))
         else:
-            loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 8,margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
-            
-        # if mode == 'train':
-        #     loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 8).to(torch.device('cuda'))
-        # else:
-        #     loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 8).to(torch.device('cuda'))
-            
+            loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 8, distance = LpDistance(power = 2, p =2) ).to(torch.device('cuda'))
+        # self.config.train.lr_inner = 0.01
+        # loss_optimizer.zero_grad()
         # for name, parameter in loss_func.named_parameters():
         #     print(name, parameter.requires_grad)
             
         prototypes  = support_feature.mean(0).squeeze()
         norms = torch.norm(prototypes, dim=1, keepdim=True)
         expanded_norms = norms.expand_as(prototypes)
-        # prototypes = prototypes / expanded_norms
-        loss_func.proxies = nn.parameter.Parameter(prototypes.detach().requires_grad_())
-        
-        loss_optimizer = torch.optim.SGD(loss_func.parameters(), lr=self.config.train.lr_inner)
-        loss_optimizer.zero_grad()
+        prototypes = prototypes / expanded_norms
+        # loss_func.proxies = nn.parameter.Parameter(prototypes * 2)
         # print(prototypes)
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
@@ -156,13 +140,15 @@ class ProtoMAML_proxy(BaseModel):
         # local_optim = optim.SGD(local_model.parameters(), 0.001, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
         local_optim.zero_grad()
         # Create output layer weights with prototype-based initialization
-        # init_weight = 2 * prototypes
+        init_weight =  prototypes
+        output_weight = init_weight.detach().requires_grad_()
         # init_bias = -torch.norm(prototypes, dim=1)**2
         # init_weight = 2 * prototypes
         # # init_weight =  prototypes
         # init_bias = -torch.norm(prototypes, dim=1)**2
+        loss_func.proxies = nn.parameter.Parameter(output_weight)
+        loss_optimizer = torch.optim.SGD(loss_func.parameters(), lr=self.config.train.lr_inner)
 
-        
 
         
         # output_weight = init_weight.detach().requires_grad_()
@@ -173,7 +159,7 @@ class ProtoMAML_proxy(BaseModel):
         # print('inner loop')
         # Optimize inner loop model on support set
         for i in range(5):
-            proxies = loss_func.proxies
+            # proxies = loss_func.proxies
             # print(torch.norm(proxies, dim=1))
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(local_model, loss_func, support_data, support_label, mode = mode)
@@ -201,7 +187,7 @@ class ProtoMAML_proxy(BaseModel):
             acc = torch.mean(acc).detach()
 
             # print(proxies)
-        # print('~~~~~~~')
+        print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -223,7 +209,7 @@ class ProtoMAML_proxy(BaseModel):
         support_feat = torch.cat(support_feat, dim=0)
         # support_feat = torch.empty(1, 512)
         # print('end inner loop')
-        proxies = loss_func.proxies.detach()
+        # proxies = loss_func.proxies.detach()
         return local_model, loss_func, support_feat
     
     
@@ -244,77 +230,14 @@ class ProtoMAML_proxy(BaseModel):
         feats = torch.cat(feats, dim=0)
         
         proxies = loss_func.proxies
-        preds = - self.euclidean_dist(feats, proxies)
-        # preds = self.cos_dist(feats, proxies)
+        
+
+        
+        # preds = F.linear(feats, proxies)
+        preds = self.euclidean_dist(feats, proxies)
         # print('preds', preds)
         # preds = F.softmax(preds, dim = 1)
-        if mode == 'train':
-            loss1 = F.cross_entropy(preds, labels)
-        else:
-            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([1.0, 1.0]).to(self.device))
-
-        # acc = (preds.argmax(dim=1) == labels).float().mean()
-        # print('acc', acc)
-        loss2= loss_func(feats, labels)
-        # print('loss', loss2)
-        loss = loss2
-        # print('loss', loss)
-        # print(get_silhouette_score(feats, labels))
-        # pos_num = feats[(labels == 0)].shape[0]
-        # neg_num = feats[(labels == 1)].shape[0]
-        
-        # c_loss = torch.tensor(0.0).to(self.device)
-        # feats_pos = torch.mean(feats[(labels == 0)], dim=0)
-        # for i in feats[(labels == 1)]:
-        #     c_loss+=self.contrastive_loss(feats_pos, i, torch.tensor(0).to(self.device))
-        # c_loss = c_loss/feats[(labels == 1)].shape[0]
-
-        # dataset = TensorDataset(feats, torch.zeros(feats.shape[0]))
-        # data_loader = DataLoader(dataset, batch_size=32, shuffle=False)
-
-
-        # print('loss', loss)
-        # print(preds.argmax(dim=1))
-        # print(labels)
-        # print('!!!!!!')
-        acc = (preds.argmax(dim=1) == labels).float()
-        # aux_loss = (get_silhouette_score(feats, labels) + torch.tensor(1.).to(self.device)) / 2
-        # print('aux_loss', aux_loss)
-        # aux_loss = get_silhouette_score(feats, labels) + torch.tensor(1.).to(self.device)) / 2
-        # loss -= torch.log(aux_loss)
-        # loss += torch.tensor(1.).to(self.device)
-        # loss -= get_silhouette_score(feats, labels)
-        labels = labels.cpu().numpy()
-        preds = preds.argmax(dim=1).detach().cpu().numpy()
-        report = classification_report(labels, preds,zero_division=0, digits=3)
-        # print(report)
-        # report = None
-        # acc = torch.tensor(0.0).to(self.device)
-        return loss, report, acc
-
-
-
-    def feed_forward2(self, local_model, loss_func, data, labels, mode):
-        # Execute a model with given output layer weights and inputs
-        # print('feed_forward')
-        # print(len(data))
-        
-        # print('data', data.shape)
-        feat_dataset = TensorDataset(data, torch.zeros(data.shape[0]))
-        feat_data_loader = DataLoader(feat_dataset, batch_size=32, shuffle=False)
-        
-        feats = []
-        for batch in feat_data_loader:
-            data, _ = batch
-            feats.append(local_model(data))
-        
-        feats = torch.cat(feats, dim=0)
-        
-        proxies = loss_func.proxies
-        preds = -self.euclidean_dist(feats, proxies)
-        # preds = self.cos_dist(feats, proxies)
         # print('preds', preds)
-        # preds = F.softmax(preds, dim = 1)
         if mode == 'train':
             loss1 = F.cross_entropy(preds, labels)
         else:
@@ -323,10 +246,11 @@ class ProtoMAML_proxy(BaseModel):
         # acc = (preds.argmax(dim=1) == labels).float().mean()
         # print('acc', acc)
         loss2= loss_func(feats, labels)
-        # print('loss', loss2)
-        loss = loss1  + loss2 * 0.0
-        # print('loss', loss)
-        # print(get_silhouette_score(feats, labels))
+        print('loss', loss2)
+        loss = loss1 * 0.0 + loss2 
+        # loss = loss1
+        print('loss', loss)
+        print(get_silhouette_score(feats, labels))
         # pos_num = feats[(labels == 0)].shape[0]
         # neg_num = feats[(labels == 1)].shape[0]
         
@@ -363,15 +287,15 @@ class ProtoMAML_proxy(BaseModel):
 
     
     
-    def feed_forward_test(self, local_model, proxies, data):
+    def feed_forward_test(self, local_model, loss_func, data):
         # Execute a model with given output layer weights and inputs
         local_model.eval()
         feats = local_model(data)
-        # preds = self.cos_dist(feats, proxies)
+        proxies = loss_func.proxies
+        preds = self.euclidean_dist(feats, proxies)
 
-        preds = -self.euclidean_dist(feats, proxies)
+        # preds = F.linear(feats, proxies)
         # print('preds', preds)
-        # preds = preds/0.1
         preds = F.softmax(preds, dim = 1)
         preds = preds.detach().cpu().numpy()
         return preds, feats
@@ -409,7 +333,7 @@ class ProtoMAML_proxy(BaseModel):
                 # print(proxies)
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
                 # print('after inner loop')
-                loss, _, acc = self.feed_forward2(local_model, loss_func, query_data , query_label, mode = 'train')
+                loss, _, acc = self.feed_forward(local_model, loss_func, query_data , query_label, mode = 'train')
                 # print('outer loop: loss:{:.3f}'.format(loss.item()))
                 if mode == 'train':
                     # for g in self.feature_extractor.parameters():
@@ -548,7 +472,7 @@ class ProtoMAML_proxy(BaseModel):
                     prob_all = []
                     for batch in tqdm(query_loader):
                         query_data, _ = batch
-                        prob, feats = self.feed_forward_test(local_model, loss_func.proxies, query_data)
+                        prob, feats = self.feed_forward_test(local_model, loss_func, query_data)
                         feats = feats.detach().cpu().numpy()
                         with h5py.File(feat_file, 'a') as f:
                             
@@ -653,6 +577,17 @@ class ProtoMAML_proxy(BaseModel):
         print(self.average_res(best_res_all))
         print(np.mean(best_threshold_all))
         return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all)
+    
+        
+    def euclidean_dist(self,query, support):
+        n = query.size(0)
+        m = support.size(0)
+        query = query.unsqueeze(1).expand(n, m, -1)
+        support = support.unsqueeze(0).expand(n, m, -1)
+
+        return torch.pow(query - support, 2).sum(2)
+
+
     def cos_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
