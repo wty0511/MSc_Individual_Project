@@ -124,10 +124,11 @@ class ProtoMAML_proxy(BaseModel):
 
 
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
+        # self.config.train.lr_inner = 0.01
         if mode == 'train':
-            loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 8, margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
+            loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512,  alpha = 32, margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
         else:
-            loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 8,margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
+            loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 32, margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
             
         # if mode == 'train':
         #     loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 8).to(torch.device('cuda'))
@@ -144,6 +145,7 @@ class ProtoMAML_proxy(BaseModel):
         loss_func.proxies = nn.parameter.Parameter(prototypes.detach().requires_grad_())
         
         loss_optimizer = torch.optim.SGD(loss_func.parameters(), lr=self.config.train.lr_inner)
+        loss_func.train()
         loss_optimizer.zero_grad()
         # print(prototypes)
         # Create inner-loop model and optimizer
@@ -223,7 +225,9 @@ class ProtoMAML_proxy(BaseModel):
         support_feat = torch.cat(support_feat, dim=0)
         # support_feat = torch.empty(1, 512)
         # print('end inner loop')
-        proxies = loss_func.proxies.detach()
+        # proxies = loss_func.proxies.detach()
+        # loss_func.proxies = nn.parameter.Parameter((loss_func.proxies - init_proto).detach() + init_proto)
+        
         return local_model, loss_func, support_feat
     
     
@@ -245,19 +249,33 @@ class ProtoMAML_proxy(BaseModel):
         
         proxies = loss_func.proxies
         preds = - self.euclidean_dist(feats, proxies)
+        
+        # norms = torch.norm(proxies, dim=1, keepdim=True)
+        # proxies = proxies / norms
+        # Create inner-loop model and optimizer
+        # init_weight = 2 * proxies
+        # init_weight =  prototypes
+        # init_bias = -torch.norm(proxies, dim=1)**2
+        
+        # preds = F.linear(feats, proxies)
         # preds = self.cos_dist(feats, proxies)
         # print('preds', preds)
         # preds = F.softmax(preds, dim = 1)
+        pos_num = feats[(labels == 0)].shape[0]
+        neg_num = feats[(labels == 1)].shape[0]
+        
         if mode == 'train':
             loss1 = F.cross_entropy(preds, labels)
         else:
-            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([1.0, 1.0]).to(self.device))
+            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
+
 
         # acc = (preds.argmax(dim=1) == labels).float().mean()
         # print('acc', acc)
         loss2= loss_func(feats, labels)
         # print('loss', loss2)
-        loss = loss2
+        
+        loss = loss1 * 0.0 +  loss2
         # print('loss', loss)
         # print(get_silhouette_score(feats, labels))
         # pos_num = feats[(labels == 0)].shape[0]
@@ -309,6 +327,8 @@ class ProtoMAML_proxy(BaseModel):
             feats.append(local_model(data))
         
         feats = torch.cat(feats, dim=0)
+        pos_num = feats[(labels == 0)].shape[0]
+        neg_num = feats[(labels == 1)].shape[0]
         
         proxies = loss_func.proxies
         preds = -self.euclidean_dist(feats, proxies)
@@ -318,13 +338,13 @@ class ProtoMAML_proxy(BaseModel):
         if mode == 'train':
             loss1 = F.cross_entropy(preds, labels)
         else:
-            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([5.0, 1.0]).to(self.device))
+            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
 
         # acc = (preds.argmax(dim=1) == labels).float().mean()
         # print('acc', acc)
         loss2= loss_func(feats, labels)
         # print('loss', loss2)
-        loss = loss1  + loss2 * 0.0
+        loss = loss1 +  loss2 * 0.0
         # print('loss', loss)
         # print(get_silhouette_score(feats, labels))
         # pos_num = feats[(labels == 0)].shape[0]
@@ -479,7 +499,7 @@ class ProtoMAML_proxy(BaseModel):
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
 
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-                query_loader = DataLoader(query_dataset, batch_size=16, shuffle=False)
+                query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 # print(len(pos_dataset))
                 # print(len(neg_dataset))
                 # print(len(query_dataset))
@@ -506,12 +526,14 @@ class ProtoMAML_proxy(BaseModel):
                         
                         
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
+                    # test_loop_neg_sample = 50
                     neg_sup[1] = neg_sup[1].squeeze() 
                     if neg_sup[1].shape[0] > test_loop_neg_sample:
                         neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
                         neg_seg_sample = neg_sup[1][neg_indices]
                     else:
                         neg_seg_sample = neg_sup[1]
+                    # neg_seg_sample = neg_sup[1]
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                     neg_feat = []

@@ -39,10 +39,10 @@ class MAML(BaseModel):
         for weight in self.feature_extractor.parameters():
             weight.fast = None
         self.feature_extractor.zero_grad()
-
+        # self.config.train.lr_inner = 0.01
         # Create output layer weights 
         # Optimize inner loop model on support set
-        for i in range(5):
+        for i in range(10):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(support_data, support_label, mode = mode)
 
@@ -89,11 +89,15 @@ class MAML(BaseModel):
         #     weights = torch.cat((torch.full((half_size,), 3, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
         #     loss = F.cross_entropy(preds, labels, weight=weights)
         # else:
-
+        pos_num = preds[(labels == 0)].shape[0]
+        neg_num = preds[(labels == 1)].shape[0]
+        
         if mode == 'train':
             loss = F.cross_entropy(preds, labels)
         else:
-            loss = F.cross_entropy(preds, labels, weight=torch.tensor([5, 1]).float().to(self.device))
+            loss = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
+
+
         acc = (preds.argmax(dim=1) == labels).float()
         labels = labels.cpu().numpy()
         preds = preds.argmax(dim=1).detach().cpu().numpy()
