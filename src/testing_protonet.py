@@ -46,7 +46,7 @@ model = ProtoNet(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 model.load_state_dict(model_state)
 model.eval()
 # torch.save(checkpoint, save_file)
-
+# checkpoint['threshold'] = 0.95
 val_dataset = FileDataset(cfg,val=False, debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 print(checkpoint['threshold'])
@@ -59,6 +59,6 @@ print(report_dir)
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
     
-with open(report_dir, 'w') as outfile:
-    json.dump(report, outfile)
+# with open(report_dir, 'w') as outfile:
+#     json.dump(report, outfile)
     

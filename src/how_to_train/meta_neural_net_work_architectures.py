@@ -683,3 +683,147 @@ class Convnet(nn.Module):
                             params[name].grad = None
 
 
+
+
+class ConvnetClassifier(nn.Module):
+    def __init__(self, cfg, meta_classifier=True):
+        """
+        Builds a multilayer convolutional network. It also provides functionality for passing external parameters to be
+        used at inference time. Enables inner loop optimization readily.
+        :param im_shape: The input image batch shape.
+        :param num_output_classes: The number of output classes of the network.
+        :param device: The device to run this on.
+        :param meta_classifier: A flag indicating whether the system's meta-learning (inner-loop) functionalities should
+        be enabled.
+        """
+        super(ConvnetClassifier, self).__init__()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.total_layers = 0
+        self.upscale_shapes = []
+        self.cnn_filters = 64
+        self.config = cfg
+        self.num_stages = 3
+        self.conv_stride = 1
+    
+        self.meta_classifier = meta_classifier
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.num_output_classes = 2
+        self.build_network()
+        print("meta network params")
+        for name, param in self.named_parameters():
+            print(name, param.shape)
+
+        
+    def build_network(self):
+        """
+        Builds the network before inference is required by creating some dummy inputs with the same input as the
+        self.im_shape tuple. Then passes that through the network and dynamically computes input shapes and
+        sets output shapes for each layer.
+        """
+        x = torch.zeros((1, 1, 8, 128))
+        out = x
+        self.layer_dict = nn.ModuleDict()
+        self.upscale_shapes.append(x.shape)
+        for i in range(self.num_stages):
+            self.layer_dict['conv{}'.format(i)] = MetaConvNormLayerReLU(input_shape=out.shape,
+                                                                        num_filters=self.cnn_filters,
+                                                                        kernel_size=3, stride=self.conv_stride,
+                                                                        padding=1,
+                                                                        use_bias=True, cfg=self.config,
+                                                                        normalization=True,
+                                                                        meta_layer=self.meta_classifier,
+                                                                        no_bn_learnable_params=False,
+                                                                        device=self.device)
+
+            out = self.layer_dict['conv{}'.format(i)](out, training=True, num_step=0)
+
+
+            out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
+
+        # if not self.args.max_pooling:
+        #     out = F.avg_pool2d(out, out.shape[2])
+
+        self.encoder_features_shape = list(out.shape)
+        
+        out = self.avgpool(out)
+        out = out.view((out.shape[0], -1))
+
+        self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
+                                                    num_filters=self.num_output_classes, use_bias=True)
+
+        out = self.layer_dict['linear'](out)
+        # print("VGGNetwork build", out.shape)
+
+    def forward(self, x, num_step, dropout_training=None, params=None, training=False,
+                backup_running_statistics=False, arg_max_softmax=False, output_features=False):
+        """
+        Forward propages through the network. If any params are passed then they are used instead of stored params.
+        :param x: Input image batch.
+        :param num_step: The current inner loop step number
+        :param params: If params are None then internal parameters are used. If params are a dictionary with keys the
+         same as the layer names then they will be used instead.
+        :param training: Whether this is training (True) or eval time.
+        :param backup_running_statistics: Whether to backup the running statistics in their backup store. Which is
+        then used to reset the stats back to a previous state (usually after an eval loop, when we want to throw away stored statistics)
+        :return: Logits of shape b, num_output_classes.
+        """
+        param_dict = dict()
+
+        if params is not None:
+            param_dict = extract_top_level_dict(current_dict=params)
+
+        for name, param in list(self.layer_dict.named_parameters()) + list(self.layer_dict.items()):
+            path_bits = name.split(".")
+            layer_name = path_bits[0]
+            if layer_name not in param_dict:
+                param_dict[layer_name] = None
+        (num_samples,seq_len,mel_bins) = x.shape
+        
+        x = x.view(-1,1,seq_len,mel_bins)
+        
+        out = x
+
+        for i in range(self.num_stages):
+            # print(param_dict['conv{}'.format(i)])
+            out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
+                                                      backup_running_statistics=backup_running_statistics,
+                                                      num_step=num_step)
+            
+            out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
+
+        # if not self.args.max_pooling:
+        #     out = F.avg_pool2d(out, out.shape[2])
+        features = out
+        out = self.avgpool(out)
+        out = out.view(out.size(0), -1)
+        out = self.layer_dict['linear'](out, param_dict['linear'])
+        if output_features:
+            return out, features
+        else:
+            return out
+
+    def restore_backup_stats(self):
+        """
+        Reset stored batch statistics from the stored backup.
+        """
+        for name, module in self.named_modules():
+            if type(module) == MetaBatchNormLayer:
+                module.restore_backup_stats()
+
+    def zero_grad(self, params=None):
+        if params is None:
+            for param in self.parameters():
+                if param.requires_grad == True:
+                    if param.grad is not None:
+                        if torch.sum(param.grad) > 0:
+                            # print(param.grad)
+                            param.grad.zero_()
+        else:
+            for name, param in params.items():
+                if param.requires_grad == True:
+                    if param.grad is not None:
+                        if torch.sum(param.grad) > 0:
+                            print(param.grad)
+                            param.grad.zero_()
+                            params[name].grad = None
+

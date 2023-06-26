@@ -37,7 +37,7 @@ set_seed(SEED)
 # save_file = os.path.join(model_dir, 'best_model.pth')
 # save_file = r"/root/task5_2023/Checkpoints/test/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_2way/Model/best_model.pth"
-save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/proxyMAML_2way/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -71,7 +71,7 @@ model.load_state_dict(model_state)
 model.eval()
 val_dataset = FileDataset(cfg,val=False,debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-# checkpoint['threshold'] = 0.9
+# checkpoint['threshold'] = 0.5
 df_all_time, report, best_threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'])
 
 report_dir = normalize_path(cfg.checkpoint.report_dir)
@@ -80,8 +80,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))

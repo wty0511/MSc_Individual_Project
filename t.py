@@ -81,7 +81,7 @@ model.train()
 
 no_imporve = 0
 
-for epoch in range(200//cfg.train.n_way):
+for epoch in range(100//cfg.train.n_way):
     model.train()
     model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):

@@ -119,21 +119,24 @@ class ProtoMAML_proxy(BaseModel):
         m = support.size(0)
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
-
+        # query = query.unsqueeze(1).expand(n, m, -1)
+        # query = F.normalize(query, p=2, dim=2)
+        # support = support.unsqueeze(0).expand(n, m, -1)
+        # support = F.normalize(support, p=2, dim=2)
         return torch.pow(query - support, 2).sum(2)
 
 
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         # self.config.train.lr_inner = 0.01
         if mode == 'train':
-            loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512,  alpha = 32, margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
+            loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512,   alpha = 32, margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
         else:
             loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 32, margin = 0.01, distance = LpDistance(power = 2, p =2)).to(torch.device('cuda'))
             
         # if mode == 'train':
-        #     loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 8).to(torch.device('cuda'))
+        #     loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 32, margin = 0).to(torch.device('cuda'))
         # else:
-        #     loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 8).to(torch.device('cuda'))
+        #     loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 32, margin = 0).to(torch.device('cuda'))
             
         # for name, parameter in loss_func.named_parameters():
         #     print(name, parameter.requires_grad)
@@ -259,6 +262,7 @@ class ProtoMAML_proxy(BaseModel):
         
         # preds = F.linear(feats, proxies)
         # preds = self.cos_dist(feats, proxies)
+        # preds = preds/0.1
         # print('preds', preds)
         # preds = F.softmax(preds, dim = 1)
         pos_num = feats[(labels == 0)].shape[0]
@@ -333,6 +337,7 @@ class ProtoMAML_proxy(BaseModel):
         proxies = loss_func.proxies
         preds = -self.euclidean_dist(feats, proxies)
         # preds = self.cos_dist(feats, proxies)
+        # preds = preds/0.1
         # print('preds', preds)
         # preds = F.softmax(preds, dim = 1)
         if mode == 'train':
@@ -388,11 +393,17 @@ class ProtoMAML_proxy(BaseModel):
         local_model.eval()
         feats = local_model(data)
         # preds = self.cos_dist(feats, proxies)
-
-        preds = -self.euclidean_dist(feats, proxies)
-        # print('preds', preds)
         # preds = preds/0.1
+        # print(self.euclidean_dist(feats, proxies))
+        # dis = LpDistance(power = 2, p =2)
+        # # print(dis.compute_mat(feats, proxies))
+        # print(feats)
+        # print(proxies)
+        preds = -self.euclidean_dist(feats, proxies)
+        # print('preds', -preds)
+
         preds = F.softmax(preds, dim = 1)
+        # print('preds', preds)
         preds = preds.detach().cpu().numpy()
         return preds, feats
     
@@ -562,26 +573,28 @@ class ProtoMAML_proxy(BaseModel):
                     local_model, loss_func, support_feats = self.inner_loop(support_data, proto, support_label, mode = 'test')
                 
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
-                    with h5py.File(feat_file, 'w') as f:
-                        f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                        f.create_dataset("labels", data=label.squeeze().cpu().numpy())
-                        f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
-                        f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                    # with h5py.File(feat_file, 'w') as f:
+                    #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                    #     f.create_dataset("labels", data=label.squeeze().cpu().numpy())
+                    #     f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                    #     f.create_dataset("labels_t", data=support_label.cpu().numpy())
                     prob_all = []
                     for batch in tqdm(query_loader):
                         query_data, _ = batch
                         prob, feats = self.feed_forward_test(local_model, loss_func.proxies, query_data)
                         feats = feats.detach().cpu().numpy()
-                        with h5py.File(feat_file, 'a') as f:
+                        # with h5py.File(feat_file, 'a') as f:
                             
-                            size = f['features'].shape[0]
-                            nwe_size = f['features'].shape[0] + feats.shape[0]
+                        #     size = f['features'].shape[0]
+                        #     nwe_size = f['features'].shape[0] + feats.shape[0]
 
-                            f['features'].resize((nwe_size, 512))
+                        #     f['features'].resize((nwe_size, 512))
 
-                            f['features'][size:nwe_size] = feats
+                        #     f['features'][size:nwe_size] = feats
                         prob_all.append(prob)
                     prob_all = np.concatenate(prob_all, axis=0)
+                    # if 'DCASE2021-ML_72010931.wav' in wav_file:
+                    #     break
                     #########################################################################
                     
                     prob_all = prob_all[:,0]
@@ -640,9 +653,9 @@ class ProtoMAML_proxy(BaseModel):
                     # print(wav_file)
                     # print(on_set_time[:5])
                     # print('query_start', all_meta[wav_file]['start'])
-                    for i in range(len(off_set_time)):
-                        if off_set_time[i] > all_meta[wav_file]['end']:
-                            raise ValueError('off_set_time is larger than query_end')
+                    for i in range(len(off_set_time)-1):
+                        if off_set_time[i] > on_set_time[i+1]:
+                            raise ValueError('off_set_time is larger than on_set_time')
                 
                 df_all_time = pd.DataFrame(all_time)
                 df_all_time = post_processing(df_all_time)
