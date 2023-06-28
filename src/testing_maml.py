@@ -35,9 +35,9 @@ set_seed(SEED)
 # cfg = compose(config_name="config.yaml")
 # model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
-# save_file = r"/root/task5_2023/Checkpoints/test/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/proxyMAML_5way_cos/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_2way/Model/best_model.pth"
-save_file = r"/root/task5_2023/Checkpoints/proxyMAML_2way/Model/best_model.pth"
+# save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -56,6 +56,7 @@ print(config)
 epoch = checkpoint['epoch']
 print('epoch:', epoch)
 print('threshold:', checkpoint['threshold'])
+print('f1:', checkpoint['f1'])
 # model = ProtoMAML_temp(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
@@ -69,9 +70,10 @@ model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu
 # 将保存的状态加载到新的模型实例中
 model.load_state_dict(model_state)
 model.eval()
+# checkpoint['threshold'] = None
 val_dataset = FileDataset(cfg,val=False,debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-# checkpoint['threshold'] = 0.5
+# checkpoint['threshold'] = None
 df_all_time, report, best_threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'])
 
 report_dir = normalize_path(cfg.checkpoint.report_dir)

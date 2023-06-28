@@ -44,7 +44,7 @@ class ClassDataset(Dataset):
     def __init__(self, config, mode,same_class_in_different_file, debug):
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
-        if mode == 'train':
+        if mode == 'train' or mode == 'anchor':
             self.data_dir = normalize_path(config.path.train_dir)
         elif mode == 'val':
             self.data_dir = normalize_path(config.path.val_dir)
@@ -100,17 +100,17 @@ class ClassDataset(Dataset):
                 sample = self.get_task(name)
                 task_batch.append(sample)
             return task_batch
-        elif isinstance(class_name, str) and self.mode != 'pretrain':
-            if len(self.recent_return_sample[name]) == self.config.train.n_support + self.config.train.n_query:
-                    self.recent_return_sample[name] = set()
+        elif isinstance(class_name, str) and (self.mode != 'pretrain' and self.mode != 'anchor'):
+            if len(self.recent_return_sample[class_name]) == self.config.train.n_support + self.config.train.n_query:
+                    self.recent_return_sample[class_name] = set()
             while True:
-                    sample = self.get_task(name)
-                    if sample not in self.recent_return_sample[name]:
-                        self.recent_return_sample[name].add(sample)
+                    sample = self.get_task(class_name)
+                    if sample not in self.recent_return_sample[class_name]:
+                        self.recent_return_sample[class_name].add(sample)
                         break
-            sample = self.get_task(name)
+            sample = self.get_task(class_name)
             return [sample]
-        elif self.mode == 'pretrain':
+        elif self.mode == 'pretrain' or self.mode == 'anchor':
             task =self.get_task(class_name)
             
             return task[1], torch.tensor(task[2]).to(self.device)
@@ -161,7 +161,6 @@ class ClassDataset(Dataset):
 
             # class name starts from the 4th column
             for column in df.columns[3:]:
-
                 pos_idx = df[df[column] == 'POS'].index.tolist()
                 if not same_label:
                     column = column + '&'+ file

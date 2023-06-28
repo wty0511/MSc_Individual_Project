@@ -102,6 +102,7 @@ class FileDataset(Dataset):
                 self.classes.add(column)
                 start = df['Starttime'][pos_idx].tolist()
                 end = df['Endtime'][pos_idx].tolist()
+
                 # print('start', start)
                 # print('end', end)
                 self.seg_meta[column] = self.seg_meta.get(column, {})
@@ -109,6 +110,7 @@ class FileDataset(Dataset):
                 self.seg_meta[column]['duration'] = self.seg_meta[column].get('duration', [])
 
                 for s, e in zip(start, end):
+
                     self.seg_meta[column]['time_spane'].append({'start': s, 'end': e, 'file': file})
                     self.seg_meta[column]['duration'].append(e - s)
                 
@@ -158,6 +160,7 @@ class FileDataset(Dataset):
                 f = i['file']
                 s = i['start']
                 e = i['end']
+                
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
                 # print('s', s)
@@ -183,6 +186,10 @@ class FileDataset(Dataset):
                 f = i['file']
                 s = i['start']
                 e = i['end']
+               
+                # if s> 0.025:
+                #     s = s - 0.025
+                # e = e + 0.025
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
 
