@@ -159,7 +159,7 @@ class ProtoMAML(BaseModel):
     
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
-        
+        # self.config.train.lr_inner = 0.001
         prototypes     = support_feature.mean(0).squeeze()
         norms = torch.norm(prototypes, dim=1, keepdim=True)
         # print(norms.shape)
@@ -208,9 +208,9 @@ class ProtoMAML(BaseModel):
             output_weight.grad.fill_(0)
             output_bias.grad.fill_(0)
             loss = loss.detach()
-            print('loss', loss)
+            # print('loss', loss)
             acc = torch.mean(acc).detach()
-        print('~~~~~~~')
+        # print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -268,15 +268,16 @@ class ProtoMAML(BaseModel):
             # preds = F.linear(data, output_weight, bias=None)
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
-        print(preds)
+        # print(preds)
         half_size = output_weight.shape[0] // 2
         temperature = 1
         preds = preds / temperature
         if self.config.train.neg_prototype or mode == 'test':
             
             weights = torch.cat((torch.full((half_size,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
-            # weights = torch.cat((torch.full((half_size,), 1, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((half_size,), 1, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
+            # loss = F.cross_entropy(preds, labels)
         else:
             loss = F.cross_entropy(preds, labels)
         # print(preds.argmax(dim=1))
@@ -375,7 +376,7 @@ class ProtoMAML(BaseModel):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
-    def test_loop(self, test_loader,fix_shreshold = None):
+    def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -395,7 +396,7 @@ class ProtoMAML(BaseModel):
 
                 all_meta[wav_file]['end'] = query_end
                 all_meta[wav_file]['seg_hop'] = seg_hop
-                all_meta[wav_file]['seg_len'] = seg_len
+                all_meta[wav_file]['seg_len'] = seg_len.item()
                 
                 all_meta[wav_file]['label'] = label[0]
                 # print(wav_file)
@@ -419,7 +420,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):
@@ -537,7 +538,8 @@ class ProtoMAML(BaseModel):
                     
                     
                     on_set_time = on_set*all_meta[wav_file]['seg_hop']/self.fps + all_meta[wav_file]['start']
-                    off_set_time = off_set*all_meta[wav_file]['seg_hop']/self.fps + all_meta[wav_file]['start']
+                    off_set_time = off_set*(all_meta[wav_file]['seg_hop'])/self.fps + all_meta[wav_file]['start']
+                    
                     all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
                     all_time['Starttime'].extend(on_set_time)
                     all_time['Endtime'].extend(off_set_time)
@@ -549,7 +551,7 @@ class ProtoMAML(BaseModel):
                             raise ValueError('off_set_time is larger than query_end')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

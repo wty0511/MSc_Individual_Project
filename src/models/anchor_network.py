@@ -94,7 +94,7 @@ class AnchorNet(BaseModel):
             optimizer.step()
             # print('loss:{:.3f}'.format(loss.item()))
 
-    def test_loop(self, test_loader , fix_shreshold = None):
+    def test_loop(self, test_loader , fix_shreshold = None, mode = 'test'):
         self.feature_extractor.eval()
         all_prob = {}
         all_meta = {}
@@ -266,7 +266,7 @@ class AnchorNet(BaseModel):
                         raise ValueError('off_set_time is larger than query_end')
 
             df_all_time = pd.DataFrame(all_time)
-            df_all_time = post_processing(df_all_time)
+            df_all_time = post_processing(df_all_time, self.config, mode)
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

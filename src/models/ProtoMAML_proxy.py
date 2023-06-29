@@ -489,7 +489,7 @@ class ProtoMAML_proxy(BaseModel):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
-    def test_loop(self, test_loader,fix_shreshold = None):
+    def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -668,7 +668,7 @@ class ProtoMAML_proxy(BaseModel):
                             raise ValueError('off_set_time is larger than on_set_time')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

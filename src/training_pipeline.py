@@ -59,7 +59,7 @@ def train(train_loader, val_loader, config):
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
 
-        df_all_time, best_res, best_threshold = model.test_loop(val_loader)
+        df_all_time, best_res, best_threshold = model.test_loop(val_loader, fix_shreshold=None, mode = 'val')
         acc = best_res['overall_scores']['fmeasure (percentage)']
         
         if acc > best_acc :

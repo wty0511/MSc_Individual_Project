@@ -1,3 +1,4 @@
+# This code is modified from DCASE Challenge 2022 https://github.com/c4dm/dcase-few-shot-bioacoustic
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
 import torch.nn as nn
 import torch
@@ -68,6 +69,34 @@ class ConvNet(nn.Module):
         x = self.encoder(x)
         # print('x_shape ',x.shape)
         x = self.avgpool(x)
+        # x = nn.MaxPool2d(2)(x)
+        x = x.view(x.size(0),-1)
+        return x
+
+
+class ConvNetLarge(nn.Module):
+    def __init__(self):
+        super(ConvNetLarge,self).__init__()
+        self.encoder = nn.Sequential(
+            conv_block(1,128),
+            conv_block(128,128),
+            conv_block(128,128),
+            # conv_block(128,64,False),
+            conv_block(128,128),
+            # conv_block(64,64,False)
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        total_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+        print('total_trainable_params:', total_trainable_params)
+        # self.temperature_param = nn.Parameter(torch.tensor(1.0))
+    def forward(self,x):
+        
+        (num_samples,seq_len,mel_bins) = x.shape
+        x = x.view(-1,1,seq_len,mel_bins)
+        x = self.encoder(x)
+        # print('x_shape ',x.shape)
+        # x = self.avgpool(x)
         # x = nn.MaxPool2d(2)(x)
         x = x.view(x.size(0),-1)
         return x

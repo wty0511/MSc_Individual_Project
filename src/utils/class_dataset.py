@@ -158,6 +158,9 @@ class ClassDataset(Dataset):
             df = pd.read_csv(file)
             df = df.sort_values(by='Starttime', ascending=True)
             file = file.replace('.csv','.wav')
+            # df.loc[:, 'Starttime'] = df['Starttime'].apply(lambda x:(max(x - 0.025, 0)))
+            # df.loc[:, 'Endtime'] = df['Endtime'].apply(lambda x: min(x + 0.025, self.feature_per_file
+            #                                                          [file]['duration']))
 
             # class name starts from the 4th column
             for column in df.columns[3:]:

@@ -51,7 +51,7 @@ model.eval()
 val_dataset = FileDataset(cfg,val=False, debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 print(checkpoint['threshold'])
-df_all_time, report, threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'])
+df_all_time, report, threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'], mode = 'test')
 acc = report['overall_scores']['fmeasure (percentage)']
 
 report_dir = normalize_path(cfg.checkpoint.report_dir)

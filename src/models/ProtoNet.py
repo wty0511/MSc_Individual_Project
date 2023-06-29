@@ -83,7 +83,7 @@ class ProtoNet(BaseModel):
         avg_loss = avg_loss / len(data_loader)
         return avg_loss
     
-    def test_loop(self, test_loader, fix_shreshold = None):
+    def test_loop(self, test_loader, fix_shreshold = None, mode = 'test'):
         all_prob = {}
         all_meta = {}
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -112,13 +112,14 @@ class ProtoNet(BaseModel):
             pos_feat = []
             for batch in pos_loader:
                 pos_data, _ = batch
+                # print(pos_data.shape)
                 feat = self.forward(pos_data)
-                # print(feat.shape)
+                
                 pos_feat.append(feat.mean(0))
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
             prob_mean = []
-            for i in range(1):
+            for i in range(5):
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
                 # if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
@@ -191,10 +192,10 @@ class ProtoNet(BaseModel):
                 all_time['Audiofilename'].extend([os.path.basename(wav_file)]*len(on_set_time))
                 all_time['Starttime'].extend(on_set_time)
                 all_time['Endtime'].extend(off_set_time)
-                
+            
             
             df_all_time = pd.DataFrame(all_time)
-            df_all_time = post_processing(df_all_time)
+            df_all_time = post_processing(df_all_time, self.config, mode)
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{}.csv'.format(threshold))
@@ -220,6 +221,7 @@ class ProtoNet(BaseModel):
                 best_threshold = threshold
             if fix_shreshold is not None:
                 break
+
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(best_res)
         print('best_threshold:{}'.format(best_threshold))

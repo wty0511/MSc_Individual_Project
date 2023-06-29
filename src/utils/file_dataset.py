@@ -92,6 +92,7 @@ class FileDataset(Dataset):
         else:
             print("Processing test labels...")
         for file in tqdm(walk_files(self.val_dir, debug = self.debug, file_extension = ('.csv'))):
+            # print(file)
             df = pd.read_csv(file)
             file = file.replace('.csv','.wav')
             # class name starts from the 4th column(only one class in this case)
@@ -100,6 +101,9 @@ class FileDataset(Dataset):
                 pos_idx = df[df[column] == 'POS'].index.tolist()
                 column = column+'&'+file
                 self.classes.add(column)
+                
+                # df.loc[:, 'Starttime'] = df['Starttime'].apply(lambda x:(max(x - 0.025, 0)))
+                # df.loc[:, 'Endtime'] = df['Endtime'].apply(lambda x: x + 0.025)
                 start = df['Starttime'][pos_idx].tolist()
                 end = df['Endtime'][pos_idx].tolist()
 
@@ -113,6 +117,8 @@ class FileDataset(Dataset):
 
                     self.seg_meta[column]['time_spane'].append({'start': s, 'end': e, 'file': file})
                     self.seg_meta[column]['duration'].append(e - s)
+                    
+
                 
                 if self.seg_meta[column]['time_spane'] == []:
                     self.classes.remove(column)
@@ -160,7 +166,6 @@ class FileDataset(Dataset):
                 f = i['file']
                 s = i['start']
                 e = i['end']
-                
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
                 # print('s', s)
@@ -186,10 +191,7 @@ class FileDataset(Dataset):
                 f = i['file']
                 s = i['start']
                 e = i['end']
-               
-                # if s> 0.025:
-                #     s = s - 0.025
-                # e = e + 0.025
+
                 s = time2frame(s, self.fps)
                 e = time2frame(e, self.fps)
 
@@ -282,37 +284,60 @@ class FileDataset(Dataset):
         # hop_seg = seg_len // self.hop_len_frac
         # seg_len = 3
         # hop_seg = 1
-        if max_len < 8:
-            seg_len = 8
-        elif max_len < 30:# 30 0.4
-            seg_len = max_len
-        elif (
-            max_len >= 30
-            and max_len <= 60# 60 0.8
-        ):
-            seg_len = max_len // 2
-        elif max_len > 60 and max_len < 250:
-            seg_len = max_len // 4
-        else:
-            seg_len = max_len // 8
-        hop_seg = seg_len // self.hop_len_frac
-    
-        # if max_len < 8:
+        # print('max_len', max_len)
+        
+
+        # print('max_len', max_len)
+        # if max_len <= 8:
         #     seg_len = 8
+        # elif max_len < 30 and max_len >8:# 30 0.4
+        #     seg_len = max_len
+        # elif (
+        #     max_len >= 30
+        #     and max_len <= 60# 60 0.8
+        # ):
+        #     seg_len = max_len // 2
+        # elif max_len > 60 and max_len < 250:
+        #     seg_len = max_len // 4
+        # else:
+        #     seg_len = max_len // 8
+        # hop_seg = seg_len // self.hop_len_frac
+    
+        
+        # if max_len <= 17:
+        #     seg_len = 17
+        # elif max_len < 40 and max_len >17:# 30 0.4
+        #     seg_len = max_len
+        # elif (
+        #     max_len >= 40
+        #     and max_len <= 80# 60 0.8
+        # ):
+        #     seg_len = max_len // 2
+        # elif max_len > 80 and max_len < 250:
+        #     seg_len = max_len // 4
+        # else:
+        #     seg_len = max_len // 8
+        # hop_seg = seg_len // self.hop_len_frac
+    
+        # print('max_len', max_len)   
+        # if max_len <= 17:
+        #     seg_len = 17
         # elif max_len < 100:
         #     seg_len = max_len
         # elif max_len > 100 and max_len < 500 :
         #     seg_len = max_len//4
         # else:
         #     seg_len = max_len//8
-        # hop_seg = seg_len // 2
+        # hop_seg = seg_len // 3
+        
         
         # if max_len < 8:
         #     seg_len = 8
         #     hop_seg = 4
         # else:
-        #     seg_len = 17
-        #     hop_seg = 4
+        seg_len = 17
+        hop_seg = 4
+        # print('seg_len', seg_len)
         return seg_len, hop_seg
         #################################################################################
         
@@ -336,6 +361,7 @@ class FileDataset(Dataset):
         # print('duration', end - query_start)
         label = []
         duration = end - query_start
+        # print('seg_len', self.seg_len)
         if  duration< self.seg_len:
             feature = np.tile(feature[:, query_start:end], (1,np.ceil(self.seg_len/duration).astype(int)))
             res.append(feature[:, : self.seg_len])

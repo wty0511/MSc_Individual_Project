@@ -26,6 +26,8 @@ class BaseModel(nn.Module):
         #     self.feature_extractor  = ResNet2()
         elif config.train.backbone == 'convnet':
             self.feature_extractor = ConvNet()
+        elif config.train.backbone == 'convnetlarge':
+            self.feature_extractor = ConvNetLarge()
         elif config.train.backbone == 'convnetfw':
             self.feature_extractor = ConvNetfw()
         elif config.train.backbone == 'convclassifier':
