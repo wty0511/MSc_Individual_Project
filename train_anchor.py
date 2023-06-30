@@ -36,7 +36,7 @@ debug = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
-cfg = compose(config_name="config.yaml")
+cfg = compose(config_name="config_anchor.yaml")
 print('preparing training dataset')
 
 train_dataset = ClassDataset(cfg, mode = 'anchor', same_class_in_different_file=True, debug= debug)
@@ -45,7 +45,7 @@ print(train_dataset.seg_meta.keys())
 
 
 class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
-
+print(len(train_dataset))
 train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 64)
 val_dataset = FileDataset(cfg,val=True, debug= debug)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
@@ -63,7 +63,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
 best_f1 = 0
 no_imporve = 0
 
-for epoch in range(50):
+for epoch in range(10):
     model.train()
     model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):
@@ -73,7 +73,7 @@ for epoch in range(50):
     if epoch % 10 == 0:
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
-    df_all_time, report, threshold = model.test_loop(val_loader)
+    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val')
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
     if no_imporve == 30:

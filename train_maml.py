@@ -41,7 +41,32 @@ debug = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
+
+
 cfg = compose(config_name="config.yaml")
+
+model_name = 'ProtoMAML_proxy' # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
+
+if model_name == 'ProtoMAML':
+    model = ProtoMAML(cfg)
+    cfg = compose(config_name="config_protomaml.yaml")
+    
+elif model_name == 'ProtoMAML_temp':
+    model = ProtoMAML_temp(cfg)
+    cfg = compose(config_name="config_protomaml_temp.yaml")
+elif model_name == 'ProtoMAML_grad':
+    model = ProtoMAML_grad(cfg)
+    cfg = compose(config_name="config_protomaml_grad.yaml")
+    
+elif model_name == 'ProtoMAML_proxy':
+    model = ProtoMAML_proxy(cfg)
+    cfg = compose(config_name="config_protomaml_proxy.yaml")
+    
+    
+    
+
+
+
 print('preparing training dataset')
 train_dataset = ClassDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
 print(len(train_dataset))
@@ -57,14 +82,17 @@ val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain/Model/best_model.pth')
 pretrain_dict = pretrain_model['state']
 pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
+
+
+    
 # model = ProtoMAML_temp(cfg)
 # model = ProtoMAML_grad(cfg)
 # model = ProtoMAML_query(cfg)
-# model = ProtoMAML(cfg)
+
 # model = SNNMAML(cfg)
 # model = MAML(cfg)
 # model = TNNMAML(cfg)
-model =ProtoMAML_proxy(cfg)
+# model =ProtoMAML_proxy(cfg)
 # model = ProtoMAMLfw(cfg)
 print(pretrain_model['state'].keys())
 # model.feature_extractor.load_state_dict(pretrain_dict)
@@ -91,7 +119,7 @@ for epoch in range(100//cfg.train.n_way):
     if epoch % 10 == 0:
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
-    df_all_time, report, threshold = model.test_loop(val_loader)
+    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val')
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
     if no_imporve == 30:

@@ -22,7 +22,7 @@ def set_seed(seed):
 SEED = 42
 set_seed(SEED)
 
-save_file = r"/root/task5_2023/Checkpoints/protnnet_10way_5shot_res/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/protonet_large_10way/Model/best_model.pth"
 checkpoint = torch.load(save_file)
 cfg = checkpoint['config']
 # cfg = compose(config_name="config.yaml")
@@ -31,6 +31,7 @@ model_dir = cfg.checkpoint.model_dir
 
 
 # 加载模型
+is_val = False
 
 # checkpoint['config']['checkpoint']['experiment_name'] = 'ProtoNet'
 print(checkpoint['config'])
@@ -46,11 +47,12 @@ model = ProtoNet(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 model.load_state_dict(model_state)
 model.eval()
 # torch.save(checkpoint, save_file)
-# checkpoint['threshold'] = 0.95
-val_dataset = FileDataset(cfg,val=False, debug=False)
+# checkpoint['threshold'] = 0.5
+val_dataset = FileDataset(cfg,val=is_val, debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-print(checkpoint['threshold'])
-df_all_time, report, threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'])
+# print(checkpoint['threshold'])
+
+df_all_time, report, threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'], mode = 'val' if is_val else 'test')
 acc = report['overall_scores']['fmeasure (percentage)']
 
 report_dir = normalize_path(cfg.checkpoint.report_dir)
@@ -59,6 +61,6 @@ print(report_dir)
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
     
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
     

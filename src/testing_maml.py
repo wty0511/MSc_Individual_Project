@@ -35,14 +35,17 @@ set_seed(SEED)
 # cfg = compose(config_name="config.yaml")
 # model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
-save_file = r"/root/task5_2023/Checkpoints/proxyMAML_5way_cos/Model/best_model.pth"
+# save_file = r"/root/task5_2023/Checkpoints/proxyMAML_5way_cos/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_2way/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
+
+save_file = r"/root/task5_2023/Checkpoints/FOMAMLProtoNet_no_neg_2way_lr0.01_5setp3/Model/best_model.pth"
 # 加载模型
 checkpoint = torch.load(save_file)
 print(checkpoint.keys())
 
+is_val = False
 # 从checkpoint中获取模型的状态和配置信息
 model_state = checkpoint['state']
 config = checkpoint['config']
@@ -60,21 +63,21 @@ print('f1:', checkpoint['f1'])
 # model = ProtoMAML_temp(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
-# model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_refine(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
 model.load_state_dict(model_state)
 model.eval()
 # checkpoint['threshold'] = None
-val_dataset = FileDataset(cfg,val=False,debug=False)
+val_dataset = FileDataset(cfg,val=is_val,debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 # checkpoint['threshold'] = None
-df_all_time, report, best_threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'])
+df_all_time, report, best_threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'], mode = 'val' if is_val else 'test')
 
 report_dir = normalize_path(cfg.checkpoint.report_dir)
 report_dir = os.path.join(report_dir,'test_report_best.json')

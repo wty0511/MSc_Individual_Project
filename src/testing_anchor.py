@@ -23,7 +23,7 @@ def set_seed(seed):
 SEED = 42
 set_seed(SEED)
 
-save_file = r"/root/task5_2023/Checkpoints/anchornet/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/test2/Model/best_model.pth"
 checkpoint = torch.load(save_file)
 cfg = checkpoint['config']
 # cfg = compose(config_name="config.yaml")
@@ -47,7 +47,7 @@ model = AnchorNet(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 model.load_state_dict(model_state)
 model.eval()
 # torch.save(checkpoint, save_file)
-# checkpoint['threshold'] = 0.95
+# checkpoint['threshold'] = None
 val_dataset = FileDataset(cfg,val=False, debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 print(checkpoint['threshold'])
@@ -60,6 +60,6 @@ print(report_dir)
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
     
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
     

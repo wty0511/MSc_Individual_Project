@@ -64,6 +64,9 @@ class ClassPairDataset(Dataset):
         self.sr = config.features.sr
         self.fps = self.sr / config.features.hop_length
         self.neg_prototype = self.config.train.neg_prototype
+        self.mean = 0.50484073
+        self.std =  0.36914015
+
         self.collect_features()
         self.process_labels(same_class_in_different_file)
         self.class2index = self._class2index()
@@ -264,7 +267,7 @@ class ClassPairDataset(Dataset):
             # print('end', end)
             # print('shape', feature.shape)
             res = feature[:, start:start+seg_length]
-
+        res = (res - self.mean) / self.std
 
         res = torch.from_numpy(res).to(self.device)
 

@@ -6,16 +6,16 @@ def conv_block(in_channels,out_channels, max_pool = True):
         return nn.Sequential(
             nn.Conv2d(in_channels,out_channels,3,padding=1),
             nn.BatchNorm2d(out_channels),
-            # nn.ReLU(),
-            nn.LeakyReLU(),
+            nn.ReLU(),
+            # nn.LeakyReLU(),
             nn.MaxPool2d(2)
         )
     else:
         return nn.Sequential(
             nn.Conv2d(in_channels,out_channels,3,padding=1),
             nn.BatchNorm2d(out_channels),
-            # nn.ReLU(),
-            nn.LeakyReLU(),
+            nn.ReLU(),
+            # nn.LeakyReLU(),
         )
 
 def conv_block2(in_channels,out_channels):
@@ -72,7 +72,40 @@ class ConvNet(nn.Module):
         x = x.view(x.size(0),-1)
         return x
 
+class ConvNetLarge(nn.Module):
+    def __init__(self):
+        super(ConvNetLarge,self).__init__()
+        self.encoder = nn.Sequential(
+            conv_block(1,128),
+            conv_block(128,128),
+            conv_block(128,128),
+            conv_block(128,128)
+            # conv_block(64,64,False),
+            # conv_block(64,64,False),
+                    
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        total_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
 
+        print('total_trainable_params:', total_trainable_params)
+        # self.temperature_param = nn.Parameter(torch.tensor(1.0))
+    def forward(self,x):
+        
+        (num_samples,seq_len,mel_bins) = x.shape
+        x = x.view(-1,1,seq_len,mel_bins)
+        x = self.encoder(x)
+        # print('x_shape ',x.shape)
+        # x = self.avgpool(x)
+        # x = nn.MaxPool2d(2)(x)
+        x = x.view(x.size(0),-1)
+        # zeros = torch.eq(x, 0)
+
+
+
+        # num_zeros = torch.sum(zeros)
+        # print('num_zeros', num_zeros/num_samples)
+        return x
+    
 
 # class ConvNet(nn.Module):
 #     def __init__(self):

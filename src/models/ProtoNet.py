@@ -83,7 +83,7 @@ class ProtoNet(BaseModel):
         avg_loss = avg_loss / len(data_loader)
         return avg_loss
     
-    def test_loop(self, test_loader, fix_shreshold = None):
+    def test_loop(self, test_loader, fix_shreshold = None, mode = 'test'):
         all_prob = {}
         all_meta = {}
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -112,21 +112,22 @@ class ProtoNet(BaseModel):
             pos_feat = []
             for batch in pos_loader:
                 pos_data, _ = batch
+
                 feat = self.forward(pos_data)
-                # print(feat.shape)
+                # print(feat)
                 pos_feat.append(feat.mean(0))
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
-
+            # print(pos_feat)
             prob_mean = []
-            for i in range(1):
+            for i in range(5):
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
-                # if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
-                #     neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
-                #     neg_seg_sample = neg_sup[1][neg_indices]
-                # else:
-                #     neg_seg_sample = neg_sup[1]
-                neg_seg_sample = neg_sup[1]
+                if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
+                    neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
+                    neg_seg_sample = neg_sup[1][neg_indices]
+                else:
+                    neg_seg_sample = neg_sup[1]
+                # neg_seg_sample = neg_sup[1]
                 neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                 neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 neg_feat = []
@@ -140,6 +141,8 @@ class ProtoNet(BaseModel):
                         # print("Allocated Memory:", torch.cuda.memory_allocated(self.device) / 1024 ** 3, "GB")
 
                 neg_feat = torch.stack(neg_feat, dim=0).mean(0)
+                # print(torch.norm(neg_feat))
+                # print(neg_feat)
                 ##############################################################################
                 del neg_dataset
                 del neg_loader
@@ -150,14 +153,17 @@ class ProtoNet(BaseModel):
                     query_data, _ = batch
                     query_feat = self.forward(query_data)
                     dist = self.euclidean_dist(query_feat, proto)
+                    # print(dist)
                     scores = -dist
                     prob = F.softmax(scores, dim=1)
+                    # print(prob)
                     prob_all.append(prob.detach().cpu().numpy())
                 ##############################################################################
                 
                 prob_all = np.concatenate(prob_all, axis=0)
                 # print(prob_all)
                 prob_all = prob_all[:,0]
+                # print(prob_all)
                 # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
                 prob_mean.append(prob_all)
             prob_mean = np.stack(prob_mean, axis=0).mean(0)
@@ -194,7 +200,7 @@ class ProtoNet(BaseModel):
                 
             
             df_all_time = pd.DataFrame(all_time)
-            df_all_time = post_processing(df_all_time)
+            df_all_time = post_processing(df_all_time, self.config, mode)
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{}.csv'.format(threshold))
@@ -229,10 +235,11 @@ class ProtoNet(BaseModel):
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-        
+        # print(torch.norm(query, dim=1))
+        # print(torch.norm(support, dim=1))
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
-
+        # print(torch.pow(query - support, 2).sum(2))
         return torch.pow(query - support, 2).sum(2)
 
     

@@ -14,6 +14,7 @@ from hydra import initialize, compose
 from hydra.core.global_hydra import GlobalHydra
 from src.utils.class_dataset import *
 from src.utils.file_dataset import *
+import omegaconf
 import json
 # GPT
 def set_seed(seed):
@@ -51,15 +52,16 @@ def train(train_loader, val_loader, config):
     print('optimizer:', config.train.optimizer)
     best_acc = 0       
     model_dir = config.checkpoint.model_dir
-    for epoch in range(epoches):
+
+    for epoch in range(100//config.train.n_way):
         model.train()
-        avg_loss = model.train_loop(train_loader,  optimizer )
+        avg_loss = model.train_loop(train_loader,  optimizer)
         model.eval()
 
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
 
-        df_all_time, best_res, best_threshold = model.test_loop(val_loader)
+        df_all_time, best_res, best_threshold = model.test_loop(val_loader, mode = 'val')
         acc = best_res['overall_scores']['fmeasure (percentage)']
         
         if acc > best_acc :
@@ -67,6 +69,13 @@ def train(train_loader, val_loader, config):
             best_acc = acc
             save_file = os.path.join(model_dir, 'best_model.pth')
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config, 'threshold':best_threshold}, save_file)
+            config_dir = normalize_path(config.checkpoint.exp_dir)
+            if not os.path.exists(os.path.dirname(config_dir)):
+                os.makedirs(os.path.dirname(config_dir))
+            config_dir = os.path.join(config_dir,'config.json')
+            with open(config_dir, 'w') as outfile:
+                json.dump( omegaconf.OmegaConf.to_container(config, resolve=True), outfile)
+            
             report_dir = normalize_path(config.checkpoint.report_dir)
             report_dir = os.path.join(report_dir,'val_report_best.json')
             if not os.path.exists(os.path.dirname(report_dir)):

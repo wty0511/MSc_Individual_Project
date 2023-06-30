@@ -30,7 +30,7 @@ class AnchorNet(BaseModel):
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.approx = True
         # self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=512,   alpha = 32, margin =0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
-        self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=512,   alpha = 32, margin =0.1).to(torch.device('cuda'))
+        self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=1024,   alpha = 32, margin =0.1).to(torch.device('cuda'))
     
     def euclidean_dist(self,query, support):
         n = query.size(0)
@@ -94,7 +94,7 @@ class AnchorNet(BaseModel):
             optimizer.step()
             # print('loss:{:.3f}'.format(loss.item()))
 
-    def test_loop(self, test_loader , fix_shreshold = None):
+    def test_loop(self, test_loader , fix_shreshold = None, mode = 'test'):
         self.feature_extractor.eval()
         all_prob = {}
         all_meta = {}
@@ -160,11 +160,11 @@ class AnchorNet(BaseModel):
                 
                 
                 support_feats = self.feature_extractor(support_data)
-                with h5py.File(feat_file, 'w') as f:
-                    f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                    f.create_dataset("labels", data=label.squeeze(0).numpy())
-                    f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
-                    f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                # with h5py.File(feat_file, 'w') as f:
+                #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                #     f.create_dataset("labels", data=label.squeeze(0).numpy())
+                #     f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                #     f.create_dataset("labels_t", data=support_label.cpu().numpy())
                             
                 
                 
@@ -196,14 +196,14 @@ class AnchorNet(BaseModel):
                     query_data, _ = batch
                     prob, feats  = self.feed_forward_test(proto, query_data)
                     prob_all.append(prob)
-                    with h5py.File(feat_file, 'a') as f:
+                    # with h5py.File(feat_file, 'a') as f:
                             
-                            size = f['features'].shape[0]
-                            nwe_size = f['features'].shape[0] + feats.shape[0]
+                    #         size = f['features'].shape[0]
+                    #         nwe_size = f['features'].shape[0] + feats.shape[0]
 
-                            f['features'].resize((nwe_size, 512))
+                    #         f['features'].resize((nwe_size, 512))
 
-                            f['features'][size:nwe_size] = feats.detach().cpu().numpy()
+                    #         f['features'][size:nwe_size] = feats.detach().cpu().numpy()
                 prob_all = np.concatenate(prob_all, axis=0)
                 #########################################################################
                   
@@ -266,7 +266,7 @@ class AnchorNet(BaseModel):
                         raise ValueError('off_set_time is larger than query_end')
 
             df_all_time = pd.DataFrame(all_time)
-            df_all_time = post_processing(df_all_time)
+            df_all_time = post_processing(df_all_time, self.config, mode )
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

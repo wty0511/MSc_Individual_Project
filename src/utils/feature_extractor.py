@@ -26,6 +26,7 @@ class Feature_Extractor():
         self.fmax = config.features.fmax
         self.feature_list = config.features.feature_list.split("&")
     def load_audio(self,path):
+        # print('loading audio from {}'.format(path))
         audio, sr = librosa.load(path, sr=self.sr)
         return audio, sr
 
@@ -40,7 +41,7 @@ class Feature_Extractor():
         return y / np.max(np.abs(y))
     def extract_pcen(self,audio):
         # as sugested
-        audio = self.norm(audio)
+        # audio = self.norm(audio)
         audio = audio*(2**32)
         mel = librosa.feature.melspectrogram(audio, sr=self.sr, n_mels=self.n_mels, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, fmax=self.fmax)
         # mel or log_mel
@@ -128,7 +129,7 @@ def preprecess(cfg):
     print("Extracting features...")
     feature_list = cfg.features.feature_list.split("&")
     # print(normalize_path(cfg.path.data_dir))
-    for file in tqdm(walk_files(normalize_path(cfg.path.data_dir), '.wav')):
+    for file in tqdm(walk_files(normalize_path(cfg.path.data_dir), False,  '.wav')):
         feature = feature_extractor.extract_all_features(file)
         for feature_name in feature_list:
             save_path = audio2feature(file, feature_name)

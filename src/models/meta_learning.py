@@ -26,6 +26,8 @@ class BaseModel(nn.Module):
         #     self.feature_extractor  = ResNet2()
         elif config.train.backbone == 'convnet':
             self.feature_extractor = ConvNet()
+        elif config.train.backbone == 'convnetlarge':
+            self.feature_extractor = ConvNetLarge()
         elif config.train.backbone == 'convnetfw':
             self.feature_extractor = ConvNetfw()
         elif config.train.backbone == 'convclassifier':
@@ -100,7 +102,6 @@ class BaseModel(nn.Module):
         return data_support, data_query
     
     def split_support_query_feature(self, pos_input, neg_input, is_data, model = None):
-        
         if self.config.train.neg_prototype:
             if is_data:
                 pos_dataset = TensorDataset(pos_input, torch.zeros(pos_input.shape[0]))

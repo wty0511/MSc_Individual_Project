@@ -46,7 +46,9 @@ class FileDataset(Dataset):
         self.seg_len = 0
         self.seg_hop = 0
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
+        self.mean = 0.50484073
+        self.std =  0.36914015
+        
 
     def __getitem__(self, idx):
 
@@ -233,6 +235,7 @@ class FileDataset(Dataset):
         # for i in res:
         #     print('res', i.shape)
         res = np.stack(res)
+        res = (res - self.mean) / self.std
         res = torch.from_numpy(res).to(self.device)
         return res
     
@@ -278,24 +281,24 @@ class FileDataset(Dataset):
         #     seg_len = max_len // 4
         # else:
         #     seg_len = max_len // 8
-        # # print(f"Adaptive segment length for %s is {seg_len}" % (file))
+        # print(f"Adaptive segment length for %s is {seg_len}" % (file))
         # hop_seg = seg_len // self.hop_len_frac
         # seg_len = 3
         # hop_seg = 1
-        if max_len < 8:
-            seg_len = 8
-        elif max_len < 30:# 30 0.4
-            seg_len = max_len
-        elif (
-            max_len >= 30
-            and max_len <= 60# 60 0.8
-        ):
-            seg_len = max_len // 2
-        elif max_len > 60 and max_len < 250:
-            seg_len = max_len // 4
-        else:
-            seg_len = max_len // 8
-        hop_seg = seg_len // self.hop_len_frac
+        # if max_len < 8:
+        #     seg_len = 8
+        # elif max_len < 30:# 30 0.4
+        #     seg_len = max_len
+        # elif (
+        #     max_len >= 30
+        #     and max_len <= 60# 60 0.8
+        # ):
+        #     seg_len = max_len // 2
+        # elif max_len > 60 and max_len < 250:
+        #     seg_len = max_len // 4
+        # else:
+        #     seg_len = max_len // 8
+        # hop_seg = seg_len // self.hop_len_frac
     
         # if max_len < 8:
         #     seg_len = 8
@@ -311,8 +314,10 @@ class FileDataset(Dataset):
         #     seg_len = 8
         #     hop_seg = 4
         # else:
-        #     seg_len = 17
-        #     hop_seg = 4
+            # seg_len = 17
+            # hop_seg = 4
+        seg_len = 17
+        hop_seg = 4
         return seg_len, hop_seg
         #################################################################################
         
@@ -361,6 +366,7 @@ class FileDataset(Dataset):
                 label.append(1)
 
         res = np.stack(res)
+        res = (res - self.mean) / self.std
         res = torch.from_numpy(res).to(self.device) 
         label = np.array(label)
         return res, label

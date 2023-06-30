@@ -111,6 +111,7 @@ class ProtoMAML_proxy(BaseModel):
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
+        
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
         # query = query.unsqueeze(1).expand(n, m, -1)
@@ -122,16 +123,17 @@ class ProtoMAML_proxy(BaseModel):
 
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         # self.config.train.lr_inner = 0.001
+        dim = support_feature.shape[-1]
         if not self.use_cosine_similarity:
             if mode == 'train':
-                loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512,   alpha = 4, margin =0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
+                loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim,   alpha = 4, margin =0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
             else:
-                loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha =4, margin = 0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
+                loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=dim, alpha =4, margin = 0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
         if self.use_cosine_similarity:
             if mode == 'train':
-                loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = 1, margin = 0.1).to(torch.device('cuda'))
+                loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim, alpha = 32, margin = 0.1).to(torch.device('cuda'))
             else:
-                loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = 1, margin = 0.1).to(torch.device('cuda'))
+                loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=dim, alpha = 32, margin = 0.1).to(torch.device('cuda'))
             # for name, parameter in loss_func.named_parameters():
             #     print(name, parameter.requires_grad)
             
@@ -196,11 +198,11 @@ class ProtoMAML_proxy(BaseModel):
             # loss_optimizer.zero_grad()
             # output_weight.grad.fill_(0)
             # output_bias.grad.fill_(0)
-            # print('loss', loss)
+            print('loss', loss)
             acc = torch.mean(acc).detach()
 
             # print(proxies)
-        # print('~~~~~~~')
+        print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -443,7 +445,7 @@ class ProtoMAML_proxy(BaseModel):
 
                 # print(len(set(list(classes))))
                 # Perform inner loop adaptation
-                # print(data_pos.shape)
+                # print(classes)
                 # print(data_neg.shape)
 
                 local_model, loss_func, support_feats = self.inner_loop(support_data, support_feat, support_label)
@@ -489,7 +491,7 @@ class ProtoMAML_proxy(BaseModel):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
-    def test_loop(self, test_loader,fix_shreshold = None):
+    def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -531,7 +533,7 @@ class ProtoMAML_proxy(BaseModel):
                     # print(feat.shape)
                     pos_feat.append(feat.mean(0))
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
-
+                # print(pos_feat)
                 prob_mean = []
                 for i in range(5):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
@@ -565,6 +567,7 @@ class ProtoMAML_proxy(BaseModel):
                         # print(feat.shape)
                         neg_feat.append(feat.mean(0))
                     neg_feat = torch.stack(neg_feat, dim=0).mean(0)
+                    # print(neg_feat)
                     #########################################################################
                     # use less unsqueeze, used to match the dimension of inner loop
                     proto = torch.stack([pos_feat,neg_feat], dim=0).unsqueeze(0)
@@ -668,7 +671,7 @@ class ProtoMAML_proxy(BaseModel):
                             raise ValueError('off_set_time is larger than on_set_time')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

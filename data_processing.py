@@ -20,4 +20,4 @@ if __name__ == "__main__":
         initialize(config_path=".")
     # Compose the configuration
     cfg = compose(config_name="config.yaml")
-    # preprecess_WMW(cfg)
+    preprecess(cfg)

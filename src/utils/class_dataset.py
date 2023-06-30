@@ -63,6 +63,11 @@ class ClassDataset(Dataset):
         self.fps = self.sr / config.features.hop_length
         
         self.neg_prototype = self.config.train.neg_prototype
+        self.mean = 0.50484073
+        self.std =  0.36914015
+        
+        
+
         self.collect_features()
         self.process_labels(same_class_in_different_file)
         # sum = 0
@@ -83,7 +88,7 @@ class ClassDataset(Dataset):
         self.recent_return_sample = {}
         for key in self.seg_meta.keys():
             self.recent_return_sample[key] = set()
-        
+
     
     
     def __getitem__(self, class_name):
@@ -94,6 +99,7 @@ class ClassDataset(Dataset):
                     self.recent_return_sample[name] = set()
                 while True:
                     sample = self.get_task(name)
+                    # print('sample', sample)
                     if sample not in self.recent_return_sample[name]:
                         self.recent_return_sample[name].add(sample)
                         break
@@ -143,14 +149,21 @@ class ClassDataset(Dataset):
         return(self.length )
     def collect_features(self):
         print("Collecting training set features...")
+        array_list = []
         for file in tqdm(walk_files(self.data_dir,debug= self.debug, file_extension = ('.wav'))):
             for feature in self.feature_list:
                 self.feature_per_file[file] = self.feature_per_file.get(file, {})
                 self.feature_per_file[file]['duration'] = librosa.get_duration(filename = file)
                 save_path = audio2feature(file, feature)
                 self.feature_per_file[file][feature] = np.load(save_path)
-                
-    
+                print('file', file, 'feature', feature, 'shape', self.feature_per_file[file][feature].shape)
+                array_list.append(self.feature_per_file[file][feature])
+        array_list = np.concatenate(array_list, axis = 1)
+        self.mean = np.mean(array_list)
+        self.std = np.std(array_list)
+        print('mean', self.mean)
+        print('std', self.std)
+        
     def process_labels(self, same_label):
         print("Processing labels...")
         for file in tqdm(walk_files(self.data_dir,debug= self.debug, file_extension = ('.csv'))):
@@ -228,7 +241,8 @@ class ClassDataset(Dataset):
         end = time2frame(end, self.fps)
 
         res = self.select_sample(file, start, end, seg_length)
-
+        
+        
         return res
 
     def get_neg_sample(self, selected_class, seg_length = 10):
@@ -243,6 +257,7 @@ class ClassDataset(Dataset):
         end = sample[0]['end']
         start = time2frame(start, self.fps)
         end = time2frame(end, self.fps)
+        
         return self.select_sample(file, start, end, seg_length)
     
     
@@ -254,6 +269,7 @@ class ClassDataset(Dataset):
         # print('real fps', feature.shape[1]/length)
         if end > feature.shape[1]:
             raise ValueError('end is larger than feature length')
+        
         duration = end - start
         # print('file', file, 'start', start, 'end', end)
         if duration == 0:
@@ -280,10 +296,12 @@ class ClassDataset(Dataset):
             # print('end', end)
             # print('shape', feature.shape)
             res = feature[:, start:start+seg_length]
-
-
+        # print('mean',self.mean)
+        # print('std', self.std)  
+        res = (res - self.mean) / self.std
         res = torch.from_numpy(res).to(self.device)
-
+        
+        
         return res
     
     def _class2index(self):

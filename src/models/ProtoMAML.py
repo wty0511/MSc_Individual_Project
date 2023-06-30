@@ -167,7 +167,7 @@ class ProtoMAML(BaseModel):
         # print(norms.shape)
         
         prototypes = prototypes / expanded_norms
-        
+        # self.config.train.lr_inner = 0.01
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
         local_model.train()
@@ -191,7 +191,7 @@ class ProtoMAML(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(5):
+        for i in range(15):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
@@ -208,9 +208,9 @@ class ProtoMAML(BaseModel):
             output_weight.grad.fill_(0)
             output_bias.grad.fill_(0)
             loss = loss.detach()
-            print('loss', loss)
+            # print('loss', loss)
             acc = torch.mean(acc).detach()
-        print('~~~~~~~')
+        # print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -268,13 +268,13 @@ class ProtoMAML(BaseModel):
             # preds = F.linear(data, output_weight, bias=None)
             preds_all.append(preds)
         preds = torch.cat(preds_all, dim=0)
-        print(preds)
+        # print(preds)
         half_size = output_weight.shape[0] // 2
         temperature = 1
         preds = preds / temperature
         if self.config.train.neg_prototype or mode == 'test':
             
-            weights = torch.cat((torch.full((half_size,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((half_size,), max(neg_num/pos_num, 1), dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             # weights = torch.cat((torch.full((half_size,), 1, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:
@@ -322,8 +322,6 @@ class ProtoMAML(BaseModel):
                     classes, data_pos, _ =pos_data
                     _, data_neg, _ =neg_data
                     support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
-                    support_data, query_data = self.split_support_query_data(data_pos, data_neg)
-                    support_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_support)).long().to(self.device)
                 else:
                     pos_data = task 
                     classes, data_pos, _ =pos_data
@@ -375,7 +373,7 @@ class ProtoMAML(BaseModel):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
-    def test_loop(self, test_loader,fix_shreshold = None):
+    def test_loop(self, test_loader,fix_shreshold = None, mode = 'test' ):
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -419,7 +417,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(1):
+                for i in range(3):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):
@@ -549,7 +547,8 @@ class ProtoMAML(BaseModel):
                             raise ValueError('off_set_time is larger than query_end')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
