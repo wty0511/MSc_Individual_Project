@@ -53,7 +53,7 @@ def train(train_loader, val_loader, config):
     best_acc = 0       
     model_dir = config.checkpoint.model_dir
 
-    for epoch in range(100//config.train.n_way):
+    for epoch in range(40):
         model.train()
         avg_loss = model.train_loop(train_loader,  optimizer)
         model.eval()
@@ -61,7 +61,7 @@ def train(train_loader, val_loader, config):
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
 
-        df_all_time, best_res, best_threshold = model.test_loop(val_loader, mode = 'val')
+        df_all_time, best_res, best_threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
         acc = best_res['overall_scores']['fmeasure (percentage)']
         
         if acc > best_acc :

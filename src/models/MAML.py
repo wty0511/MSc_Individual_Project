@@ -42,15 +42,13 @@ class MAML(BaseModel):
         # self.config.train.lr_inner = 0.01
         # Create output layer weights 
         # Optimize inner loop model on support set
-        for i in range(10):
+        for i in range(self.config.train.inner_step):
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(support_data, support_label, mode = mode)
 
             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
             if self.approx:
                 grad = [ g.detach()  for g in grad ]
-                
-            
             fast_parameters = []
                 
             for k, weight in enumerate(self.parameters()):
@@ -77,8 +75,8 @@ class MAML(BaseModel):
 
         # Execute a model with given output layer weights and inputs
         preds = self.feature_extractor(data)
-        
-
+        # print(preds)
+        # print(labels)
         # feats_pos = torch.mean(feats[(labels == 0)], dim=0)
         # for i in feats[(labels == 1)]:
         #     c_loss+=self.contrastive_loss(feats_pos, i, torch.tensor(0).to(self.device))
@@ -95,13 +93,14 @@ class MAML(BaseModel):
         if mode == 'train':
             loss = F.cross_entropy(preds, labels)
         else:
-            loss = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
+            loss = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 1), 1.0]).to(self.device))
 
 
         acc = (preds.argmax(dim=1) == labels).float()
         labels = labels.cpu().numpy()
         preds = preds.argmax(dim=1).detach().cpu().numpy()
         report = classification_report(labels, preds,zero_division=0, digits=3)
+        # print(report)
         return loss, report, acc
     
     
@@ -157,7 +156,7 @@ class MAML(BaseModel):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
-    def test_loop(self, test_loader,fix_shreshold = None):
+    def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -194,7 +193,7 @@ class MAML(BaseModel):
 
 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     
@@ -299,7 +298,7 @@ class MAML(BaseModel):
                             raise ValueError('off_set_time is larger than query_end')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode = mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

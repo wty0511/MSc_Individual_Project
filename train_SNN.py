@@ -35,7 +35,7 @@ debug = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
-cfg = compose(config_name="config.yaml")
+cfg = compose(config_name="config_snn.yaml")
 print('preparing training dataset')
 train_dataset = ClassPairDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
 print(len(train_dataset))

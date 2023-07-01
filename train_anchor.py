@@ -45,7 +45,7 @@ print(train_dataset.seg_meta.keys())
 
 
 class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
-print(len(train_dataset))
+# print(len(train_dataset))
 train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 64)
 val_dataset = FileDataset(cfg,val=True, debug= debug)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
@@ -73,7 +73,7 @@ for epoch in range(10):
     if epoch % 10 == 0:
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
-    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val')
+    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold = 0.5)
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
     if no_imporve == 30:

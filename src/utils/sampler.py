@@ -9,7 +9,7 @@ class BatchSampler(Sampler):
         self.n_support = config.train.n_support
         self.n_query = config.train.n_query
         self.class_list = list(classes)
-        self.n_episode = data_set_len//(self.n_query)
+        self.n_episode = data_set_len
     def __iter__(self):
         for _ in range(self.n_episode):
             # randomly select n_way classes

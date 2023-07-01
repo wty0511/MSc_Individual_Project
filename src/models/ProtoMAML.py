@@ -191,14 +191,16 @@ class ProtoMAML(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(15):
+        for i in range(self.config.train.inner_step):
             # Determine loss on the support set
 
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
             
             # Calculate gradients and perform inner loop update
             loss.backward()
-            local_optim.step()
+            # local_optim.step()
+            for parameter in local_model.parameters():
+                parameter.data -= self.config.train.lr_inner * parameter.grad.data
             # Update output layer via SGD
             output_weight.data -= self.config.train.lr_inner * output_weight.grad
             output_bias.data -= self.config.train.lr_inner * output_bias.grad
@@ -417,7 +419,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(3):
+                for i in range(5):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):

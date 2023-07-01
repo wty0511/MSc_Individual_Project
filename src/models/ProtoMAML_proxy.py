@@ -106,8 +106,8 @@ class ProtoMAML_proxy(BaseModel):
         self.contrastive_loss = ContrastiveLoss(20)
         self.tri_loss = TripletLoss(margin = 1)
         self.use_cosine_similarity = True
-    
-    
+        # print(self.feature_extractor)
+        # print(config)
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
@@ -140,10 +140,11 @@ class ProtoMAML_proxy(BaseModel):
         prototypes  = support_feature.mean(0).squeeze()
         norms = torch.norm(prototypes, dim=1, keepdim=True)
         expanded_norms = norms.expand_as(prototypes)
-        # prototypes = prototypes / expanded_norms
+        if self.use_cosine_similarity:   
+            prototypes = prototypes / expanded_norms
         loss_func.proxies = nn.parameter.Parameter(prototypes.detach().requires_grad_())
         
-        loss_optimizer = torch.optim.SGD(loss_func.parameters(), lr=self.config.train.lr_inner*10)
+        loss_optimizer = torch.optim.SGD(loss_func.parameters(), lr=self.config.train.lr_inner *5)
         loss_func.train()
         loss_optimizer.zero_grad()
         # print(prototypes)
@@ -173,7 +174,7 @@ class ProtoMAML_proxy(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
-        for i in range(5):
+        for i in range(self.config.train.inner_step):
             proxies = loss_func.proxies
             # print(torch.norm(proxies, dim=1))
             # Determine loss on the support set
@@ -185,8 +186,10 @@ class ProtoMAML_proxy(BaseModel):
             #     print(name, parameter.requires_grad)
             #     break
             # print(loss_func.proxies.grad)
-            local_optim.step()
+            # local_optim.step()
             loss_optimizer.step()
+            for parameter in local_model.parameters():
+                parameter.data -= self.config.train.lr_inner * parameter.grad.data
             # loss_optimizer.step()
             # Update output layer via SGD
             # print(loss_func.proxies.grad)
@@ -198,11 +201,11 @@ class ProtoMAML_proxy(BaseModel):
             # loss_optimizer.zero_grad()
             # output_weight.grad.fill_(0)
             # output_bias.grad.fill_(0)
-            print('loss', loss)
+            # print('loss', loss)
             acc = torch.mean(acc).detach()
 
             # print(proxies)
-        print('~~~~~~~')
+        # print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             print(preds)
@@ -245,10 +248,17 @@ class ProtoMAML_proxy(BaseModel):
             feats.append(local_model(data))
         
         feats = torch.cat(feats, dim=0)
-        
+        # if mode == 'test':
+        #     pos_feat = feats[(labels == 0)]
+        #     neg_feat = feats[(labels == 1)]
+        #     pos_indices = torch.randperm(pos_feat.shape[0])[:50]
+        #     pos_feat = pos_feat[pos_indices]
+        #     feats = torch.cat([pos_feat, neg_feat], dim=0)
+        #     labels = torch.cat([torch.zeros(pos_feat.shape[0]), torch.ones(neg_feat.shape[0])], dim=0).long().to(self.device)
         proxies = loss_func.proxies
         if self.use_cosine_similarity:
             preds = self.cos_dist(feats, proxies)
+            preds = preds / 0.1
         else:
             preds = - self.euclidean_dist(feats, proxies)
         
@@ -267,14 +277,20 @@ class ProtoMAML_proxy(BaseModel):
         # preds = preds/0.1
         # print('preds', preds)
         # print('preds',F.softmax(preds, dim = 1))
+
         pos_num = feats[(labels == 0)].shape[0]
         neg_num = feats[(labels == 1)].shape[0]
-        
+        # print(labels)
         if mode == 'train':
             loss1 = F.cross_entropy(preds, labels)
         else:
             loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
+        
 
+            # print(pos_feat.shape)
+            # print(neg_feat.shape)
+            
+            # print(labels)
 
         # acc = (preds.argmax(dim=1) == labels).float().mean()
         # print('acc', acc)
@@ -341,7 +357,7 @@ class ProtoMAML_proxy(BaseModel):
         proxies = loss_func.proxies
         if self.use_cosine_similarity:
             preds = self.cos_dist(feats, proxies)
-            preds = preds/0.01
+            preds = preds / 0.1
         else:
             preds = - self.euclidean_dist(feats, proxies)
             
@@ -352,7 +368,7 @@ class ProtoMAML_proxy(BaseModel):
             loss1 = F.cross_entropy(preds, labels)
         else:
             loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
-
+        
         # acc = (preds.argmax(dim=1) == labels).float().mean()
         # print('acc', acc)
         loss2= loss_func(feats, labels)
@@ -409,7 +425,7 @@ class ProtoMAML_proxy(BaseModel):
         # print(proxies)
         if self.use_cosine_similarity:
             preds = self.cos_dist(feats, proxies)
-            preds = preds/0.01
+            preds = preds/0.1
         else:
             preds = - self.euclidean_dist(feats, proxies)
         # print('preds', -preds)

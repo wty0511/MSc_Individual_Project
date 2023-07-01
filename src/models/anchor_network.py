@@ -30,7 +30,7 @@ class AnchorNet(BaseModel):
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.approx = True
         # self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=512,   alpha = 32, margin =0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
-        self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=1024,   alpha = 32, margin =0.1).to(torch.device('cuda'))
+        self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=512,   alpha = 32, margin =0.1).to(torch.device('cuda'))
     
     def euclidean_dist(self,query, support):
         n = query.size(0)
@@ -82,6 +82,7 @@ class AnchorNet(BaseModel):
                     
     def train_loop(self, data_loader, optimizer):
         self.feature_extractor.train()
+        loss_all = []
         for batch in data_loader:
             data, label = batch
             feat = self.feature_extractor(data)
@@ -92,7 +93,10 @@ class AnchorNet(BaseModel):
             # for i in self.parameters():
             #     print(i.grad)
             optimizer.step()
-            # print('loss:{:.3f}'.format(loss.item()))
+            optimizer.zero_grad()
+            loss_all.append(loss.item())
+            print('loss', loss.item())
+        # print('loss', np.mean(loss_all))
 
     def test_loop(self, test_loader , fix_shreshold = None, mode = 'test'):
         self.feature_extractor.eval()

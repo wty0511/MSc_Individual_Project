@@ -155,7 +155,10 @@ class FileDataset(Dataset):
             # You may want to return a default value or raise an exception
             raise Exception('empty', selected_class)
         else:
+            
+            # print('class_meta', class_meta['duration'])
             duration_frame = time2frame(class_meta['duration'], self.fps)
+            
             self.seg_len, self.seg_hop = self.adaptive_length_hop(duration_frame)
             all_pos_seg = []
             for i in class_meta['time_spane'][:self.config.train.n_support]:
@@ -263,6 +266,10 @@ class FileDataset(Dataset):
         #################################Adaptive hop_seg#########################################
 
         # Adaptive segment length based on the audio file.
+        # print('duration_list', duration_list)
+        duration_list = duration_list[:self.config.train.n_support]
+        # print('duration_list', duration_list[:self.config.train.n_support])
+        # print('duration_list', duration_list)
         max_len = max(duration_list)
         
         # Choosing the segment length based on the maximum size in the 5-shot.
@@ -285,20 +292,22 @@ class FileDataset(Dataset):
         # hop_seg = seg_len // self.hop_len_frac
         # seg_len = 3
         # hop_seg = 1
-        # if max_len < 8:
-        #     seg_len = 8
-        # elif max_len < 30:# 30 0.4
-        #     seg_len = max_len
-        # elif (
-        #     max_len >= 30
-        #     and max_len <= 60# 60 0.8
-        # ):
-        #     seg_len = max_len // 2
-        # elif max_len > 60 and max_len < 250:
-        #     seg_len = max_len // 4
-        # else:
-        #     seg_len = max_len // 8
-        # hop_seg = seg_len // self.hop_len_frac
+        
+        print('max_len', max_len)
+        if max_len < 8:
+            seg_len = 8
+        elif max_len < 30:# 30 0.4
+            seg_len = max_len
+        elif (
+            max_len >= 30
+            and max_len <= 60# 60 0.8
+        ):
+            seg_len = max_len // 2
+        elif max_len > 60 and max_len < 250:
+            seg_len = max_len // 4
+        else:
+            seg_len = max_len // 8
+        hop_seg = seg_len // self.hop_len_frac
     
         # if max_len < 8:
         #     seg_len = 8
@@ -316,8 +325,8 @@ class FileDataset(Dataset):
         # else:
             # seg_len = 17
             # hop_seg = 4
-        seg_len = 17
-        hop_seg = 4
+        # seg_len = 17
+        # hop_seg = 4
         return seg_len, hop_seg
         #################################################################################
         

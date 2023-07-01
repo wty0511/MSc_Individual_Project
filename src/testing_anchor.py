@@ -23,7 +23,7 @@ def set_seed(seed):
 SEED = 42
 set_seed(SEED)
 
-save_file = r"/root/task5_2023/Checkpoints/test2/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/anchor_convnet/Model/best_model.pth"
 checkpoint = torch.load(save_file)
 cfg = checkpoint['config']
 # cfg = compose(config_name="config.yaml")
@@ -31,7 +31,7 @@ model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
 
 
-# 加载模型
+is_val = False
 
 # checkpoint['config']['checkpoint']['experiment_name'] = 'ProtoNet'
 print(checkpoint['config'])
@@ -48,10 +48,10 @@ model.load_state_dict(model_state)
 model.eval()
 # torch.save(checkpoint, save_file)
 # checkpoint['threshold'] = None
-val_dataset = FileDataset(cfg,val=False, debug=False)
+val_dataset = FileDataset(cfg,val=is_val, debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 print(checkpoint['threshold'])
-df_all_time, report, threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'])
+df_all_time, report, threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'], mode = 'val' if is_val else 'test')
 acc = report['overall_scores']['fmeasure (percentage)']
 
 report_dir = normalize_path(cfg.checkpoint.report_dir)

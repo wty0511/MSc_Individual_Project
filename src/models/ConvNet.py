@@ -49,14 +49,14 @@ class ConvNet(nn.Module):
     def __init__(self):
         super(ConvNet,self).__init__()
         self.encoder = nn.Sequential(
-            conv_block(1,64),
-            conv_block(64,64),
-            conv_block(64,64),
-            # conv_block(64,64,False),
+            conv_block(1,128),
+            conv_block(128,128),
+            conv_block(128,128),
+            conv_block(128,128,False),
             # conv_block(64,64,False),
                     
         )
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
         total_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
 
         print('total_trainable_params:', total_trainable_params)

@@ -311,7 +311,8 @@ class PairDataset(Dataset):
         else:
             self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+        self.mean = 0.50484073
+        self.std =  0.36914015
         
         
     def __getitem__(self, class_name):
@@ -336,8 +337,11 @@ class PairDataset(Dataset):
         selected_class = random.choice(list(temp_set))
 
         index3 = random.choice(self.class_index[selected_class])
+        data1 = (self.data[index1] - self.mean) / self.std
+        data2 = (self.data[index2] - self.mean) / self.std
+        data3 = (self.data[index3] - self.mean) / self.std
         
-        return self.data[index1], self.data[index2], self.data[index3], 
+        return data1, data2, data3
     
     def __len__(self):
         return(self.length )

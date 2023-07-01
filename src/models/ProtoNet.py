@@ -121,7 +121,7 @@ class ProtoNet(BaseModel):
             prob_mean = []
             for i in range(5):
                 neg_sup[1] = neg_sup[1].squeeze() 
-                
+                # neg_sup[1] = query
                 if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:
                     neg_indices = torch.randperm(neg_sup[1].shape[0])[: self.config.val.test_loop_neg_sample]
                     neg_seg_sample = neg_sup[1][neg_indices]
@@ -153,7 +153,6 @@ class ProtoNet(BaseModel):
                     query_data, _ = batch
                     query_feat = self.forward(query_data)
                     dist = self.euclidean_dist(query_feat, proto)
-                    # print(dist)
                     scores = -dist
                     prob = F.softmax(scores, dim=1)
                     # print(prob)

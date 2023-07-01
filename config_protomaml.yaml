@@ -33,7 +33,7 @@ train:
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
-  backbone:  convnetlarge
+  backbone:  convnet
   model_type: protonet
   epoches: 51
   lr: 0.001
@@ -69,7 +69,7 @@ checkpoint:
   best_model_dir: ${checkpoint.model_dir}/model_best.pth.tar
   start_epoch: 0
   # experiment_name: protomaml_large_2way
-  experiment_name: anchornet_large
+  experiment_name: Proto_MAML_${train.n_way}way_${train.inner_step}step_${train.backbone}
   # experiment_name: protnnet_10way_5shot_res
   # experiment_name: test
   exp_dir: ${path.root_dir}/Checkpoints/${checkpoint.experiment_name}

@@ -43,26 +43,29 @@ if not GlobalHydra().is_initialized():
 # Compose the configuration
 
 
-cfg = compose(config_name="config.yaml")
+# cfg = compose(config_name="config.yaml")
 
 model_name = 'ProtoMAML_proxy' # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
 
 if model_name == 'ProtoMAML':
-    model = ProtoMAML(cfg)
     cfg = compose(config_name="config_protomaml.yaml")
-    
+    model = ProtoMAML(cfg)
+
 elif model_name == 'ProtoMAML_temp':
-    model = ProtoMAML_temp(cfg)
     cfg = compose(config_name="config_protomaml_temp.yaml")
+    model = ProtoMAML_temp(cfg)
 elif model_name == 'ProtoMAML_grad':
-    model = ProtoMAML_grad(cfg)
+
     cfg = compose(config_name="config_protomaml_grad.yaml")
+    model = ProtoMAML_grad(cfg)
     
 elif model_name == 'ProtoMAML_proxy':
-    model = ProtoMAML_proxy(cfg)
     cfg = compose(config_name="config_protomaml_proxy.yaml")
+    model = ProtoMAML_proxy(cfg)
     
-    
+elif model_name == 'MAML':
+    cfg = compose(config_name="config_maml.yaml")
+    model = MAML(cfg)
     
 
 
@@ -90,7 +93,7 @@ pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
 # model = ProtoMAML_query(cfg)
 
 # model = SNNMAML(cfg)
-# model = MAML(cfg)
+
 # model = TNNMAML(cfg)
 # model =ProtoMAML_proxy(cfg)
 # model = ProtoMAMLfw(cfg)
@@ -105,21 +108,26 @@ if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
 # optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr)
+# if model_name == 'MAML':
+#     optimizer = optim.Adam([
+#     {'params': model.feature_extractor.fc.parameters(), 'lr': 0.0001},  
+#     {'params': model.feature_extractor.conv.parameters()}  
+# ], lr=0.001)  # 默认学习率
 model.train()
 
 no_imporve = 0
 
-for epoch in range(100//cfg.train.n_way):
+for epoch in range(40):
     model.train()
     model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
         
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
-    if epoch % 10 == 0:
+    if epoch % cfg.checkpoint.save_freq == 0:
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
-    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val')
+    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
     if no_imporve == 30:
