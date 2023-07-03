@@ -102,7 +102,7 @@ class ConvNetClassifierfw(nn.Module):
     def __init__(self, depth = 3):
         super(ConvNetClassifierfw,self).__init__()
         self.conv = ConvNetfw_large(depth = 4)
-        self.fc = Linear_fw(1024, 2)
+        self.fc = Linear_fw(512, 2)
         # print('weight',self.fc.bias.data)
         
     def forward(self,x):
@@ -113,7 +113,7 @@ class ConvNetClassifierfw(nn.Module):
 
 
 class ConvNetfw_large(nn.Module):
-    def __init__(self, depth = 3):
+    def __init__(self, depth = 4):
         super(ConvNetfw_large,self).__init__()
         trunk = []
         for i in range(depth):
@@ -122,7 +122,7 @@ class ConvNetfw_large(nn.Module):
             B = ConvBlock(indim, outdim, pool = ( i < 3 ) ) #only pooling for fist 4 layers
             trunk.append(B)
         self.trunk = nn.Sequential(*trunk)
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
     def forward(self,x):
 
         (num_samples,seq_len,mel_bins) = x.shape
@@ -132,25 +132,25 @@ class ConvNetfw_large(nn.Module):
         out = out.view(x.size(0),-1)
         return out
     
-class ConvNetfw(nn.Module):
-    def __init__(self, depth = 3):
-        super(ConvNetfw,self).__init__()
-        trunk = []
-        for i in range(depth):
-            indim = 1 if i == 0 else 64
-            outdim = 64
-            B = ConvBlock(indim, outdim, pool = ( i < 3 ) ) #only pooling for fist 4 layers
-            trunk.append(B)
-        self.trunk = nn.Sequential(*trunk)
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
-    def forward(self,x):
+# class ConvNetfw(nn.Module):
+#     def __init__(self, depth = 3):
+#         super(ConvNetfw,self).__init__()
+#         trunk = []
+#         for i in range(depth):
+#             indim = 1 if i == 0 else 64
+#             outdim = 64
+#             B = ConvBlock(indim, outdim, pool = ( i < 3 ) ) #only pooling for fist 4 layers
+#             trunk.append(B)
+#         self.trunk = nn.Sequential(*trunk)
+#         self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+#     def forward(self,x):
 
-        (num_samples,seq_len,mel_bins) = x.shape
-        x = x.view(-1,1,seq_len,mel_bins)
-        out = self.trunk(x)
-        out = self.avgpool(out)
-        out = out.view(x.size(0),-1)
-        return out
+#         (num_samples,seq_len,mel_bins) = x.shape
+#         x = x.view(-1,1,seq_len,mel_bins)
+#         out = self.trunk(x)
+#         out = self.avgpool(out)
+#         out = out.view(x.size(0),-1)
+#         return out
     
 class SNNfw(nn.Module):
     def __init__(self, depth = 3):

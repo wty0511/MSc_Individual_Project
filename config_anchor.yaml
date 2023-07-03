@@ -57,7 +57,7 @@ train:
 val:
   seg_len_base: 30
   hop_len_frac: 3
-  test_loop_batch_size: 128
+  test_loop_batch_size: 1024
   test_loop_neg_sample: 50
   threshold: 0.5
 

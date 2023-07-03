@@ -28,29 +28,15 @@ class AnchorNet(BaseModel):
         super(AnchorNet, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.approx = True
         # self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=512,   alpha = 32, margin =0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
         self.loss_func = losses.ProxyAnchorLoss(num_classes=19, embedding_size=512,   alpha = 32, margin =0.1).to(torch.device('cuda'))
-    
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-        
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
-
         return torch.pow(query - support, 2).sum(2)
 
-    def cossim(self, query, support):
-        cos_sim = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
-        n = query.size(0)
-        m = support.size(0)
-        query = query.unsqueeze(1).expand(n, m, -1)
-        support = support.unsqueeze(0).expand(n, m, -1)
-        return cos_sim(query, support)
-
-    
-    
     
     def feed_forward_test(self, prototype, query_data):
         # Execute a model with given output layer weights and inputs
@@ -58,17 +44,15 @@ class AnchorNet(BaseModel):
         query_feat = self.feature_extractor(query_data)
         dists = self.cos_dist(query_feat, prototype)
         # dists = -self.euclidean_dist(query_feat, prototype)
-        dists = dists/0.01
+        dists = dists
         preds = F.softmax(dists, dim = 1)
         preds = preds.detach().cpu().numpy()
-
         return preds, query_feat
     
 
     def cos_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-        
         query = query.unsqueeze(1).expand(n, m, -1)
         query = F.normalize(query, p=2, dim=2)
         support = support.unsqueeze(0).expand(n, m, -1)
@@ -80,11 +64,13 @@ class AnchorNet(BaseModel):
         
                     
                     
-    def train_loop(self, data_loader, optimizer):
+    def train_loop(self, data_loader, loss_optimizer, model_optimizer):
         self.feature_extractor.train()
         loss_all = []
         for batch in data_loader:
             data, label = batch
+            # print(data.shape)
+            # print(label)
             feat = self.feature_extractor(data)
             # print(feat.shape)
             # print(label.shape)
@@ -92,18 +78,18 @@ class AnchorNet(BaseModel):
             loss.backward()
             # for i in self.parameters():
             #     print(i.grad)
-            optimizer.step()
-            optimizer.zero_grad()
+            loss_optimizer.step()
+            loss_optimizer.zero_grad()
+            model_optimizer.step()
+            model_optimizer.zero_grad()
             loss_all.append(loss.item())
-            print('loss', loss.item())
+        #     print('loss', loss.item())
         # print('loss', np.mean(loss_all))
 
     def test_loop(self, test_loader , fix_shreshold = None, mode = 'test'):
         self.feature_extractor.eval()
         all_prob = {}
         all_meta = {}
-
-                        
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
             seg_hop = seg_hop.item()
             query_start = query_start.item()
@@ -120,7 +106,7 @@ class AnchorNet(BaseModel):
             all_meta[wav_file]['seg_len'] = seg_len
             
             all_meta[wav_file]['label'] = label[0]
-            
+
             feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
             feat_file = os.path.join('/root/task5_2023/latent_feature/TNN_noMAML', feat_file)
             if os.path.isfile(feat_file):
@@ -136,7 +122,7 @@ class AnchorNet(BaseModel):
             pos_data = pos_sup[1].squeeze()
             query = query.squeeze()
             query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
-            query_loader = DataLoader(query_dataset, batch_size=128, shuffle=False)
+            query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             
@@ -144,7 +130,6 @@ class AnchorNet(BaseModel):
             for i in range(5):
                 test_loop_neg_sample = self.config.val.test_loop_neg_sample
                 neg_sup[1] = neg_sup[1].squeeze() 
-                
                 if neg_sup[1].shape[0] > test_loop_neg_sample:
                     neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
                     neg_seg_sample = neg_sup[1][neg_indices]
@@ -196,7 +181,7 @@ class AnchorNet(BaseModel):
                     
                 
                 prob_all = []
-                for batch in tqdm(query_loader):
+                for batch in query_loader:
                     query_data, _ = batch
                     prob, feats  = self.feed_forward_test(proto, query_data)
                     prob_all.append(prob)
@@ -296,15 +281,3 @@ class AnchorNet(BaseModel):
         print('best_threshold', best_threshold)
         print('~~~~~~~~~~~~~~~')
         return df_all_time, best_res, best_threshold
-    
-    
-    
-    
-    def euclidean_dist(self,query, support):
-        n = query.size(0)
-        m = support.size(0)
-        query = query.unsqueeze(1).expand(n, m, -1)
-        support = support.unsqueeze(0).expand(n, m, -1)
-
-        return torch.pow(query - support, 2).sum(2)
-

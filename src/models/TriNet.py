@@ -54,7 +54,7 @@ class TriNet(BaseModel):
         super(TriNet, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = TripletLoss(margin=10.0)
+        self.loss_fn = TripletLoss(margin=0.2)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
         self.cosloss = nn.CosineEmbeddingLoss(margin= 0.95)
@@ -252,6 +252,9 @@ class TriNet(BaseModel):
             anchor_feat = self.feature_extractor(anchor)
             pos_feat = self.feature_extractor(pos)
             neg_feat = self.feature_extractor(neg)
+            anchor_feat = F.normalize(anchor_feat, dim=1)
+            pos_feat = F.normalize(pos_feat, dim=1)
+            neg_feat = F.normalize(neg_feat, dim=1)
             # loss = self.loss_fn(anchor_feat, pos_feat, torch.zeros(anchor.shape[0]).to(self.device))
             # loss = loss + self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor.shape[0]).to(self.device))
             # loss = self.cosloss(anchor_feat, pos_feat, torch.ones(anchor.shape[0]).to(self.device)) + self.cosloss(anchor_feat, neg_feat, -torch.ones(anchor.shape[0]).to(self.device))
@@ -262,7 +265,7 @@ class TriNet(BaseModel):
             optimizer.step()
             print('loss:{:.3f}'.format(loss.item()))
 
-    def test_loop(self, test_loader , fix_shreshold = None):
+    def test_loop(self, test_loader , fix_shreshold = None, mode = 'test'):
         self.feature_extractor.eval()
         all_prob = {}
         all_meta = {}
@@ -305,7 +308,7 @@ class TriNet(BaseModel):
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             
             prob_mean = []
-            for i in range(1):
+            for i in range(5):
                 test_loop_neg_sample = self.config.val.test_loop_neg_sample
                 neg_sup[1] = neg_sup[1].squeeze() 
                 
@@ -434,7 +437,7 @@ class TriNet(BaseModel):
                         raise ValueError('off_set_time is larger than query_end')
 
             df_all_time = pd.DataFrame(all_time)
-            df_all_time = post_processing(df_all_time)
+            df_all_time = post_processing(df_all_time, self.config, mode)
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

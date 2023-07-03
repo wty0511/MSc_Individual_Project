@@ -33,7 +33,8 @@ train:
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
-  backbone:  convnetlarge
+  # backbone:  convnetfwlarge
+  backbone:  convnet
   model_type: protonet
   epoches: 51
   lr: 0.001
@@ -57,7 +58,7 @@ train:
 val:
   seg_len_base: 30
   hop_len_frac: 3
-  test_loop_batch_size: 128
+  test_loop_batch_size: 1024
   test_loop_neg_sample: 50
   threshold: 0.5
 
@@ -68,7 +69,7 @@ checkpoint:
   resume: false
   best_model_dir: ${checkpoint.model_dir}/model_best.pth.tar
   start_epoch: 0
-  experiment_name: test2
+  experiment_name: Trinet${train.backbone}_${version}
   # experiment_name: anchornet
   # experiment_name: protnnet_10way_5shot_res
   # experiment_name: test
@@ -80,3 +81,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
+version: 1

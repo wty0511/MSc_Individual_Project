@@ -1,4 +1,3 @@
-# This code is modified from https://github.com/KevinMusgrave/pytorch-adapt
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
 # This code is modified from https://github.com/wyharveychen/CloserLookFewShot
 # This code is modified from https://github.com/phlippe/uvadlc_notebooks
@@ -22,79 +21,6 @@ from pytorch_metric_learning import  losses,reducers
 from pytorch_metric_learning.distances import CosineSimilarity, LpDistance
 from src.utils.distance import NormMinusLpDistance
 
-class ContrastiveLoss(nn.Module):
-    def __init__(self, margin):
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-
-    def forward(self, embeddings1, embeddings2, labels):
-        euclidean_distance = torch.sqrt(torch.sum(torch.pow(embeddings1 - embeddings2, 2), dim=0))
-        loss = (labels * torch.pow(euclidean_distance, 2) +
-                (1 - labels) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
-        return torch.mean(loss) * 0.5
-
-
-class TripletLoss(nn.Module):
-    def __init__(self, margin=1.0):
-        super(TripletLoss, self).__init__()
-        self.margin = margin
-
-    def forward(self, anchor, positive, negative):
-        # print(anchor.shape)
-        # print(positive.shape)
-        # print(negative.shape)
-        distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
-        # print(distance_positive)
-        distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
-        # print('~~~~~~~~~~~~~')
-        losses = F.relu(distance_positive - distance_negative + self.margin)
-        return losses.mean()
-    
-    
-
-
-def get_silhouette_score(feats, labels):
-    device, dtype = feats.device, feats.dtype
-    unique_labels = torch.unique(labels)
-    num_samples = len(feats)
-    if not (1 < len(unique_labels) < num_samples):
-        raise ValueError("num unique labels must be > 1 and < num samples")
-    scores = []
-    for L in unique_labels:
-        curr_cluster = feats[labels == L]
-        num_elements = len(curr_cluster)
-        if num_elements > 1:
-            intra_cluster_dists = torch.cdist(curr_cluster, curr_cluster)
-            mean_intra_dists = torch.sum(intra_cluster_dists, dim=1) / (
-                num_elements - 1
-            )  # minus 1 to exclude self distance
-            dists_to_other_clusters = []
-            for otherL in unique_labels:
-                if otherL != L:
-                    other_cluster = feats[labels == otherL]
-                    inter_cluster_dists = torch.cdist(curr_cluster, other_cluster)
-                    mean_inter_dists = torch.sum(inter_cluster_dists, dim=1) / (
-                        len(other_cluster)
-                    )
-                    dists_to_other_clusters.append(mean_inter_dists)
-            dists_to_other_clusters = torch.stack(dists_to_other_clusters, dim=1)
-            min_dists, _ = torch.min(dists_to_other_clusters, dim=1)
-            curr_scores = (min_dists - mean_intra_dists) / (
-                torch.maximum(min_dists, mean_intra_dists)
-            )
-            # curr_scores = (min_dists - mean_intra_dists)
-        else:
-            curr_scores = torch.tensor([0], device=device, dtype=dtype)
-
-        scores.append(curr_scores)
-
-    scores = torch.cat(scores, dim=0)
-    if len(scores) != num_samples:
-        raise ValueError(
-            f"scores (shape {scores.shape}) should have same length as feats (shape {feats.shape})"
-        )
-    return torch.mean(scores)
-
 
 class ProtoMAML_proxy(BaseModel):
     
@@ -103,48 +29,60 @@ class ProtoMAML_proxy(BaseModel):
         super(ProtoMAML_proxy, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.contrastive_loss = ContrastiveLoss(20)
-        self.tri_loss = TripletLoss(margin = 1)
         self.use_cosine_similarity = True
-        # print(self.feature_extractor)
-        # print(config)
+        # self.intializer = torch.nn.Linear(512, 512)
+
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-        
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
-        # query = query.unsqueeze(1).expand(n, m, -1)
-        # query = F.normalize(query, p=2, dim=2)
-        # support = support.unsqueeze(0).expand(n, m, -1)
-        # support = F.normalize(support, p=2, dim=2)
         return torch.pow(query - support, 2).sum(2)
 
 
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         # self.config.train.lr_inner = 0.001
+        # self.config.train.alpha = 32
+        # self.config.train.margin = 0.1
+        # self.config.train.scale = 10
         dim = support_feature.shape[-1]
         if not self.use_cosine_similarity:
             if mode == 'train':
                 loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim,   alpha = 4, margin =0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
             else:
                 loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=dim, alpha =4, margin = 0.1, distance = NormMinusLpDistance(power = 2, p =2, normalize_embeddings = False)).to(torch.device('cuda'))
+        # if not self.use_cosine_similarity:
+        #     if mode == 'train':
+        #         loss_func = losses.ProxyNCALoss(num_classes=self.n_way, embedding_size=dim).to(torch.device('cuda'))
+        #     else:
+        #         loss_func = losses.ProxyNCALoss(num_classes=2, embedding_size=dim).to(torch.device('cuda'))
+        
         if self.use_cosine_similarity:
             if mode == 'train':
-                loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim, alpha = 32, margin = 0.1).to(torch.device('cuda'))
+                loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
             else:
-                loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=dim, alpha = 32, margin = 0.1).to(torch.device('cuda'))
+                loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=dim, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
+        
+        # if self.use_cosine_similarity:
+        #     if mode == 'train':
+        #         loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim, alpha = 16, margin = 0.1).to(torch.device('cuda'))
+        #     else:
+        #         loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=dim,alpha = 64, margin = 0.4).to(torch.device('cuda'))
             # for name, parameter in loss_func.named_parameters():
             #     print(name, parameter.requires_grad)
-            
         prototypes  = support_feature.mean(0).squeeze()
+        
         norms = torch.norm(prototypes, dim=1, keepdim=True)
         expanded_norms = norms.expand_as(prototypes)
         if self.use_cosine_similarity:   
             prototypes = prototypes / expanded_norms
-        loss_func.proxies = nn.parameter.Parameter(prototypes.detach().requires_grad_())
-        
-        loss_optimizer = torch.optim.SGD(loss_func.parameters(), lr=self.config.train.lr_inner *5)
+        # prototypes = self.intializer(prototypes)
+        init_weight =  prototypes
+        output_weight = init_weight.detach().requires_grad_()
+        loss_func.proxies = nn.parameter.Parameter(output_weight)
+        # print(loss_func.proxies)
+        # print(torch.norm(output_weight,dim=1, keepdim=True))
+        loss_optimizer = torch.optim.SGD(loss_func.parameters(), lr=self.config.train.lr_inner *self.config.train.scale)
         loss_func.train()
         loss_optimizer.zero_grad()
         # print(prototypes)
@@ -175,10 +113,13 @@ class ProtoMAML_proxy(BaseModel):
         # print('inner loop')
         # Optimize inner loop model on support set
         for i in range(self.config.train.inner_step):
+            
             proxies = loss_func.proxies
-            # print(torch.norm(proxies, dim=1))
+            # print(proxies)
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(local_model, loss_func, support_data, support_label, mode = mode)
+            
+            # print('first loss', loss)
             # Calculate gradients and perform inner loop update
             loss.backward()
             # for name, parameter in local_model.named_parameters():
@@ -201,7 +142,7 @@ class ProtoMAML_proxy(BaseModel):
             # loss_optimizer.zero_grad()
             # output_weight.grad.fill_(0)
             # output_bias.grad.fill_(0)
-            # print('loss', loss)
+            print('loss', loss)
             acc = torch.mean(acc).detach()
 
             # print(proxies)
@@ -228,7 +169,7 @@ class ProtoMAML_proxy(BaseModel):
         # support_feat = torch.empty(1, 512)
         # print('end inner loop')
         # proxies = loss_func.proxies.detach()
-        # loss_func.proxies = nn.parameter.Parameter((loss_func.proxies - init_proto).detach() + init_proto)
+        # loss_func.proxies = nn.parameter.Parameter((loss_func.proxies - init_weight).detach() + init_weight)
         
         return local_model, loss_func, support_feat
     
@@ -248,6 +189,8 @@ class ProtoMAML_proxy(BaseModel):
             feats.append(local_model(data))
         
         feats = torch.cat(feats, dim=0)
+        # print('feats', feats.shape)
+        # print('labels', labels)
         # if mode == 'test':
         #     pos_feat = feats[(labels == 0)]
         #     neg_feat = feats[(labels == 1)]
@@ -258,7 +201,8 @@ class ProtoMAML_proxy(BaseModel):
         proxies = loss_func.proxies
         if self.use_cosine_similarity:
             preds = self.cos_dist(feats, proxies)
-            preds = preds / 0.1
+            # print(preds)
+            preds = preds *  self.config.train.temperature
         else:
             preds = - self.euclidean_dist(feats, proxies)
         
@@ -294,13 +238,12 @@ class ProtoMAML_proxy(BaseModel):
 
         # acc = (preds.argmax(dim=1) == labels).float().mean()
         # print('acc', acc)
-        # print('loss1', loss1)
+
         loss2= loss_func(feats, labels)
         # print('loss', loss2)
         
         loss = loss1 * 0.0 +  loss2
         # print('loss', loss)
-        # print(get_silhouette_score(feats, labels))
         # pos_num = feats[(labels == 0)].shape[0]
         # neg_num = feats[(labels == 1)].shape[0]
         
@@ -357,7 +300,7 @@ class ProtoMAML_proxy(BaseModel):
         proxies = loss_func.proxies
         if self.use_cosine_similarity:
             preds = self.cos_dist(feats, proxies)
-            preds = preds / 0.1
+            preds = preds  *  self.config.train.temperature
         else:
             preds = - self.euclidean_dist(feats, proxies)
             
@@ -373,8 +316,9 @@ class ProtoMAML_proxy(BaseModel):
         # print('acc', acc)
         loss2= loss_func(feats, labels)
         # print('loss', loss2)
-        loss = loss1 +  loss2 * 0.0
-        # print('loss', loss)
+        loss = loss1   +  loss2 * 0.0
+        # loss = loss1
+        # print('loss2', loss2)
         # print(get_silhouette_score(feats, labels))
         # pos_num = feats[(labels == 0)].shape[0]
         # neg_num = feats[(labels == 1)].shape[0]
@@ -425,7 +369,7 @@ class ProtoMAML_proxy(BaseModel):
         # print(proxies)
         if self.use_cosine_similarity:
             preds = self.cos_dist(feats, proxies)
-            preds = preds/0.1
+            preds = preds *  self.config.train.temperature
         else:
             preds = - self.euclidean_dist(feats, proxies)
         # print('preds', -preds)
@@ -448,6 +392,7 @@ class ProtoMAML_proxy(BaseModel):
                 if self.config.train.neg_prototype:
                     pos_data, neg_data = task 
                     classes, data_pos, _ =pos_data
+                    
                     _, data_neg, _ =neg_data
                     support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
                     support_data, query_data = self.split_support_query_data(data_pos, data_neg)
@@ -458,7 +403,7 @@ class ProtoMAML_proxy(BaseModel):
                     support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
                     support_data, query_data = self.split_support_query_data(data_pos, None)
                     support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
-
+                    
                 # print(len(set(list(classes))))
                 # Perform inner loop adaptation
                 # print(classes)
@@ -477,12 +422,13 @@ class ProtoMAML_proxy(BaseModel):
                     loss.backward()
 
                     for p_global, p_local in zip(self.feature_extractor.parameters(), local_model.parameters()):
-                        
+                        # print(p_global.grad)
                         if p_global.grad is None:
+                            # print("p_global.grad is None")
                             p_global.grad = p_local.grad
                         else:
                             p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
-                        # print(p_global.requires_grad)
+                        
 
                         # print(p_global.grad)
                 loss = loss.detach().cpu().item()
@@ -500,7 +446,7 @@ class ProtoMAML_proxy(BaseModel):
                 opt.step()
                 opt.zero_grad()
                 # for name, parameter in self.feature_extractor.named_parameters():
-                #     print(name, parameter[0])
+                #     print(name, parameter.grad)
                 #     break
                 # print('~~~~~~')
     def train_loop(self, data_loader, optimizer):
@@ -533,6 +479,7 @@ class ProtoMAML_proxy(BaseModel):
                 # print(wav_file)
                 # print(query_start)
                 pos_data = pos_sup[1].squeeze()
+                # print(pos_data.shape)
                 query = query.squeeze()
                 pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
@@ -545,6 +492,7 @@ class ProtoMAML_proxy(BaseModel):
                 pos_feat = []
                 for batch in pos_loader:
                     p_data, _ = batch
+                    # print(p_data.shape)
                     feat = self.forward(p_data)
                     # print(feat.shape)
                     pos_feat.append(feat.mean(0))

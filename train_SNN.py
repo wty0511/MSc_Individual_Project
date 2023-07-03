@@ -46,10 +46,12 @@ print(val_dataset.seg_meta.keys())
 best_f1 = 0
 class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
 
-train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 64)
+train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 256)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 # model = SNN(cfg)
-model =TriNet(cfg)
+# model =TriNet(cfg)
+# for param in model.parameters():
+#     param.fast = None
 print(len(train_loader))
 model = model.cuda()
 model_dir = cfg.checkpoint.model_dir
@@ -67,7 +69,7 @@ for epoch in range(100):
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
     if epoch % 10 == 0:
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
-    df_all_time, report, threshold = model.test_loop(val_loader)
+    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold = 0.5)
     f1 = report['overall_scores']['fmeasure (percentage)']
     if f1 > best_f1:
         best_f1 = f1

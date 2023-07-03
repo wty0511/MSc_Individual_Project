@@ -112,50 +112,7 @@ class ProtoMAML(BaseModel):
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.contrastive_loss = ContrastiveLoss(20)
         self.tri_loss = TripletLoss(margin = 1)
-    def feed_forward2(self, support_data, support_label):
-        # # Execute a model with given output layer weights and inputs
-        # support_feat = self.feature_extractor(support_data)
-        # # nway 不是2nway要注意
-        # support_feat = self.split_1d(support_feat)
-        # prototype = support_feat.mean(0)
-        # query_feat = self.feature_extractor(query_data)
-        # dists = self.euclidean_dist(query_feat, prototype)
-
-        # scores = -dists
-
-        # preds = scores.argmax(dim=1)
-        # y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-        # acc = torch.eq(preds, y_query).float().mean()
-
-        
-        # loss = self.ce(scores, y_query)
-        # y_query = y_query.cpu().numpy()
-        # preds = preds.detach().cpu().numpy()
-        # report = classification_report(y_query, preds,zero_division=0, digits=3)
-        # print(report)
-        support_label = support_label.cpu().numpy()
-        sampler = IntClassSampler(self.config, support_label, 100)
-        dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 10)
-        loss = []
-        for batch in dataloader:
-            data, lable = batch
-            anchor, pos, neg = data
-            # print(anchor.shape)
-            # print(pos.shape)
-            # print(neg.shape)
-            anchor_feat = self.feature_extractor(anchor)
-            pos_feat = self.feature_extractor(pos)
-            neg_feat = self.feature_extractor(neg)
-            loss.append(self.tri_loss(anchor_feat, pos_feat, neg_feat))
-            # print('inner loop: loss:{:.3f}'.format(loss.item()))
-            # loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
-        
-        loss = torch.sum(torch.stack(loss))
-        print(loss)
-        report = None
-        acc = torch.tensor(0.0).to(self.device)
-        return loss, report, acc
+    
     
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
@@ -180,9 +137,6 @@ class ProtoMAML(BaseModel):
         init_weight = 2 * prototypes
         # init_weight =  prototypes
         init_bias = -torch.norm(prototypes, dim=1)**2
-
-        
-
         
         output_weight = init_weight.detach().requires_grad_()
         output_bias = init_bias.detach().requires_grad_()
@@ -360,7 +314,7 @@ class ProtoMAML(BaseModel):
                 accuracies.append(acc)
                 losses.append(loss)
             if i % 1 == 0:
-                print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
+                print("loss: ", np.sum(losses), "acc: ", np.mean(accuracies))
             if mode == "train":
                 # for name, parameter in self.feature_extractor.named_parameters():
                 #     print(name, parameter[0])
@@ -577,9 +531,9 @@ class ProtoMAML(BaseModel):
             best_res_all.append(best_res)
             # print('best_threshold', best_threshold)
             # print('~~~~~~~~~~~~~~~')
-        print(self.average_res(best_res_all))
+        print(best_res_all[0])
         print(np.mean(best_threshold_all))
-        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all)
+        return df_all_time, best_res_all[0], np.mean(best_threshold_all)
     
     def average_res (self, res_list):
         avg = deepcopy(res_list[0])

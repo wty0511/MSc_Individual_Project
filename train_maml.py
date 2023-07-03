@@ -12,7 +12,7 @@ from src.models.ProtoMAML_query import *
 from src.models.ProtoMAML_grad import *
 import os
 import sys
-
+import omegaconf
 import numpy as np
 import torch
 import torch.optim
@@ -45,7 +45,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'ProtoMAML_proxy' # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
+model_name = 'MAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
 
 if model_name == 'ProtoMAML':
     cfg = compose(config_name="config_protomaml.yaml")
@@ -67,8 +67,9 @@ elif model_name == 'MAML':
     cfg = compose(config_name="config_maml.yaml")
     model = MAML(cfg)
     
-
-
+elif model_name == 'TNNMAML':
+    cfg = compose(config_name="config_mamltnn.yaml")
+    model = TNNMAML(cfg)
 
 print('preparing training dataset')
 train_dataset = ClassDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
@@ -117,6 +118,13 @@ model.train()
 
 no_imporve = 0
 
+config_dir = normalize_path(cfg.checkpoint.exp_dir)
+if not os.path.exists(os.path.dirname(config_dir)):
+    os.makedirs(os.path.dirname(config_dir))
+config_dir = os.path.join(config_dir,'config.json')
+with open(config_dir, 'w') as outfile:
+    json.dump( omegaconf.OmegaConf.to_container(cfg, resolve=True), outfile,indent=2)
+    
 for epoch in range(40):
     model.train()
     model.train_loop(train_loader, optimizer)
@@ -130,7 +138,7 @@ for epoch in range(40):
     df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
-    if no_imporve == 30:
+    if no_imporve == 15:
         break
     if f1 > best_f1:
         no_imporve = 0

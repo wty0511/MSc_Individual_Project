@@ -6,7 +6,7 @@ from src.models.ResNet import *
 from abc import abstractmethod
 from src.models.ConvNet import *
 from src.models.Transformer import *
-from src.models.backbone import ConvNetfw, ConvNetClassifierfw, SNNfw
+from src.models.backbone import  ConvNetClassifierfw, SNNfw,ConvNetfw_large
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 class BaseModel(nn.Module):
@@ -26,10 +26,14 @@ class BaseModel(nn.Module):
         #     self.feature_extractor  = ResNet2()
         elif config.train.backbone == 'convnet':
             self.feature_extractor = ConvNet()
+        elif config.train.backbone == 'convnetattetnion':
+            self.feature_extractor = ConvNetAttetnion()
         elif config.train.backbone == 'convnetlarge':
             self.feature_extractor = ConvNetLarge()
-        elif config.train.backbone == 'convnetfw':
-            self.feature_extractor = ConvNetfw()
+        # elif config.train.backbone == 'convnetfw':
+        #     self.feature_extractor = ConvNetfw()
+        elif config.train.backbone == 'convnetfwlarge':
+            self.feature_extractor = ConvNetfw_large()
         elif config.train.backbone == 'convclassifier':
             self.feature_extractor = ConvClassifier()
         elif config.train.backbone == 'transformer':

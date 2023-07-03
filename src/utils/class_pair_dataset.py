@@ -75,7 +75,7 @@ class ClassPairDataset(Dataset):
             self.length = int(0.03 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         else:
             # self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
-            self.length = 5000
+            self.length = 50000
             
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     

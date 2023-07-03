@@ -161,8 +161,8 @@ class ClassDataset(Dataset):
         array_list = np.concatenate(array_list, axis = 1)
         self.mean = np.mean(array_list)
         self.std = np.std(array_list)
-        print('mean', self.mean)
-        print('std', self.std)
+        # print('mean', self.mean)
+        # print('std', self.std)
         
     def process_labels(self, same_label):
         print("Processing labels...")

@@ -33,6 +33,7 @@ def train(train_loader, val_loader, config):
     print('start training...')
     print('seed everything...')
     set_seed(SEED)
+    no_imporve = 0
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if config.train.model_type == 'protonet':
@@ -52,8 +53,15 @@ def train(train_loader, val_loader, config):
     print('optimizer:', config.train.optimizer)
     best_acc = 0       
     model_dir = config.checkpoint.model_dir
-
-    for epoch in range(40):
+    config_dir = normalize_path(config.checkpoint.exp_dir)
+    config_dir = os.path.join(config_dir,'config.json')
+    print('config_dir:', config_dir)
+    if not os.path.exists(os.path.dirname(config_dir)):
+        os.makedirs(os.path.dirname(config_dir))
+    
+    with open(config_dir, 'w') as outfile:
+        json.dump( omegaconf.OmegaConf.to_container(config, resolve=True), outfile,indent=2)
+    for epoch in range(epoches):
         model.train()
         avg_loss = model.train_loop(train_loader,  optimizer)
         model.eval()
@@ -63,18 +71,14 @@ def train(train_loader, val_loader, config):
 
         df_all_time, best_res, best_threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
         acc = best_res['overall_scores']['fmeasure (percentage)']
-        
+        no_imporve += 1
         if acc > best_acc :
+            no_imporve = 0
             print("best model! save...")
             best_acc = acc
             save_file = os.path.join(model_dir, 'best_model.pth')
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config, 'threshold':best_threshold}, save_file)
-            config_dir = normalize_path(config.checkpoint.exp_dir)
-            if not os.path.exists(os.path.dirname(config_dir)):
-                os.makedirs(os.path.dirname(config_dir))
-            config_dir = os.path.join(config_dir,'config.json')
-            with open(config_dir, 'w') as outfile:
-                json.dump( omegaconf.OmegaConf.to_container(config, resolve=True), outfile)
+
             
             report_dir = normalize_path(config.checkpoint.report_dir)
             report_dir = os.path.join(report_dir,'val_report_best.json')
@@ -88,6 +92,9 @@ def train(train_loader, val_loader, config):
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':config}, save_file)
         print("Epoch [{}/{}], Train Loss: {:.4f},   Val F1: {:.4f}"
           .format(epoch+1, epoches, avg_loss, acc))
+        if no_imporve > 10:
+            print('early stop!')
+            break
     return model
 
     

@@ -33,6 +33,8 @@ class MAML(BaseModel):
         self.config = config
         self.approx = True
         self.test_loop_batch_size = config.val.test_loop_batch_size
+        self.test_loop_batch_size = 128
+        
         
     def inner_loop(self, support_data, support_label, mode = 'train'):
         fast_parameters = list(self.feature_extractor.parameters())
@@ -58,7 +60,7 @@ class MAML(BaseModel):
                 else:
                     weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                 fast_parameters.append(weight.fast) # update the fast_parameters
-            
+
         #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item()))
         # print('~~~~~~~~~~~')
         if mode != 'train':
@@ -114,6 +116,7 @@ class MAML(BaseModel):
     def outer_loop(self, data_loader, mode = 'train', opt = None):
         for i, task_batch in tqdm(enumerate(data_loader)):
             loss_all = []
+            acc_all = []
             self.feature_extractor.zero_grad()
             for task in task_batch:
                 if self.config.train.neg_prototype:
@@ -140,16 +143,18 @@ class MAML(BaseModel):
                 loss, report, acc = self.feed_forward(query_data , query_label, mode = 'train')
                 # print(report)
                 # print('~~~~')
+                # print(loss.item())
                 loss_all.append(loss)
                 opt.zero_grad()
-                
-            
+                # print(report)
+                acc_all.append(acc)
             loss_q = torch.stack(loss_all).sum(0)
             loss_q.backward()
             # for i in self.parameters():
             #     print(i.grad)
             opt.step()
             opt.zero_grad()
+            print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
             print('outer loop: loss:{:.3f}'.format(loss_q.item()))
 
     def train_loop(self, data_loader, optimizer):

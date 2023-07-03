@@ -71,6 +71,46 @@ class ConvNet(nn.Module):
         # x = nn.MaxPool2d(2)(x)
         x = x.view(x.size(0),-1)
         return x
+    
+class ConvNetAttetnion(nn.Module):
+    def __init__(self):
+        super(ConvNetAttetnion,self).__init__()
+        self.encoder = nn.Sequential(
+            conv_block(1,128),
+            conv_block(128,128),
+            conv_block(128,128),
+            conv_block(128,128,False),
+            # conv_block(64,64,False),
+                    
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
+        total_trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        self.conv1 = nn.Conv2d(128, 128, kernel_size=(1,1))
+        self.conv2 = nn.Conv2d(128, 128, kernel_size=(1,1))
+        self.activ = torch.nn.Sigmoid ()
+        print('total_trainable_params:', total_trainable_params)
+        # self.temperature_param = nn.Parameter(torch.tensor(1.0))
+    def forward(self,x):
+        
+        (num_samples,seq_len,mel_bins) = x.shape
+        x = x.view(-1,1,seq_len,mel_bins)
+        x = self.encoder(x)
+        # print('x_shape ',x.shape)
+        x = self.avgpool(x)       
+        
+        x1 = self.conv1(x)
+        x2 = self.conv2(x)
+        
+        x1 = self.activ(x1)
+        sums = torch.sum(x1, dim=-1, keepdim=True)
+        x1 = x1 / sums
+        x2 = x1 * x2
+        x2 = x2.view(x2.size(0),-1, x2.size(-1))
+        x2 = torch.sum(x2, dim=-1)
+        # x = x.view(x.size(0),-1)
+        return x2
+
+
 
 class ConvNetLarge(nn.Module):
     def __init__(self):
