@@ -34,7 +34,7 @@
     "model_type": "protonet",
     "epoches": 51,
     "lr": 0.001,
-    "lr_inner": 0.001,
+    "lr_inner": 0.01,
     "momentum": 0.9,
     "weight_decay": 0.0005,
     "optimizer": "Adam",
@@ -54,7 +54,7 @@
   "val": {
     "seg_len_base": 30,
     "hop_len_frac": 3,
-    "test_loop_batch_size": 128,
+    "test_loop_batch_size": 1024,
     "test_loop_neg_sample": 50,
     "threshold": 0.5
   },

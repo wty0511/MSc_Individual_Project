@@ -119,7 +119,7 @@ class ExperimentBuilder(object):
         #           y_target_set.shape)
 
         losses, _ = self.model.run_train_iter(data_batch=train_sample, epoch=epoch_idx)
-
+        # print(losses)
         for key, value in zip(list(losses.keys()), list(losses.values())):
             if key not in total_losses:
                 total_losses[key] = [float(value)]
@@ -314,9 +314,6 @@ class ExperimentBuilder(object):
                                    self.config.train.epoches),
                         current_iter=self.state['current_iter'],
                         sample_idx=self.state['current_iter'])
-
-
-                
                 
                 pred_df, best_res, threshold = self.evaluation_iteration(val_sample=self.data.get_test_batches(),
                                                                         total_losses=self.total_losses,

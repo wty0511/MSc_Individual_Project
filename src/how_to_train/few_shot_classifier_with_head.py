@@ -101,6 +101,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 1.0 / self.config.train.inner_step)
         # 每个epoch decay一次，decay_rate是一个step的权重，multi_step_loss_num_epochs 是使用MSL的epoch数
         decay_rate = 1.0 / self.config.train.inner_step / self.config.train.multi_step_loss_num_epochs
+        # print('decay_rate',decay_rate)
         min_value_for_non_final_losses = 0.03 / self.config.train.inner_step
         for i in range(len(loss_weights) - 1):
             # 除了最后一个step，其他step的loss权重都会decay，但是不能小于min_value_for_non_final_losses
@@ -132,7 +133,9 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 or self.config.train.enable_inner_loop_optimizable_bn_params
             )
         }
+        # print('inner loop params',params_dict.keys())
         return params_dict
+    
 
     def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
         """
@@ -328,7 +331,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
 
 
 
-    def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None):
+    def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None, mode = 'test'):
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
         :param data_batch: A data batch containing the support and target sets.
@@ -343,7 +346,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
         # x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
         # [b, ncs, spc] = y_support_set.shape
-
+        fix_shreshold = 0.5
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -548,7 +551,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                             raise ValueError('off_set_time is larger than query_end')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
@@ -709,6 +712,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
         :return: The losses of the ran iteration.
         """
         epoch = int(epoch)
+        # print('epoch', epoch)
         self.scheduler.step(epoch=epoch)
         if self.current_epoch != epoch:
             self.current_epoch = epoch

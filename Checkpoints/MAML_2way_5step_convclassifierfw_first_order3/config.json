@@ -34,7 +34,7 @@
     "model_type": "protonet",
     "epoches": 51,
     "lr": 0.001,
-    "lr_inner": 0.01,
+    "lr_inner": 0.001,
     "momentum": 0.9,
     "weight_decay": 0.0005,
     "optimizer": "Adam",

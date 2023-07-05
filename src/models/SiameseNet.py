@@ -27,7 +27,7 @@ class ContrastiveLoss(nn.Module):
         distances = euclidean_distance(output1, output2)
         losses = 0.5 * (1 - label) * torch.pow(distances, 2) + \
                  0.5 * label * torch.pow(torch.clamp(self.margin - distances, min=0.0), 2)
-        loss = torch.sum(losses)
+        loss = torch.mean(losses)
         return loss
     
     
@@ -36,7 +36,7 @@ class SNN(BaseModel):
         super(SNN, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = ContrastiveLoss(margin=10.0)
+        self.loss_fn = ContrastiveLoss(margin=1.5)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
         self.cosloss = nn.CosineEmbeddingLoss(margin= 0.95)
@@ -126,14 +126,26 @@ class SNN(BaseModel):
     #         print('!!!!!!!!!')
     #     return local_model 
     
+    # def euclidean_dist(self,query, support):
+    #     n = query.size(0)
+    #     m = support.size(0)
+        
+    #     query = query.unsqueeze(1).expand(n, m, -1)
+    #     support = support.unsqueeze(0).expand(n, m, -1)
+
+    #     return torch.pow(query - support, 2).sum(2)
+    
+        
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-        
+        query = F.normalize(query, dim=1)
+        support = F.normalize(support, dim=1)
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
 
-        return torch.pow(query - support, 2).sum(2)
+        return torch.sqrt(torch.pow(query - support, 2).sum(2))
+
 
     def cossim(self, query, support):
         cos_sim = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
@@ -143,64 +155,64 @@ class SNN(BaseModel):
         support = support.unsqueeze(0).expand(n, m, -1)
         return cos_sim(query, support)
 
-    def feed_forward(self, local_model, support_data, query_data):
-        # # Execute a model with given output layer weights and inputs
-        # support_feat = local_model(support_data)
-        # # nway 不是2nway要注意
-        # support_feat = self.split_1d(support_feat)
-        # prototype = support_feat.mean(0)
-        # query_feat = local_model(query_data)
-        # dists = self.euclidean_dist(query_feat, prototype)
+    # def feed_forward(self, local_model, support_data, query_data):
+    #     # # Execute a model with given output layer weights and inputs
+    #     # support_feat = local_model(support_data)
+    #     # # nway 不是2nway要注意
+    #     # support_feat = self.split_1d(support_feat)
+    #     # prototype = support_feat.mean(0)
+    #     # query_feat = local_model(query_data)
+    #     # dists = self.euclidean_dist(query_feat, prototype)
 
-        # scores = -dists
+    #     # scores = -dists
 
-        # preds = scores.argmax(dim=1)
-        # y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-        # acc = torch.eq(preds, y_query).float().mean()
+    #     # preds = scores.argmax(dim=1)
+    #     # y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
+    #     # acc = torch.eq(preds, y_query).float().mean()
 
         
-        # loss = self.ce(scores, y_query)
-        # y_query = y_query.cpu().numpy()
-        # preds = preds.detach().cpu().numpy()
-        # report = classification_report(y_query, preds,zero_division=0, digits=3)
-        # print(report)
-        loss = 0
-        for i in range(100):
-            label = random.randint(0, 1)
-            # same class
-            if label == 0:               
-                class1 = random.randint(0, self.n_way - 1)
-                indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
-                index1, index2 = random.sample(indices1, 2)
+    #     # loss = self.ce(scores, y_query)
+    #     # y_query = y_query.cpu().numpy()
+    #     # preds = preds.detach().cpu().numpy()
+    #     # report = classification_report(y_query, preds,zero_division=0, digits=3)
+    #     # print(report)
+    #     loss = 0
+    #     for i in range(100):
+    #         label = random.randint(0, 1)
+    #         # same class
+    #         if label == 0:               
+    #             class1 = random.randint(0, self.n_way - 1)
+    #             indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
+    #             index1, index2 = random.sample(indices1, 2)
 
-                sampl1 = query_data[index1]
-                sampl2 = query_data[index2]
+    #             sampl1 = query_data[index1]
+    #             sampl2 = query_data[index2]
 
-            else:
-                class1, class2 = random.sample(range(self.n_way), 2)
+    #         else:
+    #             class1, class2 = random.sample(range(self.n_way), 2)
                 
-                indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
-                indices2 = [i for i in range(len(query_data)) if i % self.n_way == class2]
+    #             indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
+    #             indices2 = [i for i in range(len(query_data)) if i % self.n_way == class2]
                 
-                # Randomly select two different indices
-                index1 = random.sample(indices1, 1)
-                index2 = random.sample(indices2, 1)
+    #             # Randomly select two different indices
+    #             index1 = random.sample(indices1, 1)
+    #             index2 = random.sample(indices2, 1)
                 
-                sampl1 = query_data[index1[0]]
-                sampl2 = query_data[index2[0]]
-            sampl1 = sampl1.unsqueeze(0)
-            sampl2 = sampl2.unsqueeze(0)
-            # print('label:{}'.format(label))
-            # print(sampl1.shape)
-            # print(sampl2.shape)
-            # print('~~~~~~~~~~~')
-            feat1 = local_model(sampl1)
-            feat2 = local_model(sampl2)
-            loss += self.loss_fn(feat1, feat2, label)
-        loss /= 100
-        report = None
-        acc = torch.tensor(0.0).to(self.device)
-        return loss, report, acc
+    #             sampl1 = query_data[index1[0]]
+    #             sampl2 = query_data[index2[0]]
+    #         sampl1 = sampl1.unsqueeze(0)
+    #         sampl2 = sampl2.unsqueeze(0)
+    #         # print('label:{}'.format(label))
+    #         # print(sampl1.shape)
+    #         # print(sampl2.shape)
+    #         # print('~~~~~~~~~~~')
+    #         feat1 = local_model(sampl1)
+    #         feat2 = local_model(sampl2)
+    #         loss += self.loss_fn(feat1, feat2, label)
+    #     loss /= 100
+    #     report = None
+    #     acc = torch.tensor(0.0).to(self.device)
+    #     return loss, report, acc
     
     
     def feed_forward_test(self, prototype, query_data):
@@ -233,6 +245,8 @@ class SNN(BaseModel):
             anchor_feat = self.feature_extractor(anchor)
             pos_feat = self.feature_extractor(pos)
             neg_feat = self.feature_extractor(neg)
+            pos_feat = F.normalize(pos_feat, dim=1)
+            neg_feat = F.normalize(neg_feat, dim=1)
             loss = self.loss_fn(anchor_feat, pos_feat, torch.zeros(anchor.shape[0]).to(self.device))
             loss = loss + self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor.shape[0]).to(self.device))
             # loss = self.cosloss(anchor_feat, pos_feat, torch.ones(anchor.shape[0]).to(self.device)) + self.cosloss(anchor_feat, neg_feat, -torch.ones(anchor.shape[0]).to(self.device))
@@ -240,7 +254,7 @@ class SNN(BaseModel):
             optimizer.step()
             print('loss:{:.3f}'.format(loss.item()))    
 
-    def test_loop(self, test_loader , fix_shreshold = None):
+    def test_loop(self, test_loader , fix_shreshold = None, mode = 'test'):
         all_prob = {}
         all_meta = {}
         for i, (pos_sup, neg_sup, query, seg_len, seg_hop, query_start, query_end, label) in enumerate(test_loader):
@@ -348,7 +362,7 @@ class SNN(BaseModel):
                 # print(all_meta[wav_file]['seg_hop'])
                 # print(all_meta[wav_file]['seg_len'])
                 # 输出分类报告
-
+                print(y_true.shape)
                 report_f1[os.path.basename(wav_file)] = classification_report(y_true, y_pred,zero_division=0, digits=5)
                 # 计算各个类别的F1分数
                 # f1_scores = f1_score(y_true, y_pred, average=None)
@@ -380,7 +394,7 @@ class SNN(BaseModel):
                         raise ValueError('off_set_time is larger than query_end')
 
             df_all_time = pd.DataFrame(all_time)
-            df_all_time = post_processing(df_all_time)
+            df_all_time = post_processing(df_all_time, self.config, mode)
             df_all_time = df_all_time.astype('str')
             pred_path = normalize_path(self.config.checkpoint.pred_dir)
             pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
@@ -409,14 +423,6 @@ class SNN(BaseModel):
     
     
     
-    
-    def euclidean_dist(self,query, support):
-        n = query.size(0)
-        m = support.size(0)
-        query = query.unsqueeze(1).expand(n, m, -1)
-        support = support.unsqueeze(0).expand(n, m, -1)
-
-        return torch.pow(query - support, 2).sum(2)
 
     
     # def euclidean_dist(self,query, support):

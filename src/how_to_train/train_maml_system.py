@@ -21,9 +21,9 @@ if not GlobalHydra().is_initialized():
 cfg = compose(config_name="config.yaml")
 
 # Combines the arguments, model, data and experiment builders to run an experiment
-# model = MAMLFewShotClassifier(cfg)
+model = MAMLFewShotClassifier(cfg)
 # model =TNNMAMLFewShotClassifier(cfg)
-model = MAMLFewShotClassifierWithHead(cfg)
+# model = MAMLFewShotClassifierWithHead(cfg)
 data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 maml_system.run_experiment()

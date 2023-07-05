@@ -48,7 +48,7 @@ class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 256)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-# model = SNN(cfg)
+model = SNN(cfg)
 # model =TriNet(cfg)
 # for param in model.parameters():
 #     param.fast = None

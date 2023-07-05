@@ -5,10 +5,11 @@ from src.models.ProtoMAML import *
 from src.models.ProtoMAML_temperature import *
 from src.models.MAML import *
 # from src.models.SiameseMAML import *
-from src.models.SiameseMAML_copy2 import *
+from src.models.SiameseMAML_copy import *
 from src.models.ProtoMAML_proxy import *
 # from src.models.SiameseMAML_sigmoid import *
 from src.models.ProtoMAML_query import *
+from src.models.MAML_proto import *
 from src.models.ProtoMAML_grad import *
 import os
 import sys
@@ -23,6 +24,7 @@ from hydra.core.global_hydra import GlobalHydra
 from src.utils.class_dataset import *
 from src.utils.file_dataset import *
 from src.training_pipeline import train
+from src.models.MAML2 import *
 # from src.models.TrinetMAML import *
 from src.models.ProtoMAMLfw import *
 from src.models.TrinetMAML_copy import *
@@ -45,7 +47,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'MAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
+model_name = 'MAML2'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
 
 if model_name == 'ProtoMAML':
     cfg = compose(config_name="config_protomaml.yaml")
@@ -62,15 +64,28 @@ elif model_name == 'ProtoMAML_grad':
 elif model_name == 'ProtoMAML_proxy':
     cfg = compose(config_name="config_protomaml_proxy.yaml")
     model = ProtoMAML_proxy(cfg)
-    
+
 elif model_name == 'MAML':
     cfg = compose(config_name="config_maml.yaml")
     model = MAML(cfg)
+
+elif model_name == 'MAML2':
+    cfg = compose(config_name="config_maml2.yaml")
+    model = MAML2(cfg)
+
+
+elif model_name == 'MAML_proto':
+    cfg = compose(config_name="config_maml_proto.yaml")
+    model = MAML_proto(cfg)
     
 elif model_name == 'TNNMAML':
     cfg = compose(config_name="config_mamltnn.yaml")
     model = TNNMAML(cfg)
 
+elif model_name == 'SNNMAML':
+    cfg = compose(config_name="config_mamlsnn.yaml")
+    model = SNNMAML(cfg)
+    
 print('preparing training dataset')
 train_dataset = ClassDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
 print(len(train_dataset))

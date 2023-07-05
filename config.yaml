@@ -29,7 +29,7 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 10
+  n_way: 2
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
@@ -37,7 +37,7 @@ train:
   model_type: protonet
   epoches: 51
   lr: 0.001
-  lr_inner: 0.01
+  lr_inner: 0.001
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
@@ -49,9 +49,9 @@ train:
   enable_inner_loop_optimizable_bn_params: False
   second_order: false
   use_multi_step_loss_optimization: False
-  learnable_bn_gamma: True
-  learnable_bn_beta: True
-  per_step_bn_statistics: True
+  learnable_bn_gamma: False
+  learnable_bn_beta: False
+  per_step_bn_statistics: False
   norm_layer: batch_norm
 
 val:

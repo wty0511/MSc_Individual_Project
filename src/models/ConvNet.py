@@ -270,26 +270,53 @@ class ConvClassifier(nn.Module):
     def __init__(self):
         super(ConvClassifier,self).__init__()
         self.encoder = nn.Sequential(
-            conv_block(1,64),
-            conv_block(64,64),
-            conv_block(64,64),
-            # conv_block(64,64)
+            conv_block(1,128),
+            conv_block(128,128),
+            conv_block(128,128),
+            conv_block(128,128,False)
         )
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
-        self.fc = nn.Conv2d(64, 2, kernel_size=(8,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
+        self.fc = nn.Linear(512, 2)
         
     def forward(self,x):
         (num_samples,seq_len,mel_bins) = x.shape
 
         x = x.view(-1,1,seq_len,mel_bins)
         x = self.encoder(x)
+
         # print('x_shape ',x.shape)
         x = self.avgpool(x)
+        x = x.view(x.size(0),-1)
+        # print(x.shape)
         # x = nn.MaxPool2d(2)(x)
         x = self.fc(x)
-        x = x.view(x.size(0),-1)
         
         return x
+
+# class ConvClassifier(nn.Module):
+#     def __init__(self):
+#         super(ConvClassifier,self).__init__()
+#         self.encoder = nn.Sequential(
+#             conv_block(1,64),
+#             conv_block(64,64),
+#             conv_block(64,64),
+#             # conv_block(64,64)
+#         )
+#         self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+#         self.fc = nn.Conv2d(64, 2, kernel_size=(8,1))
+        
+#     def forward(self,x):
+#         (num_samples,seq_len,mel_bins) = x.shape
+
+#         x = x.view(-1,1,seq_len,mel_bins)
+#         x = self.encoder(x)
+#         # print('x_shape ',x.shape)
+#         x = self.avgpool(x)
+#         # x = nn.MaxPool2d(2)(x)
+#         x = self.fc(x)
+#         x = x.view(x.size(0),-1)
+        
+#         return x
 
 class PretrainClassifier(nn.Module):
     def __init__(self):

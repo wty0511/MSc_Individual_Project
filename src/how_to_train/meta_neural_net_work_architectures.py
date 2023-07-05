@@ -381,7 +381,7 @@ class MetaConvNormLayerReLU(nn.Module):
 
             out = self.norm_layer(out, num_step=0)
 
-        out = F.leaky_relu(out)
+        out = F.relu(out)
 
         # print(out.shape)
 
@@ -425,7 +425,7 @@ class MetaConvNormLayerReLU(nn.Module):
                                           params=batch_norm_params, training=training,
                                           backup_running_statistics=backup_running_statistics)
 
-        out = F.leaky_relu(out)
+        out = F.relu(out)
 
         return out
 
@@ -491,7 +491,7 @@ class MetaNormLayerConvReLU(nn.Module):
                                     stride=self.stride, padding=self.padding, use_bias=self.use_bias)
 
 
-        self.layer_dict['activation_function_pre'] = nn.LeakyReLU()
+        self.layer_dict['activation_function_pre'] = nn.ReLU()
 
 
         out = self.layer_dict['activation_function_pre'].forward(self.conv.forward(out))
@@ -557,18 +557,18 @@ class Convnet(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.total_layers = 0
         self.upscale_shapes = []
-        self.cnn_filters = 64
+        self.cnn_filters = 128
         self.config = cfg
-        self.num_stages = 3
+        self.num_stages = 4
         self.conv_stride = 1
     
         self.meta_classifier = meta_classifier
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
         self.build_network()
         print("meta network params")
         for name, param in self.named_parameters():
             print(name, param.shape)
-
+        print("~~~~~~~~~~~~~")
     def build_network(self):
         """
         Builds the network before inference is required by creating some dummy inputs with the same input as the
@@ -592,8 +592,8 @@ class Convnet(nn.Module):
 
             out = self.layer_dict['conv{}'.format(i)](out, training=True, num_step=0)
 
-
-            out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
+            if i < 3:
+                out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
         # if not self.args.max_pooling:
         #     out = F.avg_pool2d(out, out.shape[2])
@@ -644,7 +644,9 @@ class Convnet(nn.Module):
                                                       backup_running_statistics=backup_running_statistics,
                                                       num_step=num_step)
             
-            out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
+
+            if i < 3:
+                out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
         # if not self.args.max_pooling:
         #     out = F.avg_pool2d(out, out.shape[2])
@@ -652,6 +654,7 @@ class Convnet(nn.Module):
         out = self.avgpool(out)
         out = out.view(out.size(0), -1)
         # out = self.layer_dict['linear'](out, param_dict['linear'])
+        # print(out.shape)
         if output_features:
             return out, features
         else:
@@ -675,6 +678,7 @@ class Convnet(nn.Module):
                             param.grad.zero_()
         else:
             for name, param in params.items():
+                # print(name)
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
@@ -700,13 +704,13 @@ class ConvnetClassifier(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.total_layers = 0
         self.upscale_shapes = []
-        self.cnn_filters = 64
+        self.cnn_filters = 128
         self.config = cfg
-        self.num_stages = 3
+        self.num_stages = 4
         self.conv_stride = 1
     
         self.meta_classifier = meta_classifier
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
         self.num_output_classes = 2
         self.build_network()
         print("meta network params")
@@ -738,7 +742,9 @@ class ConvnetClassifier(nn.Module):
             out = self.layer_dict['conv{}'.format(i)](out, training=True, num_step=0)
 
 
-            out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
+
+            if i < 3:
+                out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
         # if not self.args.max_pooling:
         #     out = F.avg_pool2d(out, out.shape[2])
@@ -789,8 +795,10 @@ class ConvnetClassifier(nn.Module):
                                                       backup_running_statistics=backup_running_statistics,
                                                       num_step=num_step)
             
-            out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
+            if i < 3:
+                out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
+                
         # if not self.args.max_pooling:
         #     out = F.avg_pool2d(out, out.shape[2])
         features = out
@@ -820,6 +828,8 @@ class ConvnetClassifier(nn.Module):
                             param.grad.zero_()
         else:
             for name, param in params.items():
+                # print(name)
+                # print(param.is_leaf)
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:

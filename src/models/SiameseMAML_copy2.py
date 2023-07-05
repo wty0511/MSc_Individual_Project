@@ -90,14 +90,17 @@ class SNNMAML(BaseModel):
             print('!!!!!!!!!')
         return 
      
+    
+        
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-        
+        query = F.normalize(query, dim=1)
+        support = F.normalize(support, dim=1)
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
 
-        return torch.pow(query - support, 2).sum(2)
+        return torch.sqrt(torch.pow(query - support, 2).sum(2))
 
 
     def feed_forward(self, support_data, query_data):

@@ -13,10 +13,10 @@ from sklearn.metrics import classification_report, f1_score
 from src.evaluation_metrics.evaluation import *
 from src.utils.post_processing import *
 from copy import deepcopy
-from src.how_to_train.meta_optimizer import LSLRGradientDescentLearningRule
+from src.how_to_train.meta_optimizer import LSLRGradientDescentLearningRule, GradientDescentLearningRule
 from src.how_to_train.meta_neural_net_work_architectures import Convnet
 from src.utils.class_pair_dataset import *
-
+from src.models.triplet_loss import TripletLoss
 # def set_torch_seed(seed):
 #     """
 #     Sets the pytorch seeds for current experiment run
@@ -30,22 +30,22 @@ from src.utils.class_pair_dataset import *
 #     return rng
 
 
-class TripletLoss(nn.Module):
-    def __init__(self, margin=1.0):
-        super(TripletLoss, self).__init__()
-        self.margin = margin
+# class TripletLoss(nn.Module):
+#     def __init__(self, margin=1.0):
+#         super(TripletLoss, self).__init__()
+#         self.margin = margin
 
-    def forward(self, anchor, positive, negative):
-        # print(anchor.shape)
-        # print(positive.shape)
-        # print(negative.shape)
-        distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
-        # print(distance_positive)
-        distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
-        # print(distance_negative)
-        # print('~~~~~~~~~~~~~')
-        losses = F.relu(distance_positive - distance_negative + self.margin)
-        return losses.mean()
+#     def forward(self, anchor, positive, negative):
+#         # print(anchor.shape)
+#         # print(positive.shape)
+#         # print(negative.shape)
+#         distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
+#         # print(distance_positive)
+#         distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
+#         # print(distance_negative)
+#         # print('~~~~~~~~~~~~~')
+#         losses = F.relu(distance_positive - distance_negative + self.margin)
+#         return losses.mean()
 
 
     
@@ -59,7 +59,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         """
         super(TNNMAMLFewShotClassifier, self).__init__()
         self.config = cfg
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
+        self.device = 'cuda'
         self.batch_size = cfg.train.task_batch_size
         self.use_cuda = True
         self.current_epoch = 0
@@ -67,6 +67,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         self.classifier = Convnet(cfg = cfg, meta_classifier=True).to(device=self.device)
         self.task_learning_rate = cfg.train.lr_inner
         self.n_way = cfg.train.n_way
+        self.ce = nn.CrossEntropyLoss()
         self.n_support = cfg.train.n_support
         self.n_query = cfg.train.n_query
         # 可训练的模块类似于META SGD
@@ -74,15 +75,19 @@ class TNNMAMLFewShotClassifier(nn.Module):
         # params_head = self.classifier_head.named_parameters()
         params_classifier = self.classifier.named_parameters()
         # all_params = itertools.chain(params_head, params_classifier)
-        self.loss_fn = TripletLoss(margin=1)
-        self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
-                                                                    init_learning_rate=self.task_learning_rate,
-                                                                    total_num_inner_loop_steps= cfg.train.inner_step,
-                                                                    use_learnable_learning_rates= True)
+        self.loss_fn = TripletLoss(margin= 0.2)
+        # self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
+        #                                                             init_learning_rate=self.task_learning_rate,
+        #                                                             total_num_inner_loop_steps= cfg.train.inner_step,
+        #                                                             use_learnable_learning_rates= True)
         self.sr = cfg.features.sr
         self.fps = self.sr / cfg.features.hop_length
-        self.inner_loop_optimizer.initialise(
-            names_weights_dict=self.get_inner_loop_parameter_dict(params= params_classifier))
+        # print(self.config)
+        # self.inner_loop_optimizer.initialise(
+        #     names_weights_dict=self.get_inner_loop_parameter_dict(params= params_classifier))
+        
+        self.inner_loop_optimizer = GradientDescentLearningRule(device=self.device, learning_rate=self.task_learning_rate)
+        
         # self.inner_loop_optimizer.initialise(
             # names_weights_dict=self.get_inner_loop_parameter_dict(params=self.named_parameters()))
         # print("Inner Loop parameters")
@@ -313,20 +318,20 @@ class TNNMAMLFewShotClassifier(nn.Module):
                 # print('first layer after update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                 # print('~~~~')
                 if use_multi_step_loss_optimization and training_phase and epoch < self.config.train.multi_step_loss_num_epochs:
-                    target_loss = self.net_forward(x=query_data,
+                    target_loss, acc = self.net_forward_target(x=query_data,
                                                                  y=query_label, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
-                
+                    total_accuracies.append(acc)
                 elif num_step == (self.config.train.inner_step - 1):
-                    target_loss = self.net_forward(x=query_data,
+                    target_loss, acc = self.net_forward_target(x=query_data,
                                                                  y=query_label, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
                     task_losses.append(target_loss)
-                
+                    total_accuracies.append(acc)
             # print('end inner loop')
 
 
@@ -338,7 +343,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
-
+        print(losses)
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
 
@@ -347,14 +352,17 @@ class TNNMAMLFewShotClassifier(nn.Module):
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
+        query = F.normalize(query, dim=1)
+        support = F.normalize(support, dim=1)
         
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
 
-        return torch.pow(query - support, 2).sum(2)
+        return torch.sqrt(torch.pow(query - support, 2).sum(2))
 
 
-    def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None):
+    def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None, mode ='test'):
+        fix_shreshold = 0.5
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
         :param data_batch: A data batch containing the support and target sets.
@@ -398,19 +406,19 @@ class TNNMAMLFewShotClassifier(nn.Module):
 
                 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
-                    # if neg_sup[1].shape[0] > test_loop_neg_sample:
-                    #     neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
-                    #     neg_seg_sample = neg_sup[1][neg_indices]
-                    # else:
-                    #     neg_seg_sample = neg_sup[1]
+                    if neg_sup[1].shape[0] > test_loop_neg_sample:
+                        neg_indices = torch.randperm(neg_sup[1].shape[0])[:test_loop_neg_sample]
+                        neg_seg_sample = neg_sup[1][neg_indices]
+                    else:
+                        neg_seg_sample = neg_sup[1]
                     neg_seg_sample = neg_sup[1]
 
-                    neg_seg_sample_index = self.get_topk_sim(pos_data, neg_seg_sample)
-                    neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
+                    # neg_seg_sample_index = self.get_topk_sim(pos_data, neg_seg_sample)
+                    # neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
                     self.num_classes_per_set = self.config.train.n_way
 
                     total_losses = []
@@ -460,7 +468,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                                                                         current_step_idx=num_step)
                         # print(names_weights_copy['weight'])
                         # print('~~~~')
-                        print(support_loss)
+                        # print(support_loss)
 
                     pos_feat  = []
                     for batch in pos_loader:
@@ -575,7 +583,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                             raise ValueError('off_set_time is larger than query_end')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
@@ -651,32 +659,95 @@ class TNNMAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
-        y = y.cpu().numpy()
-        sampler = IntClassSampler(self.config, y, 100, test)
-        dataset =  PairDataset(self.config, x, y, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
-        loss = torch.tensor(0.0).to(self.device)
-        for batch in dataloader:
-            for i in range(1):
-                data, lable = batch
-                anchor, pos, neg = data
-                anchor_feat = self.classifier.forward(x=anchor, params=weights,
+        # y = y.cpu().numpy()
+        # sampler = IntClassSampler(self.config, y, 100, test)
+        # dataset =  PairDataset(self.config, x, y, debug = False)
+        # dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        # loss = torch.tensor(0.0).to(self.device)
+        # for batch in dataloader:
+        #     for i in range(1):
+        #         data, lable = batch
+        #         anchor, pos, neg = data
+        #         anchor_feat = self.classifier.forward(x=anchor, params=weights,
+        #                                 training=training,
+        #                                 backup_running_statistics=backup_running_statistics, num_step=num_step)
+                
+        #         pos_feat = self.classifier.forward(x=pos, params=weights,
+        #                                 training=training,
+        #                                 backup_running_statistics=backup_running_statistics, num_step=num_step)
+                
+        #         neg_feat = self.classifier.forward(x=neg, params=weights,
+        #                                 training=training,
+        #                                 backup_running_statistics=backup_running_statistics, num_step=num_step)
+                
+        #         loss += self.loss_fn(anchor_feat, pos_feat, neg_feat)
+        out_put = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
-                
-                pos_feat = self.classifier.forward(x=pos, params=weights,
-                                        training=training,
-                                        backup_running_statistics=backup_running_statistics, num_step=num_step)
-                
-                neg_feat = self.classifier.forward(x=neg, params=weights,
-                                        training=training,
-                                        backup_running_statistics=backup_running_statistics, num_step=num_step)
-                
-                loss += self.loss_fn(anchor_feat, pos_feat, neg_feat)
-
-
+        feat = F.normalize(out_put, dim=1)
+        loss = self.loss_fn(feat, y)
+        
         return loss
+    
+    
+    def net_forward_target(self, x, y, weights, backup_running_statistics, training, num_step, test = False):
+        """
+        A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
+        boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
+        A flag indicating whether this is the training session and an int indicating the current step's number in the
+        inner loop.
+        :param x: A data batch of shape b, c, h, w
+        :param y: A data targets batch of shape b, n_classes
+        :param weights: A dictionary containing the weights to pass to the network.
+        :param backup_running_statistics: A flag indicating whether to reset the batch norm running statistics to their
+         previous values after the run (only for evaluation)
+        :param training: A flag indicating whether the current process phase is a training or evaluation.
+        :param num_step: An integer indicating the number of the step in the inner loop.
+        :return: the crossentropy losses with respect to the given y, the predictions of the base model.
+        """
+        # y = y.cpu().numpy()
+        # sampler = IntClassSampler(self.config, y, 100, test)
+        # dataset =  PairDataset(self.config, x, y, debug = False)
+        # dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        # loss = torch.tensor(0.0).to(self.device)
+        # for batch in dataloader:
+        #     for i in range(1):
+        #         data, lable = batch
+        #         anchor, pos, neg = data
+        #         anchor_feat = self.classifier.forward(x=anchor, params=weights,
+        #                                 training=training,
+        #                                 backup_running_statistics=backup_running_statistics, num_step=num_step)
+                
+        #         pos_feat = self.classifier.forward(x=pos, params=weights,
+        #                                 training=training,
+        #                                 backup_running_statistics=backup_running_statistics, num_step=num_step)
+                
+        #         neg_feat = self.classifier.forward(x=neg, params=weights,
+        #                                 training=training,
+        #                                 backup_running_statistics=backup_running_statistics, num_step=num_step)
+                
+        #         loss += self.loss_fn(anchor_feat, pos_feat, neg_feat)
+        
+        out_put = self.classifier.forward(x=x, params=weights,
+                                        training=training,
+                                        backup_running_statistics=backup_running_statistics, num_step=num_step)
 
+
+        unique_y = torch.unique(y)
+        # print(unique_y)
+        prototype = [torch.mean(out_put[y == label], dim=0) for label in unique_y]
+        prototype = torch.stack(prototype)
+        # print(prototype.shape)
+        # print(out_put.shape)
+        dist = self.euclidean_dist(out_put, prototype)
+        score = -dist
+        # print(dist.shape)
+        acc = (torch.sum(torch.argmax(score, dim=1) == y).float() / y.size(0)).item()
+        print(F.softmax(score, dim = 1))
+        
+        loss = self.ce(score, y)
+        return loss, acc
+        
     def trainable_parameters(self):
         """
         Returns an iterator over the trainable parameters of the model.

@@ -42,7 +42,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.batch_size = cfg.train.task_batch_size
         self.use_cuda = True
         self.current_epoch = 0
-        self.classifier_head = nn.Linear(512, cfg.train.n_way).to(device=self.device)
+        # self.classifier_head = nn.Linear(512, cfg.train.n_way).to(device=self.device)
         self.classifier = Convnet(cfg = cfg, meta_classifier=True).to(device=self.device)
         self.task_learning_rate = cfg.train.lr_inner
         self.n_way = cfg.train.n_way
@@ -50,17 +50,23 @@ class MAMLFewShotClassifier(nn.Module):
         self.n_query = cfg.train.n_query
         # 可训练的模块类似于META SGD
         self.test_loop_batch_size = cfg.val.test_loop_batch_size
-        params_head = self.classifier_head.named_parameters()
-        params_classifier = self.classifier.named_parameters()
-        all_params = itertools.chain(params_head, params_classifier)
+        # params_head = self.classifier_head.named_parameters()
+        # params_classifier = self.classifier.named_parameters()
+        output_weight = torch.zeros(self.n_way, 512).to(device=self.device).requires_grad_()
+        output_bias = torch.zeros(self.n_way).to(device=self.device).requires_grad_()
+        params_head = {'weight': output_weight, 'bias': output_bias}.items()
+        all_params = itertools.chain(self.classifier.named_parameters(), params_head)
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps= cfg.train.inner_step,
                                                                     use_learnable_learning_rates= True)
         self.sr = cfg.features.sr
         self.fps = self.sr / cfg.features.hop_length
+        
+        t = self.get_inner_loop_parameter_dict(params= all_params)
+        # print(t.keys())
         self.inner_loop_optimizer.initialise(
-            names_weights_dict=self.get_inner_loop_parameter_dict(params= all_params))
+            names_weights_dict=t)
         # self.inner_loop_optimizer.initialise(
             # names_weights_dict=self.get_inner_loop_parameter_dict(params=self.named_parameters()))
         # print("Inner Loop parameters")
@@ -122,16 +128,29 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary of the parameters to use for the inner loop optimization process.
         """
         # 必须是可以计算梯度的参数，如果bn层的参数不可训练，那么就不会被加入到inner loop的参数中
-        params_dict = {
-            name: param.to(device=self.device)
-            for name, param in params
-            if param.requires_grad
-            and (
+        params_dict = {}
+         
+        for name, param in params:
+            if param.requires_grad and (
                 not self.config.train.enable_inner_loop_optimizable_bn_params
                 and "norm_layer" not in name
                 or self.config.train.enable_inner_loop_optimizable_bn_params
-            )
-        }
+            ):
+                params_dict[name] = param.to(device=self.device)
+                
+            
+        # params_dict = {
+        #     name: param.to(device=self.device)
+        #     for name, param in params
+        #     if param.requires_grad
+        #     and (
+        #         not self.config.train.enable_inner_loop_optimizable_bn_params
+        #         and "norm_layer" not in name
+        #         or self.config.train.enable_inner_loop_optimizable_bn_params
+        #     )
+        # }
+        # print('inner loop params', params.keys())
+        # print('inner loop params', params_dict.keys())
         return params_dict
 
     def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
@@ -147,7 +166,7 @@ class MAMLFewShotClassifier(nn.Module):
         # for name, param in names_weights_copy.items():
         #     print(name, param.grad_fn)
         self.classifier.zero_grad(params=names_weights_copy)
-        self.classifier_head.zero_grad()
+        # self.classifier_head.zero_grad()
         # print(names_weights_copy.keys())
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=False)
@@ -157,13 +176,13 @@ class MAMLFewShotClassifier(nn.Module):
         # names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
 
         # for key, grad in names_grads_copy.items():
-        #     if grad is None:
-        #         print('Grads not found for inner loop parameter', key)
-        #     # print('grad_shape',names_grads_copy[key].shape)
-        #     names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
-        #     print('grad_shape',names_grads_copy[key].shape)
-        #     print('weight_shape',names_weights_copy[key].shape)
-
+        #     print(key)
+        #     print(grad.shape)
+        
+        # for key, grad in names_weights_copy.items():
+        #     print(key)
+        #     print(grad.shape)
+        
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
                                                                      num_step=current_step_idx)
@@ -328,7 +347,7 @@ class MAMLFewShotClassifier(nn.Module):
 
 
 
-    def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None):
+    def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None, mode = 'test'):
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
         :param data_batch: A data batch containing the support and target sets.
@@ -343,7 +362,7 @@ class MAMLFewShotClassifier(nn.Module):
         # x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
         # [b, ncs, spc] = y_support_set.shape
-
+        fix_shreshold = 0.5
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -404,6 +423,7 @@ class MAMLFewShotClassifier(nn.Module):
                     total_accuracies = []
                     per_task_target_preds = [[] for i in range(len(data_batch))]
                     self.classifier.zero_grad()
+                    print('~~~~')
                     task_accuracies = []
                     # for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
                     #                       y_support_set,
@@ -419,9 +439,9 @@ class MAMLFewShotClassifier(nn.Module):
                     init_bias = -torch.norm(prototypes, dim=1)**2
                     output_weight = init_weight.detach().requires_grad_()
                     output_bias = init_bias.detach().requires_grad_()
-                    self.classifier_head = nn.Linear(512, 2).to(device=self.device)
-                    self.classifier_head.weight = nn.Parameter(output_weight)
-                    self.classifier_head.bias = nn.Parameter(output_bias)
+                    # self.classifier_head = nn.Linear(512, 2).to(device=self.device)
+                    # self.classifier_head.weight = nn.Parameter(output_weight)
+                    # self.classifier_head.bias = nn.Parameter(output_bias)
                     task_losses = []
                     support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
                     # support_data = pos_data
@@ -465,7 +485,7 @@ class MAMLFewShotClassifier(nn.Module):
                         preds = F.softmax(preds, dim = 1)
                         preds = preds.argmax(dim=1).detach().cpu().numpy()
     
-                        print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=5))
+                        print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=3))
                         
                         
                     with torch.no_grad():
@@ -548,7 +568,7 @@ class MAMLFewShotClassifier(nn.Module):
                             raise ValueError('off_set_time is larger than query_end')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
@@ -636,7 +656,7 @@ class MAMLFewShotClassifier(nn.Module):
         neg_num = x[(y == 1)].shape[0]
         
         if test:
-            weights = torch.cat((torch.full((1,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((1,), max(neg_num/pos_num, 1), dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(input=preds, target=y,weight=weights)
         else:
             preds = preds
@@ -648,9 +668,9 @@ class MAMLFewShotClassifier(nn.Module):
         """
         Returns an iterator over the trainable parameters of the model.
         """
-        head_name = [name for name in self.classifier_head.named_parameters()]
+        # head_name = [name for name in self.classifier_head.named_parameters()]
         for name, param in self.named_parameters():
-            if param.requires_grad and name not in head_name:
+            if param.requires_grad:
                 yield param
 
     def train_forward_prop(self, data_batch, epoch):
@@ -709,7 +729,7 @@ class MAMLFewShotClassifier(nn.Module):
         :return: The losses of the ran iteration.
         """
         epoch = int(epoch)
-        self.scheduler.step(epoch=epoch)
+        
         if self.current_epoch != epoch:
             self.current_epoch = epoch
 
@@ -729,8 +749,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.meta_update(loss=losses['loss'])
         losses['learning_rate'] = self.scheduler.get_lr()[0]
+        self.scheduler.step(epoch=epoch)
         self.optimizer.zero_grad()
-        self.zero_grad()
+        # self.zero_grad()
 
         return losses, per_task_target_preds
 

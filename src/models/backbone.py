@@ -8,6 +8,7 @@ import math
 import numpy as np
 import torch.nn.functional as F
 from torch.nn.utils.weight_norm import WeightNorm
+from torch.nn import init
 
 def init_layer(L):
     # Initialization using fan-in
@@ -83,6 +84,8 @@ class ConvBlock(nn.Module):
         self.relu   = nn.ReLU(inplace=True)
 
         self.parametrized_layers = [self.C, self.BN, self.relu]
+        # self.parametrized_layers = [self.C,  self.relu]
+        
         if pool:
             self.pool   = nn.MaxPool2d(2)
             self.parametrized_layers.append(self.pool)
@@ -103,6 +106,11 @@ class ConvNetClassifierfw(nn.Module):
         super(ConvNetClassifierfw,self).__init__()
         self.conv = ConvNetfw_large(depth = 4)
         self.fc = Linear_fw(512, 2)
+        # init.xavier_uniform_(self.fc.weight)
+
+        # print(self.fc.weight.data)
+        # print(self.fc.bias.data)
+        self.fc.bias.data.fill_(0)
         # print('weight',self.fc.bias.data)
         
     def forward(self,x):
@@ -110,6 +118,28 @@ class ConvNetClassifierfw(nn.Module):
         # print('out',out.shape)
         out = self.fc(out)
         return out
+    
+    
+
+
+class ConvNetClassifierSmallfw(nn.Module):
+    def __init__(self, depth = 3):
+        super(ConvNetClassifierSmallfw,self).__init__()
+        self.conv = ConvNetfw_small(depth = 3)
+        self.fc = Linear_fw(512, 2)
+        # init.xavier_uniform_(self.fc.weight)
+
+        # print(self.fc.weight.data)
+        # print(self.fc.bias.data)
+        self.fc.bias.data.fill_(0)
+        # print('weight',self.fc.bias.data)
+        
+    def forward(self,x):
+        out = self.conv(x)
+        # print('out',out.shape)
+        out = self.fc(out)
+        return out
+    
 
 
 class ConvNetfw_large(nn.Module):
@@ -131,6 +161,30 @@ class ConvNetfw_large(nn.Module):
         out = self.avgpool(out)
         out = out.view(x.size(0),-1)
         return out
+    
+
+
+class ConvNetfw_small(nn.Module):
+    def __init__(self, depth = 3):
+        super(ConvNetfw_small,self).__init__()
+        trunk = []
+        for i in range(depth):
+            indim = 1 if i == 0 else 64
+            outdim = 64
+            B = ConvBlock(indim, outdim, pool = ( i < 3 ) ) #only pooling for fist 4 layers
+            trunk.append(B)
+        self.trunk = nn.Sequential(*trunk)
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+    def forward(self,x):
+
+        (num_samples,seq_len,mel_bins) = x.shape
+        x = x.view(-1,1,seq_len,mel_bins)
+        out = self.trunk(x)
+        out = self.avgpool(out)
+        out = out.view(x.size(0),-1)
+        return out
+    
+
     
 # class ConvNetfw(nn.Module):
 #     def __init__(self, depth = 3):

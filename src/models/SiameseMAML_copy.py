@@ -16,6 +16,8 @@ from sklearn.metrics import classification_report, f1_score
 from src.utils.post_processing import *
 from src.evaluation_metrics.evaluation_confidence_intervals import *
 from src.utils.class_pair_dataset import *
+from pytorch_metric_learning import losses
+
 from copy import deepcopy
 import random
 import torch.optim as optim
@@ -40,7 +42,8 @@ class SNNMAML(BaseModel):
         super(SNNMAML, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = ContrastiveLoss(margin = 10.0)
+        self.loss_fn = ContrastiveLoss(margin = 1)
+        # self.loss_fn = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
@@ -50,17 +53,21 @@ class SNNMAML(BaseModel):
             weight.fast = None
         self.feature_extractor.zero_grad()
         
-        sampler = IntClassSampler(self.config, support_label, 500)
+        sampler = IntClassSampler(self.config, support_label, 100)
         dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 10)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 100)
         # self.config.train.lr_inner = 0.01
-        for i in range(1):
+        for i in range(5):
             for batch in dataloader:
                 data, lable = batch
                 anchor, pos, neg = data
                 anchor_feat = self.feature_extractor(anchor)
                 pos_feat = self.feature_extractor(pos)
                 neg_feat = self.feature_extractor(neg)
+                anchor = F.normalize(anchor_feat, dim=1)
+                pos_feat = F.normalize(pos_feat, dim=1)
+                neg_feat = F.normalize(neg_feat, dim=1)
+                
                 loss = self.loss_fn(anchor_feat, pos_feat, torch.zeros(anchor_feat.shape[0]).long().to(self.device))
                 # print('inner loop: loss:{:.3f}'.format(loss.item()))
                 loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
@@ -78,7 +85,9 @@ class SNNMAML(BaseModel):
                         weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                     fast_parameters.append(weight.fast) # update the fast_parameters
                 loss = loss.detach()
+                # print(loss)
                 # print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+
         # print('~~~~~~~~~~~~~~~')
         # loss = torch.stack(losses, dim=0).mean()
         # print('inner loop: loss:{:.3f}'.format(loss.item()))
@@ -147,11 +156,12 @@ class SNNMAML(BaseModel):
     def euclidean_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
-        
+        query = F.normalize(query, dim=1)
+        support = F.normalize(support, dim=1)
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
 
-        return torch.pow(query - support, 2).sum(2)
+        return torch.sqrt(torch.pow(query - support, 2).sum(2))
 
 
     def feed_forward(self, support_data, query_data):
@@ -168,9 +178,10 @@ class SNNMAML(BaseModel):
         preds = scores.argmax(dim=1)
         y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
         acc = torch.eq(preds, y_query).float().mean()
-
+        # print(acc)
         
         loss = self.ce(scores, y_query)
+        
         y_query = y_query.cpu().numpy()
         preds = preds.detach().cpu().numpy()
         report = classification_report(y_query, preds,zero_division=0, digits=3)
@@ -257,7 +268,7 @@ class SNNMAML(BaseModel):
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)
     
     
-    def test_loop(self, test_loader ,fix_shreshold= None):
+    def test_loop(self, test_loader ,fix_shreshold= None, mode = 'test'):
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -289,7 +300,7 @@ class SNNMAML(BaseModel):
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     
@@ -400,7 +411,7 @@ class SNNMAML(BaseModel):
                             raise ValueError('off_set_time is larger than query_end')
                 
                 df_all_time = pd.DataFrame(all_time)
-                df_all_time = post_processing(df_all_time)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
@@ -433,14 +444,6 @@ class SNNMAML(BaseModel):
     
     
     
-    
-    def euclidean_dist(self,query, support):
-        n = query.size(0)
-        m = support.size(0)
-        query = query.unsqueeze(1).expand(n, m, -1)
-        support = support.unsqueeze(0).expand(n, m, -1)
-
-        return torch.pow(query - support, 2).sum(2)
 
     
     # def euclidean_dist(self,query, support):

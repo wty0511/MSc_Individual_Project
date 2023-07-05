@@ -24,7 +24,7 @@ import h5py
 from pytorch_metric_learning import  losses,reducers
 
 from pytorch_metric_learning.distances import LpDistance
-
+from src.models.triplet_loss import *
 
 class ContrastiveLoss(nn.Module):
     def __init__(self, margin):
@@ -42,22 +42,22 @@ class ContrastiveLoss(nn.Module):
 
 
 
-class TripletLoss(nn.Module):
-    def __init__(self, margin=1.0):
-        super(TripletLoss, self).__init__()
-        self.margin = margin
+# class TripletLoss(nn.Module):
+#     def __init__(self, margin=1.0):
+#         super(TripletLoss, self).__init__()
+#         self.margin = margin
 
-    def forward(self, anchor, positive, negative):
-        # print(anchor.shape)
-        # print(positive.shape)
-        # print(negative.shape)
-        distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
-        # print(distance_positive)
-        distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
-        # print(distance_negative)
-        # print('~~~~~~~~~~~~~')
-        losses = F.relu(distance_positive - distance_negative + self.margin)
-        return losses.mean()
+#     def forward(self, anchor, positive, negative):
+#         # print(anchor.shape)
+#         # print(positive.shape)
+#         # print(negative.shape)
+#         distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
+#         # print(distance_positive)
+#         distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
+#         # print(distance_negative)
+#         # print('~~~~~~~~~~~~~')
+#         losses = F.relu(distance_positive - distance_negative + self.margin)
+#         return losses.mean()
 
 
     
@@ -67,23 +67,26 @@ class TNNMAML(BaseModel):
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
         # self.loss_fn = TripletLoss(margin=0.1)
-        self.loss_fn = losses.TripletMarginLoss(margin=0.2,
-                        swap=False,
-                        smooth_loss=False,
-                        triplets_per_anchor= 'all',
-                        distance = LpDistance(normalize_embeddings=True, p=2, power=2))
-
+        # self.loss_fn = losses.TripletMarginLoss(margin=0.2,
+        #                 swap=False,
+        #                 smooth_loss=False,
+        #                 triplets_per_anchor= 10,
+        #                 distance = LpDistance(normalize_embeddings=True, p=2, power=2))
+        self.loss_fn = TripletLoss(margin=0.2)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
-        # self.config.train.lr_inner = 0.1
+        
+        self.config.train.lr_inner = 0.01
         fast_parameters = list(self.feature_extractor.parameters())
         for weight in self.feature_extractor.parameters():
             weight.fast = None
         self.feature_extractor.zero_grad()
         support_label = torch.from_numpy(support_label).long().to(self.device)
-        for i in range(15):
-            loss = self.loss_fn(self.feature_extractor(support_data), support_label)
+        for i in range(self.config.train.inner_step):
+            
+            feat = F.normalize(self.feature_extractor(support_data), dim=1)
+            loss = self.loss_fn(feat, support_label)
             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
             if self.approx:
                 grad = [ g.detach()  for g in grad ]
@@ -98,6 +101,7 @@ class TNNMAML(BaseModel):
                 fast_parameters.append(weight.fast) # update the fast_parameters
                 # print(len(fast_parameters))
             loss = loss.detach()
+            # print('inner loop: loss:{:.3f}'.format(loss.item()))
                 # print('inner loop: loss:{:.3f}'.format(loss.item()))
         # print('inner loop: loss:{:.3f}'.format(loss.item()))
         
@@ -207,7 +211,7 @@ class TNNMAML(BaseModel):
             #         print(name, param.grad)
             opt.step()
             opt.zero_grad()
-            print('outer loop: loss:{:.3f}'.format(loss_q.item()))
+            print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
     def train_loop(self, data_loader, optimizer):
         
         self.outer_loop(data_loader, mode = 'train', opt = optimizer)

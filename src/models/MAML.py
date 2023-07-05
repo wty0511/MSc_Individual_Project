@@ -65,7 +65,7 @@ class MAML(BaseModel):
         # print('~~~~~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
-            print(preds)
+            # print(preds)
         if mode != 'train':    
             print('!!!!!!!!!')
         return
@@ -89,6 +89,7 @@ class MAML(BaseModel):
         #     weights = torch.cat((torch.full((half_size,), 3, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
         #     loss = F.cross_entropy(preds, labels, weight=weights)
         # else:
+        # preds = preds * 2.0
         pos_num = preds[(labels == 0)].shape[0]
         neg_num = preds[(labels == 1)].shape[0]
         
@@ -97,7 +98,7 @@ class MAML(BaseModel):
         else:
             loss = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 1), 1.0]).to(self.device))
 
-
+        # print(F.softmax(preds, dim = 1))
         acc = (preds.argmax(dim=1) == labels).float()
         labels = labels.cpu().numpy()
         preds = preds.argmax(dim=1).detach().cpu().numpy()
@@ -155,7 +156,7 @@ class MAML(BaseModel):
             opt.step()
             opt.zero_grad()
             print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
-            print('outer loop: loss:{:.3f}'.format(loss_q.item()))
+            print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
 
     def train_loop(self, data_loader, optimizer):
         
@@ -187,7 +188,7 @@ class MAML(BaseModel):
                 # print(query_start)
                 pos_data = pos_sup[1].squeeze()
                 query = query.squeeze()
-                # pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
+                pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
 
                 # pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
@@ -236,6 +237,7 @@ class MAML(BaseModel):
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
                     self.inner_loop(support_data, support_label, mode = 'test')
                     
+                    
                     prob_all = []
                     for batch in tqdm(query_loader):
                         query_data, _ = batch
@@ -243,8 +245,13 @@ class MAML(BaseModel):
                         prob_all.append(prob)
                     prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################
-                    
+                    soft_prob = F.softmax(torch.from_numpy(prob_all), dim=1)
+                    loss = F.cross_entropy(soft_prob,torch.from_numpy(np.array(all_meta[wav_file]['label']).astype('long')))
+                    print('loss', loss.item())
                     prob_all = prob_all[:,0]
+                    
+                    
+                    
                     # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
                     prob_mean.append(prob_all)
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)

@@ -34,8 +34,9 @@ class GradientDescentLearningRule(nn.Module):
         super(GradientDescentLearningRule, self).__init__()
         assert learning_rate > 0., 'learning_rate should be positive.'
         self.learning_rate = torch.ones(1) * learning_rate
-        self.learning_rate.to(device)
-
+        self.learning_rate = self.learning_rate.to(device)
+        # print('learning_rate', self.learning_rate.device)
+        # print('device', device)
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, num_step, tau=0.9):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so
@@ -79,18 +80,19 @@ class LSLRGradientDescentLearningRule(nn.Module):
         assert init_learning_rate > 0., 'learning_rate should be positive.'
 
         self.init_learning_rate = torch.ones(1) * init_learning_rate
-        self.init_learning_rate.to(device)
+        self.init_learning_rate = self.init_learning_rate.to(device)
         self.total_num_inner_loop_steps = total_num_inner_loop_steps
         self.use_learnable_learning_rates = use_learnable_learning_rates
 
     def initialise(self, names_weights_dict):
+        # print(names_weights_dict.keys())
         self.names_learning_rates_dict = nn.ParameterDict()
         for idx, (key, param) in enumerate(names_weights_dict.items()):
-            
             self.names_learning_rates_dict[key.replace(".", "-")] = nn.Parameter(
-                data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
+                data=torch.ones(self.total_num_inner_loop_steps + 1,device= param.device) * self.init_learning_rate,
                 requires_grad=self.use_learnable_learning_rates)
-        
+        # print(names_weights_dict.items())
+        # print('~~~~~~~~~~~~~~~~~~~~')
     def reset(self):
 
         # for key, param in self.names_learning_rates_dict.items():
