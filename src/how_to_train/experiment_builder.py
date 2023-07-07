@@ -4,8 +4,10 @@ import numpy as np
 import sys
 import time
 import torch
+import json
+from src.utils.feature_extractor import *
 
-
+import omegaconf
 class ExperimentBuilder(object):
     def __init__(self, cfg, data, model):
         """
@@ -125,7 +127,7 @@ class ExperimentBuilder(object):
                 total_losses[key] = [float(value)]
             else:
                 total_losses[key].append(float(value))
-
+        print(losses)
         train_losses = self.build_summary_dict(total_losses=total_losses, phase="train")
         train_output_update = self.build_loss_summary_string(losses)
 
@@ -136,7 +138,7 @@ class ExperimentBuilder(object):
 
         return train_losses, total_losses, current_iter
 
-    def evaluation_iteration(self, val_sample, total_losses, pbar_val, phase):
+    def evaluation_iteration(self, val_sample, total_losses, pbar_val, phase, mode):
         """
         Runs a validation iteration, updates the progress bar and returns the total and current epoch val losses.
         :param val_sample: A sample from the data provider
@@ -146,7 +148,7 @@ class ExperimentBuilder(object):
         """
         data_batch =  val_sample
 
-        pred_df, best_res, threshold = self.model.run_validation_iter(data_batch=data_batch)
+        pred_df, best_res, threshold = self.model.run_validation_iter(data_batch=data_batch, mode = mode)
         # for key, value in zip(list(losses.keys()), list(losses.values())):
         #     if key not in total_losses:
         #         total_losses[key] = [float(value)]
@@ -303,6 +305,21 @@ class ExperimentBuilder(object):
         Runs a full training experiment with evaluations of the model on the val set at every epoch. Furthermore,
         will return the test set evaluation results on the best performing validation model.
         """
+        
+        model_dir = self.config.checkpoint.model_dir
+        model_dir = normalize_path(model_dir)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        config_dir = normalize_path(self.config.checkpoint.exp_dir)
+        
+        if not os.path.exists(os.path.dirname(config_dir)):
+            os.makedirs(os.path.dirname(config_dir))
+        config_dir = os.path.join(config_dir,'config.json')
+        with open(config_dir, 'w') as outfile:
+            json.dump( omegaconf.OmegaConf.to_container(self.config, resolve=True), outfile,indent=2)
+        no_imporve = 0
+        best_f1 = 0
+        
         for epoch in range(self.config.train.epoches):
 
                 for train_sample_idx, train_sample in enumerate(self.data.get_train_batches()):
@@ -310,14 +327,60 @@ class ExperimentBuilder(object):
                     train_losses, total_losses, self.state['current_iter'] = self.train_iteration(
                         train_sample=train_sample,
                         total_losses=self.total_losses,
-                        epoch_idx=(self.state['current_iter'] /
-                                   self.config.train.epoches),
+                        epoch_idx= epoch,
                         current_iter=self.state['current_iter'],
                         sample_idx=self.state['current_iter'])
                 
-                pred_df, best_res, threshold = self.evaluation_iteration(val_sample=self.data.get_test_batches(),
+                pred_df, report, threshold = self.evaluation_iteration(val_sample=self.data.get_val_batches(),
                                                                         total_losses=self.total_losses,
                                                                         pbar_val=None,
-                                                                        phase="val")
-                print(best_res)
-                    
+                                                                        phase="val", mode = 'val')
+                print(report)
+
+                save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
+                if epoch % self.config.checkpoint.save_freq == 0:
+                    torch.save({'epoch':epoch, 'state':self.model.state_dict(), 'config':self.config}, save_file)
+                f1 = report['overall_scores']['fmeasure (percentage)']
+                no_imporve +=1
+                if no_imporve == 15:
+                    break
+                if f1 > best_f1:
+                    no_imporve = 0
+                    best_f1 = f1
+                    save_file = os.path.join(model_dir, 'best_model.pth')
+                    print(save_file)
+                    torch.save({'epoch':epoch, 'state':self.model.state_dict(), 'config':self.config, 'f1':best_f1, 'model_name':'ProtoMAML', 'threshold' : threshold}, save_file)
+                    print("best model! save...")
+                    report_dir = normalize_path(self.config.checkpoint.report_dir)
+                    report_dir = os.path.join(report_dir,'val_report_best.json')
+                    if not os.path.exists(os.path.dirname(report_dir)):
+                        os.makedirs(os.path.dirname(report_dir))
+                    with open(report_dir, 'w') as outfile:
+                        json.dump(report, outfile)
+
+        
+            
+    
+    def test(self, check_point_path):
+        checkpoint = torch.load(check_point_path)
+        self.model.load_state_dict(checkpoint['state'])
+        
+        
+        self.config = checkpoint['config']
+        pred_df, best_res, threshold = self.evaluation_iteration(val_sample=self.data.get_test_batches(),
+                                                                        total_losses=self.total_losses,
+                                                                        pbar_val=None,
+                                                                        phase="val", mode = 'test')
+        print(best_res)
+        
+        report_dir = normalize_path(self.config.checkpoint.report_dir)
+        report_dir = os.path.join(report_dir,'test_report_best.json')
+        # print(report_dir)
+        if not os.path.exists(os.path.dirname(report_dir)):
+            os.makedirs(os.path.dirname(report_dir))
+        
+        with open(report_dir, 'w') as outfile:
+            json.dump(best_res, outfile)
+        
+        return pred_df, best_res, threshold
+        

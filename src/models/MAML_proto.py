@@ -87,7 +87,7 @@ class MAML_proto(BaseModel):
             classifier_head = [output_weight, output_bias]
         #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item()))
         # print('~~~~~~~~~~~')
-        print(preds)
+        # print(preds)
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
             # print(preds)
@@ -175,13 +175,13 @@ class MAML_proto(BaseModel):
                     pos_data, neg_data = task 
                     classes, data_pos, _ =pos_data
                     _, data_neg, _ =neg_data
-                    support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+                    # support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
                     support_data, query_data = self.split_support_query_data(data_pos, data_neg)
                     support_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_support)).long().to(self.device)
                 else:
                     pos_data = task 
                     classes, data_pos, _ =pos_data
-                    support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
+                    # support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
                     support_data, query_data = self.split_support_query_data(data_pos, None)
                     support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
 
@@ -189,6 +189,13 @@ class MAML_proto(BaseModel):
                 # Perform inner loop adaptation
                 # print(data_pos.shape)
                 # print(data_neg.shape)
+                for weight in self.feature_extractor.parameters():
+                    weight.fast = None
+                
+                support_feat = self.feature_extractor(support_data)
+                support_label_unique = torch.unique(support_label)
+                support_feat = [torch.mean(support_feat[(support_label == label)], dim=0) for label in support_label_unique]
+                support_feat = torch.stack(support_feat, dim=0).unsqueeze(0)
                 
                 output_weight, output_bias = self.inner_loop(support_data, support_feat, support_label, mode = 'train')
                 

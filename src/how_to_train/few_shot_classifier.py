@@ -42,58 +42,48 @@ class MAMLFewShotClassifier(nn.Module):
         self.batch_size = cfg.train.task_batch_size
         self.use_cuda = True
         self.current_epoch = 0
-        # self.classifier_head = nn.Linear(512, cfg.train.n_way).to(device=self.device)
         self.classifier = Convnet(cfg = cfg, meta_classifier=True).to(device=self.device)
         self.task_learning_rate = cfg.train.lr_inner
+        
         self.n_way = cfg.train.n_way
         self.n_support = cfg.train.n_support
         self.n_query = cfg.train.n_query
-        # 可训练的模块类似于META SGD
         self.test_loop_batch_size = cfg.val.test_loop_batch_size
-        # params_head = self.classifier_head.named_parameters()
-        # params_classifier = self.classifier.named_parameters()
-        output_weight = torch.zeros(self.n_way, 512).to(device=self.device).requires_grad_()
-        output_bias = torch.zeros(self.n_way).to(device=self.device).requires_grad_()
-        params_head = {'weight': output_weight, 'bias': output_bias}.items()
-        all_params = itertools.chain(self.classifier.named_parameters(), params_head)
+        self.sr = cfg.features.sr
+        self.fps = self.sr / cfg.features.hop_length
+        # self.net = nn.Sequential(nn.Conv2d(1, 64, kernel_size=3, padding=1))
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps= cfg.train.inner_step,
-                                                                    use_learnable_learning_rates= True)
-        self.sr = cfg.features.sr
-        self.fps = self.sr / cfg.features.hop_length
+                                                                    use_learnable_learning_rates= True).to(device=self.device)
+        # print(self.inner_loop_optimizer)        
+
+
+
         
+        
+        output_weight = torch.zeros(self.n_way, 512).to(device=self.device).requires_grad_()
+        output_bias = torch.zeros(self.n_way).to(device=self.device).requires_grad_()
+        params_head = {'weight': output_weight, 'bias': output_bias}.items()
+        
+        all_params = itertools.chain(self.classifier.named_parameters(), params_head)
         t = self.get_inner_loop_parameter_dict(params= all_params)
         # print(t.keys())
         self.inner_loop_optimizer.initialise(
             names_weights_dict=t)
-        # self.inner_loop_optimizer.initialise(
-            # names_weights_dict=self.get_inner_loop_parameter_dict(params=self.named_parameters()))
-        # print("Inner Loop parameters")
-        # for key, value in self.inner_loop_optimizer.named_parameters():
-        #     print(key, value.shape)
-
-      
-        self.to(self.device)
-        # print("Outer Loop parameters")
-        # for name, param in self.named_parameters():
-        #     if param.requires_grad:
-        #         print(name, param.shape, param.device, param.requires_grad)
-
-
-        self.optimizer = optim.Adam(self.trainable_parameters(), lr= cfg.train.lr, amsgrad=False)
+    
+        self.optimizer = optim.Adam(self.trainable_parameters(), lr= cfg.train.lr)
+        
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.config.train.epoches,
                                                               eta_min=self.config.train.min_lr)
+        
+                
+        # for name, param in self.named_parameters():
+        #     print(name)
+        
 
-        # self.device = torch.device('cpu')
-        # if torch.cuda.is_available():
-        #     if torch.cuda.device_count() > 1:
-        #         self.to(torch.cuda.current_device())
-        #         self.classifier = nn.DataParallel(module=self.classifier)
-        #     else:
-        #         self.to(torch.cuda.current_device())
-
-        #     self.device = torch.cuda.current_device()
+        self.to(self.device)
+        
 
     def get_per_step_loss_importance_vector(self):
         """
@@ -163,11 +153,7 @@ class MAMLFewShotClassifier(nn.Module):
         :param current_step_idx: Current step's index.
         :return: A dictionary with the updated weights (name, param)
         """
-        # for name, param in names_weights_copy.items():
-        #     print(name, param.grad_fn)
         self.classifier.zero_grad(params=names_weights_copy)
-        # self.classifier_head.zero_grad()
-        # print(names_weights_copy.keys())
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=False)
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
@@ -182,6 +168,7 @@ class MAMLFewShotClassifier(nn.Module):
         # for key, grad in names_weights_copy.items():
         #     print(key)
         #     print(grad.shape)
+        
         
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
@@ -198,7 +185,8 @@ class MAMLFewShotClassifier(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
-        losses = {'loss': torch.mean(torch.stack(total_losses))}
+        
+        losses = {'loss': torch.sum(torch.stack(total_losses))}
 
         losses['accuracy'] = np.mean(total_accuracies)
 
@@ -290,6 +278,7 @@ class MAMLFewShotClassifier(nn.Module):
             # x_target_set_task = x_target_set_task.view(-1, c, h, w)
             # y_target_set_task = y_target_set_task.view(-1)
             # print('start inner loop')
+            
             for num_step in range(num_steps):
 
                 support_loss, support_preds = self.net_forward(
@@ -317,7 +306,11 @@ class MAMLFewShotClassifier(nn.Module):
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 
+
+            
                 elif num_step == (self.config.train.inner_step - 1):
+                    output_weight = (output_weight - init_weight).detach() + init_weight
+                    output_bias = (output_bias - init_bias).detach() + init_bias
                     target_loss, target_preds = self.net_forward(x=query_data,
                                                                  y=query_label, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
@@ -334,8 +327,7 @@ class MAMLFewShotClassifier(nn.Module):
             total_accuracies.extend(accuracy)
             if not training_phase:
                 self.classifier.restore_backup_stats()
-            output_weight = (output_weight - init_weight).detach() + init_weight
-            output_bias = (output_bias - init_bias).detach() + init_bias
+
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
@@ -390,7 +382,7 @@ class MAMLFewShotClassifier(nn.Module):
                 pos_feat = []
                 for batch in pos_loader:
                     p_data, _ = batch
-                    feat = self.classifier(p_data, num_step=0, training=False, backup_running_statistics=False, output_features=False)
+                    feat = self.classifier(p_data, num_step=0, training=False, backup_running_statistics=True, output_features=False)
                     # print(feat.shape)
                     pos_feat.append(feat.mean(0))
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
@@ -411,7 +403,7 @@ class MAMLFewShotClassifier(nn.Module):
                     for batch in neg_loader:
                         n_data, _ = batch
                         # print(neg_data.shape)
-                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics=False, output_features=False)
+                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics=True, output_features=False)
                         # print(feat.shape)
                         neg_feat.append(feat.mean(0))
                     neg_feat = torch.stack(neg_feat, dim=0).mean(0)
@@ -423,7 +415,7 @@ class MAMLFewShotClassifier(nn.Module):
                     total_accuracies = []
                     per_task_target_preds = [[] for i in range(len(data_batch))]
                     self.classifier.zero_grad()
-                    print('~~~~')
+                    # print('~~~~')
                     task_accuracies = []
                     # for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
                     #                       y_support_set,
@@ -458,6 +450,7 @@ class MAMLFewShotClassifier(nn.Module):
                     names_weights_copy = self.get_inner_loop_parameter_dict(all_params)
                     self.classifier.zero_grad()
                     # self.classifier_head.zero_grad()
+                    # print(names_weights_copy['weight'])
                     for num_step in range(num_steps):
 
                         support_loss, support_preds = self.net_forward(
@@ -469,7 +462,7 @@ class MAMLFewShotClassifier(nn.Module):
                             num_step=num_step,
                             test = True
                         )
-
+                        
                         # print('first layer before update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                         # print(names_weights_copy['weight'])
                         names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
@@ -483,11 +476,14 @@ class MAMLFewShotClassifier(nn.Module):
                         head_bias = names_weights_copy['bias']
                         preds = F.linear(preds_feat, head_weight, head_bias)
                         preds = F.softmax(preds, dim = 1)
+                        # print(head_weight)
+                        # print(torch.norm(head_weight,dim=1))
+                        
                         preds = preds.argmax(dim=1).detach().cpu().numpy()
+                        
+                        # print(torch.norm(head_weight,dim=1))
+                    print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=3))
     
-                        print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=3))
-                        
-                        
                     with torch.no_grad():
                         prob_all = []
                         for batch in query_loader:
@@ -499,6 +495,7 @@ class MAMLFewShotClassifier(nn.Module):
                             head_bias = names_weights_copy['bias']
                             preds = F.linear(preds_feat, head_weight, head_bias)
                             preds = F.softmax(preds, dim = 1)
+                            # print(preds)
                             preds = preds.detach().cpu().numpy()
                             # with h5py.File(feat_file, 'a') as f:
                                 
@@ -512,6 +509,7 @@ class MAMLFewShotClassifier(nn.Module):
                         prob_all = np.concatenate(prob_all, axis=0)
                         prob_all = prob_all[:,0]
                         prob_mean.append(prob_all)
+                    self.classifier.restore_backup_stats()
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)
                 all_prob[wav_file] = prob_mean
             best_res = None
@@ -688,7 +686,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                      training_phase=True)
         return losses, per_task_target_preds
 
-    def evaluation_forward_prop(self, data_batch, epoch):
+    def evaluation_forward_prop(self, data_batch, epoch, mode):
         """
         Runs an outer loop evaluation forward prop using the meta-model and base-model.
         :param data_batch: A data batch containing the support set and the target set input, output pairs.
@@ -696,9 +694,9 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary of losses for the current step.
         """
         pred_df, best_res, threshold = self.forward_test(data_batch=data_batch, epoch=epoch, use_second_order=False,
-                                                     use_multi_step_loss_optimization=True,
+                                                     use_multi_step_loss_optimization=False,
                                                      num_steps=self.config.train.inner_step,
-                                                     training_phase=False)
+                                                     training_phase=False, mode = mode)
         
         return pred_df, best_res, threshold
 
@@ -711,16 +709,26 @@ class MAMLFewShotClassifier(nn.Module):
         loss.backward()
         # for name, param in self.named_parameters():
         #     if param.requires_grad:
-        #         if param.grad is None:
-        #             print('None gradient for outer loop parameter', name)
-        #         else:
-        #             print('Outer Loop Parameter', name, param.shape)
+        #         if('inner_loop_optimizer.names_learning_rates_dict' in name):
+        #             print(name, param)
+                # print(name, param.grad)
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+        # for name, param in self.named_parameters():
+            # print(name)
+            # if 'inner_loop_optimizer.names_learning_rates_dict.layer_dict-conv0-conv-weight' in name:
+            #     print(param.requires_grad)
+            #     print(name, param)
         self.optimizer.step()
+        # for name, param in self.classifier.named_parameters():
+        #     if param.requires_grad:
+        #         if 'inner_loop_optimizer.names_learning_rates_dict.layer_dict-conv0-conv-weight' in name:
+        #             print(name, param)
 
+        # print('meta_update')
+        
     def run_train_iter(self, data_batch, epoch):
         """
         Runs an outer loop update step on the meta-model's parameters.
@@ -749,13 +757,15 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.meta_update(loss=losses['loss'])
         losses['learning_rate'] = self.scheduler.get_lr()[0]
+        # print('learning_rate', losses['learning_rate'])
+        # print(epoch)
         self.scheduler.step(epoch=epoch)
         self.optimizer.zero_grad()
-        # self.zero_grad()
+        self.zero_grad()
 
         return losses, per_task_target_preds
 
-    def run_validation_iter(self, data_batch):
+    def run_validation_iter(self, data_batch, mode):
         """
         Runs an outer loop evaluation step on the meta-model's parameters.
         :param data_batch: input data batch containing the support set and target set input, output pairs
@@ -775,7 +785,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         # data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        pred_df, best_res, threshold = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
+        pred_df, best_res, threshold = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch, mode = mode)
 
         # losses['loss'].backward() # uncomment if you get the weird memory error
         # self.zero_grad()
@@ -899,10 +909,13 @@ class MAMLFewShotClassifier(nn.Module):
             else:
                 feature_pos = pos_input
             
+            
             feature_pos = feature_pos.view(-1, self.n_way, feature_pos.size(-1))
+
             feature_support = feature_pos[:self.n_support, :, :]
             feature_query = feature_pos[self.n_support:, :, :]
-        
+            # print('feature_support',feature_support.shape)
+            # print('feature_query',feature_query.shape)
         return feature_support, feature_query
         
         

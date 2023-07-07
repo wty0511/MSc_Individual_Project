@@ -17,26 +17,31 @@ from src.evaluation_metrics.evaluation_confidence_intervals import *
 from copy import deepcopy
 import random
 import torch.optim as optim
+
+
 class ContrastiveLoss(nn.Module):
     def __init__(self, margin):
         super(ContrastiveLoss, self).__init__()
         self.margin = margin
     
     def forward(self, output1, output2, label):
-        euclidean_distance = nn.PairwiseDistance(p=2)  # 欧氏距离计算
-        distances = euclidean_distance(output1, output2)
-        losses = 0.5 * (1 - label) * torch.pow(distances, 2) + \
-                 0.5 * label * torch.pow(torch.clamp(self.margin - distances, min=0.0), 2)
+        cos_sim = F.cosine_similarity(output1, output2, dim=1)
+        # print(cos_sim)
+        
+        # print(torch.sum(label==0))
+        losses = (1 - label) * torch.pow((1-cos_sim),2.0) + \
+                 label * torch.pow(cos_sim, 2) * (cos_sim > self.margin).float()
+                
         loss = torch.mean(losses)
+        # print('loss', loss)
         return loss
-    
-    
+
 class SNN(BaseModel):
     def __init__(self, config):
         super(SNN, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = ContrastiveLoss(margin=1.5)
+        self.loss_fn = ContrastiveLoss(margin= 0.2)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
         self.cosloss = nn.CosineEmbeddingLoss(margin= 0.95)
@@ -136,7 +141,7 @@ class SNN(BaseModel):
     #     return torch.pow(query - support, 2).sum(2)
     
         
-    def euclidean_dist(self,query, support):
+    def cos_sim(self,query, support):
         n = query.size(0)
         m = support.size(0)
         query = F.normalize(query, dim=1)
@@ -144,16 +149,16 @@ class SNN(BaseModel):
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
 
-        return torch.sqrt(torch.pow(query - support, 2).sum(2))
+        return F.cosine_similarity(query, support, dim=2)
 
 
-    def cossim(self, query, support):
-        cos_sim = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
-        n = query.size(0)
-        m = support.size(0)
-        query = query.unsqueeze(1).expand(n, m, -1)
-        support = support.unsqueeze(0).expand(n, m, -1)
-        return cos_sim(query, support)
+    # def cossim(self, query, support):
+    #     cos_sim = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
+    #     n = query.size(0)
+    #     m = support.size(0)
+    #     query = query.unsqueeze(1).expand(n, m, -1)
+    #     support = support.unsqueeze(0).expand(n, m, -1)
+    #     return cos_sim(query, support)
 
     # def feed_forward(self, local_model, support_data, query_data):
     #     # # Execute a model with given output layer weights and inputs
@@ -219,12 +224,12 @@ class SNN(BaseModel):
         # Execute a model with given output layer weights and inputs
 
         query_feat = self.feature_extractor(query_data)
-        dists = self.euclidean_dist(query_feat, prototype)
+        dists = self.cos_sim(query_feat, prototype)
         # dists = self.cossim(query_feat, prototype)
         # print(dists)
         pred = dists.argmin(-1)
         
-        scores = -dists
+        scores = dists
         preds = F.softmax(scores, dim = 1)
         preds = preds.detach().cpu().numpy()
         # print(preds)

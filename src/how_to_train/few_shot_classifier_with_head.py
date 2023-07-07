@@ -182,9 +182,8 @@ class MAMLFewShotClassifierWithHead(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
-        losses = {'loss': torch.mean(torch.stack(total_losses))}
 
-        losses['accuracy'] = np.mean(total_accuracies)
+        losses = {'loss': torch.sum(torch.stack(total_losses))}
 
         return losses
 
@@ -274,8 +273,8 @@ class MAMLFewShotClassifierWithHead(nn.Module):
             # x_target_set_task = x_target_set_task.view(-1, c, h, w)
             # y_target_set_task = y_target_set_task.view(-1)
             # print('start inner loop')
+            
             for num_step in range(num_steps):
-
                 support_loss, support_preds = self.net_forward(
                     x=support_data,
                     y=support_label,
@@ -380,7 +379,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
@@ -671,7 +670,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                                                      training_phase=True)
         return losses, per_task_target_preds
 
-    def evaluation_forward_prop(self, data_batch, epoch):
+    def evaluation_forward_prop(self, data_batch, epoch, mode):
         """
         Runs an outer loop evaluation forward prop using the meta-model and base-model.
         :param data_batch: A data batch containing the support set and the target set input, output pairs.
@@ -681,7 +680,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
         pred_df, best_res, threshold = self.forward_test(data_batch=data_batch, epoch=epoch, use_second_order=False,
                                                      use_multi_step_loss_optimization=True,
                                                      num_steps=self.config.train.inner_step,
-                                                     training_phase=False)
+                                                     training_phase=False, mode = mode)
         
         return pred_df, best_res, threshold
 
@@ -738,7 +737,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
 
         return losses, per_task_target_preds
 
-    def run_validation_iter(self, data_batch):
+    def run_validation_iter(self, data_batch, mode):
         """
         Runs an outer loop evaluation step on the meta-model's parameters.
         :param data_batch: input data batch containing the support set and target set input, output pairs
@@ -758,7 +757,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
 
         # data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        pred_df, best_res, threshold = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
+        pred_df, best_res, threshold = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch, mode = mode)
 
         # losses['loss'].backward() # uncomment if you get the weird memory error
         # self.zero_grad()

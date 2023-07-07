@@ -76,20 +76,20 @@ class TNNMAMLFewShotClassifier(nn.Module):
         params_classifier = self.classifier.named_parameters()
         # all_params = itertools.chain(params_head, params_classifier)
         self.loss_fn = TripletLoss(margin= 0.2)
-        # self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
-        #                                                             init_learning_rate=self.task_learning_rate,
-        #                                                             total_num_inner_loop_steps= cfg.train.inner_step,
-        #                                                             use_learnable_learning_rates= True)
+        self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
+                                                                    init_learning_rate=self.task_learning_rate,
+                                                                    total_num_inner_loop_steps= cfg.train.inner_step,
+                                                                    use_learnable_learning_rates= True)
         self.sr = cfg.features.sr
         self.fps = self.sr / cfg.features.hop_length
         # print(self.config)
         # self.inner_loop_optimizer.initialise(
         #     names_weights_dict=self.get_inner_loop_parameter_dict(params= params_classifier))
         
-        self.inner_loop_optimizer = GradientDescentLearningRule(device=self.device, learning_rate=self.task_learning_rate)
+        # self.inner_loop_optimizer = GradientDescentLearningRule(device=self.device, learning_rate=self.task_learning_rate)
         
-        # self.inner_loop_optimizer.initialise(
-            # names_weights_dict=self.get_inner_loop_parameter_dict(params=self.named_parameters()))
+        self.inner_loop_optimizer.initialise(
+            names_weights_dict=self.get_inner_loop_parameter_dict(params_classifier))
         # print("Inner Loop parameters")
         # for key, value in self.inner_loop_optimizer.named_parameters():
         #     print(key, value.shape)
@@ -206,7 +206,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
-        losses = {'loss': torch.mean(torch.stack(total_losses))}
+        losses = {'loss': torch.sum(torch.stack(total_losses))}
 
         losses['accuracy'] = np.mean(total_accuracies)
 
@@ -772,7 +772,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                                                      training_phase=True)
         return losses, per_task_target_preds
 
-    def evaluation_forward_prop(self, data_batch, epoch):
+    def evaluation_forward_prop(self, data_batch, epoch, mode):
         """
         Runs an outer loop evaluation forward prop using the meta-model and base-model.
         :param data_batch: A data batch containing the support set and the target set input, output pairs.
@@ -782,7 +782,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         pred_df, best_res, threshold = self.forward_test(data_batch=data_batch, epoch=epoch, use_second_order=False,
                                                      use_multi_step_loss_optimization=True,
                                                      num_steps=self.config.train.inner_step,
-                                                     training_phase=False)
+                                                     training_phase=False, mode = mode)
         
         return pred_df, best_res, threshold
 
@@ -851,7 +851,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def run_validation_iter(self, data_batch):
+    def run_validation_iter(self, data_batch, mode):
         """
         Runs an outer loop evaluation step on the meta-model's parameters.
         :param data_batch: input data batch containing the support set and target set input, output pairs
@@ -871,7 +871,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
 
         # data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        pred_df, best_res, threshold = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
+        pred_df, best_res, threshold = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch, mode = mode)
 
         # losses['loss'].backward() # uncomment if you get the weird memory error
         # self.zero_grad()

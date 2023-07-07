@@ -35,11 +35,14 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 42
+SEED = 12
 set_seed(SEED)
 
 
 debug = False
+print_loss = False
+
+
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
@@ -47,7 +50,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'MAML2'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
+model_name = 'ProtoMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
 
 if model_name == 'ProtoMAML':
     cfg = compose(config_name="config_protomaml.yaml")
@@ -88,6 +91,8 @@ elif model_name == 'SNNMAML':
     
 print('preparing training dataset')
 train_dataset = ClassDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
+if print_loss:
+    train_dataset.length = 20
 print(len(train_dataset))
 print(train_dataset.seg_meta.keys())
 print('preparing val dataset')
@@ -101,6 +106,10 @@ val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain/Model/best_model.pth')
 pretrain_dict = pretrain_model['state']
 pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
+
+test_dataset = FileDataset(cfg,val=False, debug= debug)
+test_loader = DataLoader(test_dataset, batch_size = 1, shuffle = False)
+
 
 
     
@@ -133,6 +142,13 @@ model.train()
 
 no_imporve = 0
 
+train_loss_list = []
+val_loss_list = []
+test_loss_list = []
+
+val_f1_list = []
+test_f1_list = []
+
 config_dir = normalize_path(cfg.checkpoint.exp_dir)
 if not os.path.exists(os.path.dirname(config_dir)):
     os.makedirs(os.path.dirname(config_dir))
@@ -140,21 +156,22 @@ config_dir = os.path.join(config_dir,'config.json')
 with open(config_dir, 'w') as outfile:
     json.dump( omegaconf.OmegaConf.to_container(cfg, resolve=True), outfile,indent=2)
     
-for epoch in range(40):
+for epoch in range(20):
     model.train()
-    model.train_loop(train_loader, optimizer)
+    train_loss = model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-        
+    train_loss_list.append(train_loss)
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
     if epoch % cfg.checkpoint.save_freq == 0:
         torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
-    df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
-    f1 = report['overall_scores']['fmeasure (percentage)']
+    df_all_time, report, threshold, val_loss = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
+    val_loss_list.append(val_loss)
+    f1 = report['overall_scores']['fmeasure (percentage)']/100
+    val_f1_list.append(f1)
     no_imporve +=1
-    if no_imporve == 15:
-        break
+
     if f1 > best_f1:
         no_imporve = 0
         best_f1 = f1
@@ -168,3 +185,27 @@ for epoch in range(40):
             os.makedirs(os.path.dirname(report_dir))
         with open(report_dir, 'w') as outfile:
             json.dump(report, outfile)
+
+    df_all_time, report, threshold, test_loss = model.test_loop(test_loader, mode = 'test', fix_shreshold=0.5)
+    test_loss_list.append(test_loss)
+    f1 = report['overall_scores']['fmeasure (percentage)']/100
+    test_f1_list.append(f1)
+    if no_imporve == 15:
+        break
+print('train_loss', train_loss_list)
+print('train_loss', val_loss_list)
+print('train_loss', test_loss_list)
+print('train_loss', val_f1_list)
+print('train_loss', test_f1_list)
+
+loss_all = np.array([train_loss_list, val_loss_list, test_loss_list]).astype(float)
+data_show = np.array([train_loss_list, val_f1_list, test_f1_list]).astype(float)
+print(loss_all)
+print(data_show)
+
+loss_dir = os.path.join(normalize_path(cfg.checkpoint.report_dir),'loss.npy')
+np.savetxt(loss_dir, loss_all, delimiter=',', fmt='%.3f')
+data_dir = os.path.join(normalize_path(cfg.checkpoint.report_dir),'f1.npy')
+np.savetxt(data_dir, data_show, delimiter=',', fmt='%.3f')
+
+# np.savetxt(loss_dir, loss_all, delimiter=',', fmt='%.3f')

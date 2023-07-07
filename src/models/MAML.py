@@ -14,7 +14,7 @@ from src.utils.feature_extractor import *
 from src.evaluation_metrics.evaluation import *
 from src.utils.post_processing import *
 from sklearn.metrics import classification_report, f1_score
-
+import time
 
 
 class MAML(BaseModel):
@@ -37,6 +37,7 @@ class MAML(BaseModel):
         
         
     def inner_loop(self, support_data, support_label, mode = 'train'):
+        
         fast_parameters = list(self.feature_extractor.parameters())
         for weight in self.feature_extractor.parameters():
             weight.fast = None
@@ -45,6 +46,7 @@ class MAML(BaseModel):
         # Create output layer weights 
         # Optimize inner loop model on support set
         for i in range(self.config.train.inner_step):
+            start_time = time.time()
             # Determine loss on the support set
             loss, preds, acc = self.feed_forward(support_data, support_label, mode = mode)
 
@@ -60,7 +62,9 @@ class MAML(BaseModel):
                 else:
                     weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                 fast_parameters.append(weight.fast) # update the fast_parameters
-
+            end_time = time.time()
+            execution_time = end_time - start_time
+            # print(execution_time)
         #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item()))
         # print('~~~~~~~~~~~')
         if mode != 'train':
@@ -96,7 +100,7 @@ class MAML(BaseModel):
         if mode == 'train':
             loss = F.cross_entropy(preds, labels)
         else:
-            loss = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 1), 1.0]).to(self.device))
+            loss = F.cross_entropy(preds, labels, weight=torch.tensor([neg_num/pos_num, 1.0]).to(self.device))
 
         # print(F.softmax(preds, dim = 1))
         acc = (preds.argmax(dim=1) == labels).float()
@@ -115,6 +119,7 @@ class MAML(BaseModel):
         return preds
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
+        loss_epoch = []
         for i, task_batch in tqdm(enumerate(data_loader)):
             loss_all = []
             acc_all = []
@@ -155,16 +160,19 @@ class MAML(BaseModel):
             #     print(i.grad)
             opt.step()
             opt.zero_grad()
+            loss_epoch.append(loss_q.item()/len(task_batch))
             print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
             print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
-
+        return np.mean(loss_epoch)
+    
     def train_loop(self, data_loader, optimizer):
         
-        self.outer_loop(data_loader, mode = 'train', opt = optimizer)
+        return self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
     def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
         best_res_all = []
         best_threshold_all = []
+        all_loss = []
         for i in range(1):
             all_prob = {}
             all_meta = {}
@@ -199,7 +207,7 @@ class MAML(BaseModel):
 
 
                 prob_mean = []
-                for i in range(5):
+                for i in range(1):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     
@@ -245,9 +253,14 @@ class MAML(BaseModel):
                         prob_all.append(prob)
                     prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################
-                    soft_prob = F.softmax(torch.from_numpy(prob_all), dim=1)
-                    loss = F.cross_entropy(soft_prob,torch.from_numpy(np.array(all_meta[wav_file]['label']).astype('long')))
+                    temp_prob = torch.from_numpy(prob_all).to(self.device)
+                    # print(all_meta[wav_file]['label'])
+                    pos_num =torch.sum(all_meta[wav_file]['label']==0)
+                    neg_num = torch.sum(all_meta[wav_file]['label']==1)
+                    
+                    loss = F.cross_entropy(temp_prob,all_meta[wav_file]['label'].to(self.device),weight = torch.tensor([neg_num/pos_num, 1]).to(self.device)).to(self.device)
                     print('loss', loss.item())
+                    all_loss.append(loss.detach().cpu().numpy())
                     prob_all = prob_all[:,0]
                     
                     
@@ -337,10 +350,10 @@ class MAML(BaseModel):
             # print('~~~~~~~~~~~~~~~')
             best_threshold_all.append(best_threshold)
             best_res_all.append(best_res)
-            
+        print('losses', np.mean(all_loss))
         print(self.average_res(best_res_all))
         print(np.mean(best_threshold_all))
-        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all)
+        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all) , np.mean(all_loss)
     
     
     

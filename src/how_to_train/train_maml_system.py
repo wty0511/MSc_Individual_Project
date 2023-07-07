@@ -18,7 +18,18 @@ from src.how_to_train.few_shot_classifier_TNN import *
 if not GlobalHydra().is_initialized():
     initialize(config_path="../../")
 # Compose the configuration
-cfg = compose(config_name="config.yaml")
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
+SEED = 42
+set_seed(SEED)
+
+cfg = compose(config_name="configmamlpp_proto.yaml")
 
 # Combines the arguments, model, data and experiment builders to run an experiment
 model = MAMLFewShotClassifier(cfg)
@@ -26,4 +37,6 @@ model = MAMLFewShotClassifier(cfg)
 # model = MAMLFewShotClassifierWithHead(cfg)
 data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
-maml_system.run_experiment()
+# maml_system.run_experiment()
+ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnetlarge_1/Model/best_model.pth"
+maml_system.test(ckpt)

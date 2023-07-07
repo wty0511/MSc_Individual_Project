@@ -41,7 +41,7 @@ train:
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
-  task_batch_size: 20
+  task_batch_size: 2
   inner_step: 5
   min_lr: 0.001
   multi_step_loss_num_epochs: 15
@@ -79,5 +79,5 @@ checkpoint:
 
 team_name: tw1022
 dataset: EVAL
-version: 1
+version: cossim2
 #EVAL or VAL

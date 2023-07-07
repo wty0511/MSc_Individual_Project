@@ -31,7 +31,7 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 43
+SEED = 22
 set_seed(SEED)
 
 # cfg = compose(config_name="config.yaml")
@@ -42,7 +42,7 @@ set_seed(SEED)
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 
-save_file = r"/root/task5_2023/Checkpoints/MAML2_2way_5step_convclassifier_first_order_test/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_5way_5step_convnet/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -67,11 +67,11 @@ print('f1:', checkpoint['f1'])
 # model = ProtoMAML_temp(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
-# model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_refine(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-model = MAML2(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = MAML2(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
 # model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
@@ -81,7 +81,7 @@ model = MAML2(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # for name, param in model.named_parameters():
 #     print(name)
 #     print(param.shape)
-model.load_state_dict(model_state)
+# model.load_state_dict(model_state)
 
 
 # for name,  param in model.named_parameters():

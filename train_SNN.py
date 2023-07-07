@@ -46,7 +46,7 @@ print(val_dataset.seg_meta.keys())
 best_f1 = 0
 class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
 
-train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 256)
+train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 128)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 model = SNN(cfg)
 # model =TriNet(cfg)

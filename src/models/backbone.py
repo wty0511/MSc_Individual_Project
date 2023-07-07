@@ -82,6 +82,7 @@ class ConvBlock(nn.Module):
         self.C      = Conv2d_fw(indim, outdim, 3, padding = padding)
         self.BN     = BatchNorm2d_fw(outdim)
         self.relu   = nn.ReLU(inplace=True)
+        # self.relu   = nn.LeakyReLU(0.1, inplace=True)
 
         self.parametrized_layers = [self.C, self.BN, self.relu]
         # self.parametrized_layers = [self.C,  self.relu]

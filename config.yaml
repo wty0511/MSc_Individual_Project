@@ -29,7 +29,7 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 2
+  n_way: 10
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
@@ -37,7 +37,7 @@ train:
   model_type: protonet
   epoches: 51
   lr: 0.001
-  lr_inner: 0.001
+  lr_inner: 0.01
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
@@ -47,11 +47,11 @@ train:
   multi_step_loss_num_epochs: 15
   first_order_to_second_order_epoch: 15
   enable_inner_loop_optimizable_bn_params: False
-  second_order: false
-  use_multi_step_loss_optimization: False
-  learnable_bn_gamma: False
-  learnable_bn_beta: False
-  per_step_bn_statistics: False
+  second_order: True
+  use_multi_step_loss_optimization: True
+  learnable_bn_gamma: True
+  learnable_bn_beta: True
+  per_step_bn_statistics: True
   norm_layer: batch_norm
 
 val:
@@ -68,7 +68,7 @@ checkpoint:
   resume: false
   best_model_dir: ${checkpoint.model_dir}/model_best.pth.tar
   start_epoch: 0
-  experiment_name: test2
+  experiment_name: test3
   # experiment_name: anchornet
   # experiment_name: protnnet_10way_5shot_res
   # experiment_name: test

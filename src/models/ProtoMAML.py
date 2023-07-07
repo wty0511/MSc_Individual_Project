@@ -18,6 +18,7 @@ from sklearn.metrics import classification_report, f1_score
 import h5py
 from src.utils.sampler import *
 from src.utils.class_pair_dataset import *
+import time
 
 class ProtoMAML(BaseModel):
     
@@ -63,32 +64,40 @@ class ProtoMAML(BaseModel):
         
         output_weight = init_weight.detach().requires_grad_()
         output_bias = init_bias.detach().requires_grad_()
+        classifier_head = [output_weight, output_bias]
         # support_feat = torch.empty(1, 512)
         # # print('end inner loop')
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
         for i in range(self.config.train.inner_step):
+            start_time = time.time()
             # Determine loss on the support set
-
+            # print(torch.norm(output_weight,dim=1))
             loss, preds, acc = self.feed_forward(local_model, output_weight, output_bias, support_data, support_label, mode = mode)
-            
+            end_time = time.time()
             # Calculate gradients and perform inner loop update
-            loss.backward()
+            # loss.backward()
+            grad = torch.autograd.grad(loss, local_model.parameters(), create_graph=True)
+            grad_head = torch.autograd.grad(loss, classifier_head, create_graph=True)
             # local_optim.step()
-            for parameter in local_model.parameters():
-                parameter.data -= self.config.train.lr_inner * parameter.grad.data
-            # Update output layer via SGD
-            output_weight.data -= self.config.train.lr_inner * output_weight.grad
-            output_bias.data -= self.config.train.lr_inner * output_bias.grad
-
+            for k, weight in enumerate(local_model.parameters()):
+                weight.data = weight.data - self.config.train.lr_inner * grad[k]
+            output_weight.data = output_weight.data - self.config.train.lr_inner * grad_head[0]
+            output_bias.data = output_bias.data - self.config.train.lr_inner * grad_head[1]
+            
+            classifier_head = [output_weight, output_bias]
             # Reset gradients
-            local_optim.zero_grad()
-            output_weight.grad.fill_(0)
-            output_bias.grad.fill_(0)
+            # local_optim.zero_grad()
+            # output_weight.grad.fill_(0)
+            # output_bias.grad.fill_(0)
             loss = loss.detach()
             # print('loss', loss)
             acc = torch.mean(acc).detach()
+            
+            execution_time = end_time - start_time
+            # print(execution_time)
+
         # print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
@@ -153,7 +162,7 @@ class ProtoMAML(BaseModel):
         preds = preds / temperature
         if self.config.train.neg_prototype or mode == 'test':
             
-            weights = torch.cat((torch.full((half_size,), max(neg_num/pos_num, 1), dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((half_size,), neg_num/pos_num, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             # weights = torch.cat((torch.full((half_size,), 1, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:
@@ -187,8 +196,8 @@ class ProtoMAML(BaseModel):
         return preds, feats
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
-
         
+        loss_epoch = []
         for i, task_batch in tqdm(enumerate(data_loader)):
             accuracies = []
             losses = []
@@ -200,11 +209,11 @@ class ProtoMAML(BaseModel):
                     pos_data, neg_data = task 
                     classes, data_pos, _ =pos_data
                     _, data_neg, _ =neg_data
-                    support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+                    #support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
                 else:
                     pos_data = task 
                     classes, data_pos, _ =pos_data
-                    support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
+                    # support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
                     support_data, query_data = self.split_support_query_data(data_pos, None)
                     support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
 
@@ -213,6 +222,12 @@ class ProtoMAML(BaseModel):
                 # print(data_pos.shape)
                 # print(data_neg.shape)
 
+                support_feat = self.feature_extractor(support_data)
+                support_label_unique = torch.unique(support_label)
+                support_feat = [torch.mean(support_feat[(support_label == label)], dim=0) for label in support_label_unique]
+                support_feat = torch.stack(support_feat, dim=0).unsqueeze(0)
+                
+                # print(support_feat.shape)
                 local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, support_feat, support_label)
                 
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
@@ -236,6 +251,7 @@ class ProtoMAML(BaseModel):
                 # print("loss: ", loss, "acc: ", acc)
                 accuracies.append(acc)
                 losses.append(loss)
+                loss_epoch.append(np.mean(losses))
             if i % 1 == 0:
                 print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
             if mode == "train":
@@ -248,11 +264,13 @@ class ProtoMAML(BaseModel):
                 # for name, parameter in self.feature_extractor.named_parameters():
                 #     print(name, parameter[0])
                 #     break
+        return np.mean(loss_epoch)
     def train_loop(self, data_loader, optimizer):
         
-        self.outer_loop(data_loader, mode = 'train', opt = optimizer)
+        return self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
     def test_loop(self, test_loader,fix_shreshold = None, mode = 'test' ):
+        loss_all = []
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -296,7 +314,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(5):
+                for i in range(1):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):
@@ -362,11 +380,25 @@ class ProtoMAML(BaseModel):
 
                         #     f['features'][size:nwe_size] = feats
                         prob_all.append(prob)
+                        
                     prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################
+
+                    
+                    temp_prob = torch.from_numpy(prob_all).to(self.device)
+                    pos_num =torch.sum(all_meta[wav_file]['label']==0)
+                    neg_num = torch.sum(all_meta[wav_file]['label']==1)
+                    acc = torch.sum(temp_prob.argmax(dim=1)==all_meta[wav_file]['label'].to(self.device))/len(temp_prob)
+                    print(acc)
+                    loss = F.cross_entropy(temp_prob,all_meta[wav_file]['label'].to(self.device),weight = torch.tensor([neg_num/pos_num, 1]).to(self.device)).to(self.device)
+                    loss_all.append(loss.detach().cpu().numpy())
+                    print('loss', loss.item())
+                    
                     
                     prob_all = prob_all[:,0]
                     print(np.sum(prob_all>0.9))
+                    
+                    
                     # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
                     prob_mean.append(prob_all)
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)
@@ -427,7 +459,7 @@ class ProtoMAML(BaseModel):
                 
                 df_all_time = pd.DataFrame(all_time)
 
-                df_all_time = post_processing(df_all_time, self.config, mode)
+                # df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))
@@ -456,7 +488,8 @@ class ProtoMAML(BaseModel):
             # print('~~~~~~~~~~~~~~~')
         print(best_res_all[0])
         print(np.mean(best_threshold_all))
-        return df_all_time, best_res_all[0], np.mean(best_threshold_all)
+        print('loss', np.mean(loss_all))
+        return df_all_time, best_res_all[0], np.mean(best_threshold_all), np.mean(loss_all)
     
     def average_res (self, res_list):
         avg = deepcopy(res_list[0])

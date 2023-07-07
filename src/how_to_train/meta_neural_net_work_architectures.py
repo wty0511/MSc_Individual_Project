@@ -28,7 +28,6 @@ def extract_top_level_dict(current_dict):
         name = name.replace("module-", "")
         top_level = name.split(".")[0]
         sub_level = ".".join(name.split(".")[1:])
-
         if top_level in output_dict:
             new_item = {key: value for key, value in output_dict[top_level].items()}
             new_item[sub_level] = current_dict[key]
@@ -38,7 +37,7 @@ def extract_top_level_dict(current_dict):
             output_dict[top_level] = current_dict[key]
         else:
             output_dict[top_level] = {sub_level: current_dict[key]}
-    #print(current_dict.keys(), output_dict.keys())
+    # print(current_dict.keys(), output_dict.keys())
     return output_dict
 
 class MetaConv2dLayer(nn.Module):
@@ -78,6 +77,7 @@ class MetaConv2dLayer(nn.Module):
         """
         if params is not None:
             params = extract_top_level_dict(current_dict=params)
+            
             if self.use_bias:
                 (weight, bias) = params["weight"], params["bias"]
             else:
@@ -401,7 +401,9 @@ class MetaConvNormLayerReLU(nn.Module):
         batch_norm_params = None
         conv_params = None
         activation_function_pre_params = None
-
+        # print('~~~~~~')
+        # print('meta conv norm layer relu', params)
+        # print('~~~~~~')
         if params is not None:
             params = extract_top_level_dict(current_dict=params)
 
@@ -622,22 +624,32 @@ class Convnet(nn.Module):
         then used to reset the stats back to a previous state (usually after an eval loop, when we want to throw away stored statistics)
         :return: Logits of shape b, num_output_classes.
         """
+        # if params is not None:
+            
+        #     for key, value in params.items():
+        #         print(key)
+        #         print(value.shape)
+        # layer_dict.conv3.conv.weight
+        # layer_dict.conv3.conv.bias
         param_dict = dict()
-
         if params is not None:
             param_dict = extract_top_level_dict(current_dict=params)
-
-        for name, param in list(self.layer_dict.named_parameters()) + list(self.layer_dict.items()):
+        # for name in param_dict:
+        #     print(name)
+        #     print(param_dict[name])
+        # print(param_dict)
+        # print('~~~~~~~')
+        for name, param in self.layer_dict.named_parameters():
             path_bits = name.split(".")
             layer_name = path_bits[0]
             if layer_name not in param_dict:
                 param_dict[layer_name] = None
+
         (num_samples,seq_len,mel_bins) = x.shape
-        
         x = x.view(-1,1,seq_len,mel_bins)
         
         out = x
-
+        
         for i in range(self.num_stages):
             # print(param_dict['conv{}'.format(i)])
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
@@ -660,31 +672,37 @@ class Convnet(nn.Module):
         else:
             return out
 
+
+
     def restore_backup_stats(self):
         """
         Reset stored batch statistics from the stored backup.
         """
-        for name, module in self.named_modules():
-            if type(module) == MetaBatchNormLayer:
-                module.restore_backup_stats()
+        for i in range(self.num_stages):
+            self.layer_dict['conv{}'.format(i)].restore_backup_stats()
+
+
 
     def zero_grad(self, params=None):
         if params is None:
             for param in self.parameters():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            # print(param.grad)
-                            param.grad.zero_()
+                if (
+                    param.requires_grad == True
+                    and param.grad is not None
+                    and torch.sum(param.grad) > 0
+                ):
+                    # print(param.grad)
+                    param.grad.zero_()
         else:
             for name, param in params.items():
-                # print(name)
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            print(param.grad)
-                            param.grad.zero_()
-                            params[name].grad = None
+                if (
+                    param.requires_grad == True
+                    and param.grad is not None
+                    and torch.sum(param.grad) > 0
+                ):
+                    # print(param.grad)
+                    param.grad.zero_()
+                    params[name].grad = None
 
 
 
@@ -776,13 +794,16 @@ class ConvnetClassifier(nn.Module):
         param_dict = dict()
 
         if params is not None:
+            # params = {key: value[0] for key, value in params.items()}
             param_dict = extract_top_level_dict(current_dict=params)
 
-        for name, param in list(self.layer_dict.named_parameters()) + list(self.layer_dict.items()):
+
+        for name, param in self.layer_dict.named_parameters():
             path_bits = name.split(".")
             layer_name = path_bits[0]
             if layer_name not in param_dict:
                 param_dict[layer_name] = None
+        # print(param_dict.keys())
         (num_samples,seq_len,mel_bins) = x.shape
         
         x = x.view(-1,1,seq_len,mel_bins)
@@ -833,7 +854,7 @@ class ConvnetClassifier(nn.Module):
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            # print(param.grad)
                             param.grad.zero_()
                             params[name].grad = None
 
