@@ -587,7 +587,7 @@ class Convnet(nn.Module):
                                                                         kernel_size=3, stride=self.conv_stride,
                                                                         padding=1,
                                                                         use_bias=True, cfg=self.config,
-                                                                        normalization=True,
+                                                                        normalization=False,
                                                                         meta_layer=self.meta_classifier,
                                                                         no_bn_learnable_params=False,
                                                                         device=self.device)

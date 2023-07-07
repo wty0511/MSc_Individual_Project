@@ -35,7 +35,7 @@ debug = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
-cfg = compose(config_name="config_snn.yaml")
+cfg = compose(config_name="config_tnn.yaml")
 print('preparing training dataset')
 train_dataset = ClassPairDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
 print(len(train_dataset))
@@ -48,8 +48,8 @@ class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 128)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-model = SNN(cfg)
-# model =TriNet(cfg)
+# model = SNN(cfg)
+model =TriNet(cfg)
 # for param in model.parameters():
 #     param.fast = None
 print(len(train_loader))

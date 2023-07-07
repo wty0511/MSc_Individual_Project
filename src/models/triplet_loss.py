@@ -62,7 +62,7 @@ def TripletSemiHardLoss(y_true, y_pred, device, margin=0.2):
 
     # Build pairwise binary adjacency matrix.
     adjacency = torch.eq(labels, labels.transpose(0, 1))
-
+    # print(adjacency.shape)
     # Invert so we can select negatives only.
     adjacency_not = adjacency.logical_not()
 
@@ -105,8 +105,7 @@ def TripletSemiHardLoss(y_true, y_pred, device, margin=0.2):
 
     mask_positives = adjacency.to(dtype=torch.float32) - torch.diag(torch.ones(batch_size)).to(device)
     num_positives = mask_positives.sum()
-  
-
+    # print(num_positives)
     triplet_loss = (torch.max(torch.mul(loss_mat, mask_positives), torch.tensor([0.]).to(device))).sum() / num_positives
     triplet_loss = triplet_loss.to(dtype=embeddings.dtype)
     return triplet_loss

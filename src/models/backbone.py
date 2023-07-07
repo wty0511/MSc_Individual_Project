@@ -100,7 +100,34 @@ class ConvBlock(nn.Module):
         out = self.trunk(x)
         return out
 
+class ConvBlock_nobn(nn.Module):
 
+    def __init__(self, indim, outdim, pool = True, padding = 1):
+        super(ConvBlock_nobn, self).__init__()
+        self.indim  = indim
+        self.outdim = outdim
+
+        self.C      = Conv2d_fw(indim, outdim, 3, padding = padding)
+        # self.BN     = BatchNorm2d_fw(outdim)
+        self.relu   = nn.ReLU(inplace=True)
+        # self.relu   = nn.LeakyReLU(0.1, inplace=True)
+
+        # self.parametrized_layers = [self.C, self.BN, self.relu]
+        self.parametrized_layers = [self.C,  self.relu]
+        
+        if pool:
+            self.pool   = nn.MaxPool2d(2)
+            self.parametrized_layers.append(self.pool)
+
+        for layer in self.parametrized_layers:
+            init_layer(layer)
+        self.trunk = nn.Sequential(*self.parametrized_layers)
+
+
+    def forward(self,x):
+        out = self.trunk(x)
+        return out
+    
 
 class ConvNetClassifierfw(nn.Module):
     def __init__(self, depth = 3):
@@ -119,8 +146,25 @@ class ConvNetClassifierfw(nn.Module):
         # print('out',out.shape)
         out = self.fc(out)
         return out
-    
-    
+
+
+class ConvNetClassifierfw_nobn(nn.Module):
+    def __init__(self, depth = 3):
+        super(ConvNetClassifierfw_nobn,self).__init__()
+        self.conv = ConvNetfw_large_nobn(depth = 4)
+        self.fc = Linear_fw(512, 2)
+        # init.xavier_uniform_(self.fc.weight)
+
+        # print(self.fc.weight.data)
+        # print(self.fc.bias.data)
+        self.fc.bias.data.fill_(0)
+        # print('weight',self.fc.bias.data)
+        
+    def forward(self,x):
+        out = self.conv(x)
+        # print('out',out.shape)
+        out = self.fc(out)
+        return out
 
 
 class ConvNetClassifierSmallfw(nn.Module):
@@ -151,6 +195,27 @@ class ConvNetfw_large(nn.Module):
             indim = 1 if i == 0 else 128
             outdim = 128
             B = ConvBlock(indim, outdim, pool = ( i < 3 ) ) #only pooling for fist 4 layers
+            trunk.append(B)
+        self.trunk = nn.Sequential(*trunk)
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
+    def forward(self,x):
+
+        (num_samples,seq_len,mel_bins) = x.shape
+        x = x.view(-1,1,seq_len,mel_bins)
+        out = self.trunk(x)
+        out = self.avgpool(out)
+        out = out.view(x.size(0),-1)
+        return out
+    
+
+class ConvNetfw_large_nobn(nn.Module):
+    def __init__(self, depth = 4):
+        super(ConvNetfw_large_nobn,self).__init__()
+        trunk = []
+        for i in range(depth):
+            indim = 1 if i == 0 else 128
+            outdim = 128
+            B = ConvBlock_nobn(indim, outdim, pool = ( i < 3 ) ) #only pooling for fist 4 layers
             trunk.append(B)
         self.trunk = nn.Sequential(*trunk)
         self.avgpool = nn.AdaptiveAvgPool2d((4,1))

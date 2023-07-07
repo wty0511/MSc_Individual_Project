@@ -166,6 +166,8 @@ class ClassDataset(Dataset):
         
     def process_labels(self, same_label):
         print("Processing labels...")
+        count = {}
+        c = 0
         for file in tqdm(walk_files(self.data_dir,debug= self.debug, file_extension = ('.csv'))):
 
             df = pd.read_csv(file)
@@ -174,7 +176,10 @@ class ClassDataset(Dataset):
 
             # class name starts from the 4th column
             for column in df.columns[3:]:
+                
                 pos_idx = df[df[column] == 'POS'].index.tolist()
+                count[column] = count.get(column, 0) + len(pos_idx)
+                
                 if not same_label:
                     column = column + '&'+ file
                 self.classes.add(column)
@@ -189,6 +194,7 @@ class ClassDataset(Dataset):
                 for s, e in zip(start, end):
                     meta_temp['time_spane'].append({'start': s, 'end': e, 'file': file})
                     meta_temp['duration'].append(e - s)
+                    c += e - s
                 # print('file', file, 'column', column)
                 # print('before merge', len(meta_temp['time_spane']))
                 meta_temp = merge_intervals(meta_temp)
@@ -219,8 +225,8 @@ class ClassDataset(Dataset):
                         else:
                             raise Exception('start time is smaller than end time')
 
-                    
-        
+        # print('count', count)
+        # print(c)
     def get_pos_sample(self, selected_class, seg_length = 10):
         # print('getting pos sample', self.seg_meta[selected_class])
         # print('getting pos sample')

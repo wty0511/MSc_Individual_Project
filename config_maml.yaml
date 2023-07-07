@@ -32,7 +32,7 @@ train:
   n_way: 2
   n_support: 5
   n_query: 5
-  backbone:  convclassifierfw
+  backbone:  convclassifierfw_nobn
   # backbone:  convnetlarge
   # backbone:  convnetfw
   

@@ -308,7 +308,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                     training=True,
                     num_step=num_step,
                 )
-
+                # print(support_loss)
                 # print('first layer before update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                 # print('step',num_step)
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
@@ -415,8 +415,6 @@ class TNNMAMLFewShotClassifier(nn.Module):
                         neg_seg_sample = neg_sup[1][neg_indices]
                     else:
                         neg_seg_sample = neg_sup[1]
-                    neg_seg_sample = neg_sup[1]
-
                     # neg_seg_sample_index = self.get_topk_sim(pos_data, neg_seg_sample)
                     # neg_seg_sample = neg_seg_sample[neg_seg_sample_index]
                     self.num_classes_per_set = self.config.train.n_way
@@ -436,10 +434,12 @@ class TNNMAMLFewShotClassifier(nn.Module):
   
                     task_losses = []
                     support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
+                    
                     # support_data = pos_data
                     m = pos_data.shape[0]
                     n = neg_seg_sample.shape[0]
-                    
+                    # print('m',m)
+                    # print('n',n)
                     support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
                     support_label = torch.from_numpy(support_label).long().to(self.device)
                     per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
@@ -684,6 +684,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         out_put = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
+        # print(out_put.shape)
         feat = F.normalize(out_put, dim=1)
         loss = self.loss_fn(feat, y)
         
@@ -743,7 +744,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         score = -dist
         # print(dist.shape)
         acc = (torch.sum(torch.argmax(score, dim=1) == y).float() / y.size(0)).item()
-        print(F.softmax(score, dim = 1))
+        # print(F.softmax(score, dim = 1))
         
         loss = self.ce(score, y)
         return loss, acc

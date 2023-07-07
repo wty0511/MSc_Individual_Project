@@ -224,6 +224,7 @@ class MAML_proto(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
         best_res_all = []
         best_threshold_all = []
+        all_loss = []
         for i in range(1):
             all_prob = {}
             all_meta = {}
@@ -313,10 +314,16 @@ class MAML_proto(BaseModel):
                         prob_all.append(prob)
                     prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################
-                    soft_prob = F.softmax(torch.from_numpy(prob_all), dim=1)
-                    loss = F.cross_entropy(soft_prob,torch.from_numpy(np.array(all_meta[wav_file]['label']).astype('long')))
+                    temp_prob = torch.from_numpy(prob_all).to(self.device)
+                    # print(all_meta[wav_file]['label'])
+                    pos_num =torch.sum(all_meta[wav_file]['label']==0)
+                    neg_num = torch.sum(all_meta[wav_file]['label']==1)
+                    
+                    loss = F.cross_entropy(temp_prob,all_meta[wav_file]['label'].to(self.device),weight = torch.tensor([neg_num/pos_num, 1]).to(self.device)).to(self.device)
                     print('loss', loss.item())
+                    all_loss.append(loss.detach().cpu().numpy())
                     prob_all = prob_all[:,0]
+                    
                     
                     
                     
@@ -405,10 +412,10 @@ class MAML_proto(BaseModel):
             # print('~~~~~~~~~~~~~~~')
             best_threshold_all.append(best_threshold)
             best_res_all.append(best_res)
-            
+        print('losses', np.mean(all_loss))
         print(self.average_res(best_res_all))
         print(np.mean(best_threshold_all))
-        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all)
+        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all) , np.mean(all_loss)
     
     
     

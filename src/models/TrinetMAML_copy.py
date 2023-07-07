@@ -72,12 +72,12 @@ class TNNMAML(BaseModel):
         #                 smooth_loss=False,
         #                 triplets_per_anchor= 10,
         #                 distance = LpDistance(normalize_embeddings=True, p=2, power=2))
-        self.loss_fn = TripletLoss(margin=0.2)
+        self.loss_fn = TripletLoss(margin= self.config.train.margin)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
         
-        self.config.train.lr_inner = 0.01
+        # self.config.train.lr_inner = 0.01
         fast_parameters = list(self.feature_extractor.parameters())
         for weight in self.feature_extractor.parameters():
             weight.fast = None
@@ -168,7 +168,7 @@ class TNNMAML(BaseModel):
 
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
-    
+        loss_epoch = []
         for i, task_batch in tqdm(enumerate(data_loader)):
             accuracies = []
             losses = []
@@ -201,8 +201,10 @@ class TNNMAML(BaseModel):
 
                 opt.zero_grad()
                 # print('outer loop: loss:{:.3f}'.format(loss.item()))
+                
             loss_q = torch.stack(loss_all).sum(0)
             loss_q.backward()
+            loss_epoch.append(loss_q.item()/len(task_batch))
             print('outer loop: acc:{:.3f}'.format(torch.stack(accuracies).mean().item()))
             # for i in self.parameters():
             #     print(i.grad)
@@ -212,9 +214,11 @@ class TNNMAML(BaseModel):
             opt.step()
             opt.zero_grad()
             print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
+        return np.mean(loss_epoch)
+            
     def train_loop(self, data_loader, optimizer):
         
-        self.outer_loop(data_loader, mode = 'train', opt = optimizer)
+        return self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
     def get_topk_sim(self, pos, neg):
         # 最不相似的k个
@@ -232,6 +236,8 @@ class TNNMAML(BaseModel):
     def test_loop(self, test_loader, fix_shreshold=None, mode = 'test'): 
         best_res_all = []
         best_threshold_all = []
+        
+        all_loss = []
         for i in range(1):
             
             all_prob = {}
@@ -388,10 +394,17 @@ class TNNMAML(BaseModel):
                             f['features'][size:nwe_size] = feats
                     prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################
-                    
+                    temp_prob = torch.from_numpy(prob_all).to(self.device)
+                    # print(all_meta[wav_file]['label'])
+                    pos_num =torch.sum(all_meta[wav_file]['label']==0)
+                    neg_num = torch.sum(all_meta[wav_file]['label']==1)
+                    loss = F.cross_entropy(temp_prob,all_meta[wav_file]['label'].to(self.device),weight = torch.tensor([neg_num/pos_num, 1]).to(self.device)).to(self.device)
+                    print('loss', loss.item())
+                    all_loss.append(loss.detach().cpu().numpy())
                     prob_all = prob_all[:,0]
                     # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
                     prob_mean.append(prob_all)
+                    
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)
                 all_prob[wav_file] = prob_mean
             
@@ -489,18 +502,13 @@ class TNNMAML(BaseModel):
             # print('~~~~~~~~~~~~~~~')
         print(self.average_res(best_res_all))
         print(np.mean(best_threshold_all))
-        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all)
+        print('losses', np.mean(all_loss))
+        
+        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all), np.mean(all_loss)
     
     
     
     
-    def euclidean_dist(self,query, support):
-        n = query.size(0)
-        m = support.size(0)
-        query = query.unsqueeze(1).expand(n, m, -1)
-        support = support.unsqueeze(0).expand(n, m, -1)
-
-        return torch.pow(query - support, 2).sum(2)
 
 
     # def euclidean_dist(self,query, support):
