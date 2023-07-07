@@ -79,8 +79,12 @@ class ProtoMAML(BaseModel):
             # Calculate gradients and perform inner loop update
             # loss.backward()
             grad = torch.autograd.grad(loss, local_model.parameters(), create_graph=True)
+            if self.approx:
+                grad = [ g.detach()  for g in grad ] 
+                
             grad_head = torch.autograd.grad(loss, classifier_head, create_graph=True)
             # local_optim.step()
+            
             for k, weight in enumerate(local_model.parameters()):
                 weight.data = weight.data - self.config.train.lr_inner * grad[k]
             output_weight.data = output_weight.data - self.config.train.lr_inner * grad_head[0]
@@ -459,7 +463,7 @@ class ProtoMAML(BaseModel):
                 
                 df_all_time = pd.DataFrame(all_time)
 
-                # df_all_time = post_processing(df_all_time, self.config, mode)
+                df_all_time = post_processing(df_all_time, self.config, mode)
                 df_all_time = df_all_time.astype('str')
                 pred_path = normalize_path(self.config.checkpoint.pred_dir)
                 pred_path = os.path.join(pred_path, 'pred_{:.2f}.csv'.format(threshold))

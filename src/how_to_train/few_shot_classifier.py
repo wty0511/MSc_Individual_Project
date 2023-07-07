@@ -285,7 +285,7 @@ class MAMLFewShotClassifier(nn.Module):
                     x=support_data,
                     y=support_label,
                     weights=names_weights_copy,
-                    backup_running_statistics=num_step == 0,
+                    backup_running_statistics=num_step,
                     training=True,
                     num_step=num_step,
                 )
@@ -303,12 +303,13 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  y=query_label, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
-
+                    # print('last step', num_step)
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 
 
             
                 elif num_step == (self.config.train.inner_step - 1):
+                    # print('last step')
                     output_weight = (output_weight - init_weight).detach() + init_weight
                     output_bias = (output_bias - init_bias).detach() + init_bias
                     target_loss, target_preds = self.net_forward(x=query_data,
@@ -400,10 +401,10 @@ class MAMLFewShotClassifier(nn.Module):
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                     neg_feat = []
-                    for batch in neg_loader:
+                    for i, batch in enumerate(neg_loader):
                         n_data, _ = batch
                         # print(neg_data.shape)
-                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics=True, output_features=False)
+                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics= i==0, output_features=False)
                         # print(feat.shape)
                         neg_feat.append(feat.mean(0))
                     neg_feat = torch.stack(neg_feat, dim=0).mean(0)
@@ -451,13 +452,14 @@ class MAMLFewShotClassifier(nn.Module):
                     self.classifier.zero_grad()
                     # self.classifier_head.zero_grad()
                     # print(names_weights_copy['weight'])
+                    # print(num_steps)
                     for num_step in range(num_steps):
 
                         support_loss, support_preds = self.net_forward(
                             x=support_data,
                             y=support_label,
                             weights=names_weights_copy,
-                            backup_running_statistics=num_step == 0,
+                            backup_running_statistics=False,
                             training=True,
                             num_step=num_step,
                             test = True
@@ -471,7 +473,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                         current_step_idx=num_step)
                         # print(names_weights_copy['weight'])
                         # print('~~~~')
-                        preds_feat = self.classifier(support_data, num_step=self.config.train.inner_step - 1, training=True, backup_running_statistics=True, output_features=False)
+                        preds_feat = self.classifier(support_data, num_step=self.config.train.inner_step - 1, training=True, backup_running_statistics=False, output_features=False)
                         head_weight = names_weights_copy['weight']
                         head_bias = names_weights_copy['bias']
                         preds = F.linear(preds_feat, head_weight, head_bias)
@@ -490,7 +492,7 @@ class MAMLFewShotClassifier(nn.Module):
                             query_data, _ = batch
                             preds_feat = self.classifier.forward(x=query_data, params=names_weights_copy,
                                             training=True,
-                                            backup_running_statistics=True, num_step=self.config.train.inner_step - 1)
+                                            backup_running_statistics=False, num_step=self.config.train.inner_step - 1)
                             head_weight = names_weights_copy['weight']
                             head_bias = names_weights_copy['bias']
                             preds = F.linear(preds_feat, head_weight, head_bias)
@@ -654,7 +656,7 @@ class MAMLFewShotClassifier(nn.Module):
         neg_num = x[(y == 1)].shape[0]
         
         if test:
-            weights = torch.cat((torch.full((1,), max(neg_num/pos_num, 1), dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((1,), neg_num/pos_num, dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(input=preds, target=y,weight=weights)
         else:
             preds = preds
@@ -875,7 +877,7 @@ class MAMLFewShotClassifier(nn.Module):
                     if model is not None:
                         feature_pos = model.forward(data)
                     else:
-                        feature_pos = self.classifier(data, num_step=0, training=True, backup_running_statistics=False, output_features=False)
+                        feature_pos = self.classifier(data, num_step=0, training=True, backup_running_statistics=True, output_features=False)
                     pos_all.append(feature_pos)
                 feature_pos = torch.cat(pos_all, dim=0)
                 
@@ -885,7 +887,7 @@ class MAMLFewShotClassifier(nn.Module):
                     if model is not None:
                         feature_neg = model.forward(data)
                     else:
-                        feature_neg = self.classifier(data, num_step=0, training=True, backup_running_statistics=False, output_features=False)
+                        feature_neg = self.classifier(data, num_step=0, training=True, backup_running_statistics=True, output_features=False)
                     neg_all.append(feature_neg)
                 feature_neg = torch.cat(neg_all, dim=0)
             else:
@@ -904,7 +906,7 @@ class MAMLFewShotClassifier(nn.Module):
                 if model is not None:
                     feature_pos = model.forward(pos_input)
                 else:
-                    feature_pos = self.classifier(pos_input, num_step=0, training=True, backup_running_statistics=False, output_features=False)
+                    feature_pos = self.classifier(pos_input, num_step=0, training=True, backup_running_statistics=True, output_features=False)
                 
             else:
                 feature_pos = pos_input

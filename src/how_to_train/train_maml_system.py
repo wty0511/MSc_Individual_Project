@@ -28,6 +28,15 @@ def set_seed(seed):
     random.seed(seed)
 SEED = 42
 set_seed(SEED)
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
+SEED = 22
+set_seed(SEED)
 
 cfg = compose(config_name="configmamlpp_proto.yaml")
 
@@ -38,5 +47,5 @@ model = MAMLFewShotClassifier(cfg)
 data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 # maml_system.run_experiment()
-ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnetlarge_1/Model/best_model.pth"
+ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnetlarge_2/Model/best_model.pth"
 maml_system.test(ckpt)

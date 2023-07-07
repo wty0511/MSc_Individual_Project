@@ -35,7 +35,7 @@ train:
   # backbone:  convclassifierfw
   backbone:  convnetlarge
   model_type: protonet
-  epoches: 51
+  epoches: 40
   lr: 0.001
   lr_inner: 0.01
   momentum: 0.9
@@ -49,9 +49,9 @@ train:
   enable_inner_loop_optimizable_bn_params: False
   second_order: False
   use_multi_step_loss_optimization: True
-  learnable_bn_gamma: True
-  learnable_bn_beta: True
-  per_step_bn_statistics: True
+  learnable_bn_gamma: False
+  learnable_bn_beta: False
+  per_step_bn_statistics: False
   norm_layer: batch_norm
 
 val:
@@ -80,4 +80,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: 1
+version: 2

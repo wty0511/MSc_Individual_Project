@@ -42,7 +42,7 @@ set_seed(SEED)
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 
-save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_5way_5step_convnet/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/MAML_proto_10way_5step_convnetfwlarge_nobn_first_order_test/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -67,13 +67,13 @@ print('f1:', checkpoint['f1'])
 # model = ProtoMAML_temp(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
-model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_refine(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML2(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
-# model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
@@ -81,7 +81,7 @@ model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # for name, param in model.named_parameters():
 #     print(name)
 #     print(param.shape)
-# model.load_state_dict(model_state)
+model.load_state_dict(model_state)
 
 
 # for name,  param in model.named_parameters():
@@ -92,7 +92,7 @@ model.eval()
 val_dataset = FileDataset(cfg,val=is_val,debug=False)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
 # checkpoint['threshold'] = None
-df_all_time, report, best_threshold = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'], mode = 'val' if is_val else 'test')
+df_all_time, report, best_threshold, loss = model.test_loop(val_loader, fix_shreshold=checkpoint['threshold'], mode = 'val' if is_val else 'test')
 
 report_dir = normalize_path(cfg.checkpoint.report_dir)
 report_dir = os.path.join(report_dir,'test_report_best.json')
@@ -100,8 +100,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-# with open(report_dir, 'w') as outfile:
-    # json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))
