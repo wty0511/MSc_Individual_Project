@@ -36,7 +36,7 @@
     "lr": 0.001,
     "lr_inner": 0.01,
     "momentum": 0.9,
-    "margin": 0.5,
+    "margin": 0.2,
     "weight_decay": 0.0005,
     "optimizer": "Adam",
     "task_batch_size": 20,
@@ -62,13 +62,13 @@
   "checkpoint": {
     "save_freq": 5,
     "resume": false,
-    "best_model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.5_1/Model/model_best.pth.tar",
+    "best_model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.2_1/Model/model_best.pth.tar",
     "start_epoch": 0,
-    "experiment_name": "TNN_MAML_10way_5step_convnetfwlarge_0.5_1",
-    "exp_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.5_1",
-    "model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.5_1/Model",
-    "pred_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.5_1/Predictions",
-    "report_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.5_1/Reports"
+    "experiment_name": "TNN_MAML_10way_5step_convnetfwlarge_0.2_1",
+    "exp_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.2_1",
+    "model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.2_1/Model",
+    "pred_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.2_1/Predictions",
+    "report_dir": "/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_0.2_1/Reports"
   },
   "team_name": "tw1022",
   "dataset": "EVAL",

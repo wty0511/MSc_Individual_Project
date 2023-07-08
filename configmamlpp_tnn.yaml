@@ -53,7 +53,7 @@ train:
   learnable_bn_beta: True
   per_step_bn_statistics: True
   norm_layer: batch_norm
-
+  
 val:
   seg_len_base: 30
   hop_len_frac: 3

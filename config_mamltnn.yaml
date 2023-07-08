@@ -28,7 +28,6 @@ features:
 
 
 train:
-  margin: 0.5
   neg_prototype: False
   n_way: 10
   n_support: 5
@@ -40,6 +39,7 @@ train:
   lr: 0.001
   lr_inner: 0.01
   momentum: 0.9
+  margin: 0.2
   weight_decay: 0.0005
   optimizer: Adam
   task_batch_size: 20
