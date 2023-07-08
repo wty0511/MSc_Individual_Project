@@ -26,39 +26,6 @@ from pytorch_metric_learning import  losses,reducers
 from pytorch_metric_learning.distances import LpDistance
 from src.models.triplet_loss import *
 
-class ContrastiveLoss(nn.Module):
-    def __init__(self, margin):
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-    
-    def forward(self, output1, output2, label):
-        euclidean_distance = nn.PairwiseDistance(p=2)  # 欧氏距离计算
-        distances = euclidean_distance(output1, output2)
-        losses = 0.5 * (1 - label) * torch.pow(distances, 2) + \
-                 0.5 * label * torch.pow(torch.clamp(self.margin - distances, min=0.0), 2)
-        loss = torch.mean(losses)
-        return loss
-
-
-
-
-# class TripletLoss(nn.Module):
-#     def __init__(self, margin=1.0):
-#         super(TripletLoss, self).__init__()
-#         self.margin = margin
-
-#     def forward(self, anchor, positive, negative):
-#         # print(anchor.shape)
-#         # print(positive.shape)
-#         # print(negative.shape)
-#         distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
-#         # print(distance_positive)
-#         distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
-#         # print(distance_negative)
-#         # print('~~~~~~~~~~~~~')
-#         losses = F.relu(distance_positive - distance_negative + self.margin)
-#         return losses.mean()
-
 
     
 class TNNMAML(BaseModel):
@@ -70,7 +37,7 @@ class TNNMAML(BaseModel):
         # self.loss_fn = losses.TripletMarginLoss(margin=0.2,
         #                 swap=False,
         #                 smooth_loss=False,
-        #                 triplets_per_anchor= 10,
+        #                 triplets_per_anchor= 'all',
         #                 distance = LpDistance(normalize_embeddings=True, p=2, power=2))
         self.loss_fn = TripletLoss(margin= self.config.train.margin)
         self.approx = True
@@ -268,7 +235,7 @@ class TNNMAML(BaseModel):
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 
                 prob_mean = []
-                for i in range(5):
+                for i in range(1):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     # test_loop_neg_sample = 200
                     neg_sup[1] = neg_sup[1].squeeze() 

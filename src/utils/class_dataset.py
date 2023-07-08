@@ -17,34 +17,13 @@ from src.utils.sampler import *
 from torch.utils.data import DataLoader
 from src.utils.helpers import *
 import time
-def meta_learning_collate_fn(batch):
-    print(batch)
-    support_set_indices = batch[0]['support_set']
-    query_set_indices = batch[0]['query_set']
 
-    return {
-        'support_set': support_set_indices,
-        'query_set': query_set_indices
-    }
-    
-# def meta_learning_collate_fn(batch):
-#     # Assuming the batch is a list of dictionaries
-#     support_set_indices = batch[0]['support_set']
-#     query_set_indices = batch[0]['query_set']
-
-#     support_set_samples = [train_dataset.get_sample(idx) for idx in support_set_indices]
-#     query_set_samples = [train_dataset.get_sample(idx) for idx in query_set_indices]
-
-#     return {
-#         'support_set': support_set_samples,
-#         'query_set': query_set_samples
-#     }
 
 class ClassDataset(Dataset):
     def __init__(self, config, mode,same_class_in_different_file, debug):
         self.config = config
         self.feature_list = config.features.feature_list.split("&")
-        if mode == 'train' or mode == 'anchor':
+        if mode == 'train' or mode == 'anchor' or mode == 'TNN':
             self.data_dir = normalize_path(config.path.train_dir)
         elif mode == 'val':
             self.data_dir = normalize_path(config.path.val_dir)
@@ -83,12 +62,13 @@ class ClassDataset(Dataset):
         else:
             # self.length = int(3* 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
             self.length = 500
-            
+        
+        if mode == 'pretrain' or mode == 'TNN':
+            self.length = 5000
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.recent_return_sample = {}
         for key in self.seg_meta.keys():
             self.recent_return_sample[key] = set()
-
     
     
     def __getitem__(self, class_name):
@@ -106,7 +86,7 @@ class ClassDataset(Dataset):
                 sample = self.get_task(name)
                 task_batch.append(sample)
             return task_batch
-        elif isinstance(class_name, str) and (self.mode != 'pretrain' and self.mode != 'anchor'):
+        elif isinstance(class_name, str) and (self.mode != 'pretrain' and self.mode != 'anchor' and self.mode != 'TNN'):
             if len(self.recent_return_sample[class_name]) == self.config.train.n_support + self.config.train.n_query:
                     self.recent_return_sample[class_name] = set()
             while True:
@@ -116,9 +96,8 @@ class ClassDataset(Dataset):
                         break
             sample = self.get_task(class_name)
             return [sample]
-        elif self.mode == 'pretrain' or self.mode == 'anchor':
+        elif self.mode == 'pretrain' or self.mode == 'anchor' or self.mode == 'TNN':
             task =self.get_task(class_name)
-            
             return task[1], torch.tensor(task[2]).to(self.device)
         else:
             raise ValueError('Unknown type')

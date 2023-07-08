@@ -46,9 +46,9 @@ train:
   min_lr: 0.0001
   multi_step_loss_num_epochs: 15
   first_order_to_second_order_epoch: 100
-  enable_inner_loop_optimizable_bn_params: False
+  enable_inner_loop_optimizable_bn_params: True
   second_order: False
-  use_multi_step_loss_optimization: True
+  use_multi_step_loss_optimization: False
   learnable_bn_gamma: False
   learnable_bn_beta: False
   per_step_bn_statistics: False

@@ -31,7 +31,7 @@ class ProtoMAML(BaseModel):
             lr_output - Learning rate for the output layer in the inner loop
             num_inner_steps - Number of inner loop updates to perform
         """
-        
+        self.approx = True
         super(ProtoMAML, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
@@ -81,12 +81,14 @@ class ProtoMAML(BaseModel):
             grad = torch.autograd.grad(loss, local_model.parameters(), create_graph=True)
             if self.approx:
                 grad = [ g.detach()  for g in grad ] 
-                
+            
             grad_head = torch.autograd.grad(loss, classifier_head, create_graph=True)
             # local_optim.step()
             
             for k, weight in enumerate(local_model.parameters()):
-                weight.data = weight.data - self.config.train.lr_inner * grad[k]
+                if weight.requires_grad:
+                    weight.data = weight.data - self.config.train.lr_inner * grad[k]
+                
             output_weight.data = output_weight.data - self.config.train.lr_inner * grad_head[0]
             output_bias.data = output_bias.data - self.config.train.lr_inner * grad_head[1]
             
@@ -318,7 +320,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):

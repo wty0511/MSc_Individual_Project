@@ -42,7 +42,7 @@ set_seed(SEED)
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 
-save_file = r"/root/task5_2023/Checkpoints/MAML_proto_10way_5step_convnetfwlarge_nobn_first_order_test/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_formal_1/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
 # 加载模型
 checkpoint = torch.load(save_file)
@@ -73,10 +73,10 @@ print('f1:', checkpoint['f1'])
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML2(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-# model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
 # for name, param in model.named_parameters():
 #     print(name)
@@ -100,8 +100,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-with open(report_dir, 'w') as outfile:
-    json.dump(report, outfile)
+# with open(report_dir, 'w') as outfile:
+#     json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))

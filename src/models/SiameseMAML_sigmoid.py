@@ -21,18 +21,7 @@ from copy import deepcopy
 import random
 import torch.optim as optim
 from src.utils.sampler import *
-class ContrastiveLoss(nn.Module):
-    def __init__(self, margin):
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-    
-    def forward(self, output1, output2, label):
-        euclidean_distance = nn.PairwiseDistance(p=2)  # 欧氏距离计算
-        distances = euclidean_distance(output1, output2)
-        losses = 0.5 * (1 - label) * torch.pow(distances, 2) + \
-                 0.5 * label * torch.pow(torch.clamp(self.margin - distances, min=0.0), 2)
-        loss = torch.mean(losses)
-        return loss
+
     
     
 class SNNMAML(BaseModel):
@@ -40,7 +29,6 @@ class SNNMAML(BaseModel):
         super(SNNMAML, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = ContrastiveLoss(margin=20.0)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
         self.bce = nn.BCELoss()

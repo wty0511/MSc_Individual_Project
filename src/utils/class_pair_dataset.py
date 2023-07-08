@@ -82,7 +82,8 @@ class ClassPairDataset(Dataset):
     def __getitem__(self, class_name):
         if isinstance(class_name, str):
             # 0 同类， 1 异类
-            label = torch.randint(0, 2, (1,)).to(self.device)
+            label = random.choices([0, 1], weights=[1, 4], k=1)[0]
+            label = torch.tensor(label).to(self.device)
 
             return self.get_sample(class_name, self.config.features.segment_len_frame), label
         else:

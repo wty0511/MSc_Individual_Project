@@ -29,10 +29,10 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 10
+  n_way: 2
   n_support: 5
   n_query: 5
-  backbone:  convnetfwlarge_nobn
+  backbone:  convnetfwlarge
   # backbone:  convnetlarge
   # backbone:  convnetfw
   
@@ -40,6 +40,7 @@ train:
   epoches: 51
   lr: 0.001
   lr_inner: 0.01
+  frist_order: True
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
@@ -84,4 +85,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: first_order_test
+version: 1

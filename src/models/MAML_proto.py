@@ -31,7 +31,7 @@ class MAML_proto(BaseModel):
         
         super(MAML_proto, self).__init__(config)
         self.config = config
-        self.approx = True
+        self.approx = config.train.frist_order
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.test_loop_batch_size = 128
         
@@ -81,8 +81,8 @@ class MAML_proto(BaseModel):
                 else:
                     weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                 fast_parameters.append(weight.fast) # update the fast_parameters
-            output_weight = output_weight - self.config.train.lr_inner * grad_head[0]
-            output_bias = output_bias - self.config.train.lr_inner * grad_head[1]
+            output_weight = output_weight - 0.1 * grad_head[0]
+            output_bias = output_bias - 0.1 * grad_head[1]
             
             classifier_head = [output_weight, output_bias]
         #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item()))

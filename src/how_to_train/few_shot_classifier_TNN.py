@@ -17,36 +17,6 @@ from src.how_to_train.meta_optimizer import LSLRGradientDescentLearningRule, Gra
 from src.how_to_train.meta_neural_net_work_architectures import Convnet
 from src.utils.class_pair_dataset import *
 from src.models.triplet_loss import TripletLoss
-# def set_torch_seed(seed):
-#     """
-#     Sets the pytorch seeds for current experiment run
-#     :param seed: The seed (int)
-#     :return: A random number generator to use
-#     """
-#     rng = np.random.RandomState(seed=seed)
-#     torch_seed = rng.randint(0, 999999)
-#     torch.manual_seed(seed=torch_seed)
-
-#     return rng
-
-
-# class TripletLoss(nn.Module):
-#     def __init__(self, margin=1.0):
-#         super(TripletLoss, self).__init__()
-#         self.margin = margin
-
-#     def forward(self, anchor, positive, negative):
-#         # print(anchor.shape)
-#         # print(positive.shape)
-#         # print(negative.shape)
-#         distance_positive = (anchor - positive).pow(2).sum(1)  # .pow(.5)
-#         # print(distance_positive)
-#         distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
-#         # print(distance_negative)
-#         # print('~~~~~~~~~~~~~')
-#         losses = F.relu(distance_positive - distance_negative + self.margin)
-#         return losses.mean()
-
 
     
 
@@ -190,7 +160,6 @@ class TNNMAMLFewShotClassifier(nn.Module):
         #     names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
         #     print('grad_shape',names_grads_copy[key].shape)
         #     print('weight_shape',names_weights_copy[key].shape)
-
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
                                                                      num_step=current_step_idx)
@@ -206,7 +175,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
-        losses = {'loss': torch.sum(torch.stack(total_losses))}
+        losses = {'loss': torch.mean(torch.stack(total_losses))}
 
         losses['accuracy'] = np.mean(total_accuracies)
 

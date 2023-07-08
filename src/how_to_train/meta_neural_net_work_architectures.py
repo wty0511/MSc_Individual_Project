@@ -526,13 +526,14 @@ class MetaNormLayerConvReLU(nn.Module):
             #print('no inner loop params', self)
 
         out = x
-
+        out = self.conv.forward(out, params=conv_params)
+        
         if self.normalization:
             out = self.norm_layer.forward(out, num_step=num_step,
                                           params=batch_norm_params, training=training,
                                           backup_running_statistics=backup_running_statistics)
 
-        out = self.conv.forward(out, params=conv_params)
+        
         out = self.layer_dict['activation_function_pre'].forward(out)
 
         return out
@@ -587,13 +588,13 @@ class Convnet(nn.Module):
                                                                         kernel_size=3, stride=self.conv_stride,
                                                                         padding=1,
                                                                         use_bias=True, cfg=self.config,
-                                                                        normalization=False,
+                                                                        normalization=True,
                                                                         meta_layer=self.meta_classifier,
                                                                         no_bn_learnable_params=False,
                                                                         device=self.device)
 
             out = self.layer_dict['conv{}'.format(i)](out, training=True, num_step=0)
-
+            
             if i < 3:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 

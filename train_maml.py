@@ -25,6 +25,7 @@ from src.utils.class_dataset import *
 from src.utils.file_dataset import *
 from src.training_pipeline import train
 from src.models.MAML2 import *
+from src.models.ProtoMAML_lr import *
 # from src.models.TrinetMAML import *
 from src.models.ProtoMAMLfw import *
 from src.models.TrinetMAML_copy import *
@@ -50,12 +51,15 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'MAML_proto'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
+model_name = 'TNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
 
 if model_name == 'ProtoMAML':
     cfg = compose(config_name="config_protomaml.yaml")
     model = ProtoMAML(cfg)
-
+    
+if model_name == 'ProtoMAML_lr':
+    cfg = compose(config_name="config_protomaml_lr.yaml")
+    model = ProtoMAML_lr(cfg)
 elif model_name == 'ProtoMAML_temp':
     cfg = compose(config_name="config_protomaml_temp.yaml")
     model = ProtoMAML_temp(cfg)
@@ -132,6 +136,7 @@ model_dir = normalize_path(model_dir)
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
+
 # optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr)
 # if model_name == 'MAML':
 #     optimizer = optim.Adam([

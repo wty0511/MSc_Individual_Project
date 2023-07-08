@@ -18,19 +18,6 @@ from sklearn.metrics import classification_report, f1_score
 from sklearn.metrics import silhouette_score
 
 
-class ContrastiveLoss(nn.Module):
-    def __init__(self, margin):
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-
-    def forward(self, embeddings1, embeddings2, labels):
-        euclidean_distance = torch.sqrt(torch.sum(torch.pow(embeddings1 - embeddings2, 2), dim=0))
-        loss = (labels * torch.pow(euclidean_distance, 2) +
-                (1 - labels) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
-        return torch.mean(loss) * 0.5
-
-
-
 
 class ProtoMAML(BaseModel):
     
@@ -48,8 +35,7 @@ class ProtoMAML(BaseModel):
         self.config = config
         self.approx = True
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.contrastive_loss = ContrastiveLoss(20)
-        
+
     # def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
         
         

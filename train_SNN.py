@@ -35,24 +35,45 @@ debug = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
-cfg = compose(config_name="config_tnn.yaml")
+
 print('preparing training dataset')
-train_dataset = ClassPairDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
-print(len(train_dataset))
+model_name = "TNN"
+
+if model_name == 'SNN':
+    train_dataset = ClassPairDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
+    class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
+    train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 128)
+    cfg = compose(config_name="config_snn.yaml")
+    model = SNN(cfg)
+elif model_name == 'TNN':
+    cfg = compose(config_name="config_tnn.yaml")
+    train_dataset = ClassDataset(cfg, mode = 'TNN', same_class_in_different_file=True, debug= debug)
+    class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
+    train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 512)
+    model =TriNet(cfg)
+
+print(len(train_loader))
 print(train_dataset.seg_meta.keys())
 print('preparing val dataset')
 val_dataset = FileDataset(cfg,val=True, debug= debug)
 print(val_dataset.seg_meta.keys())
 best_f1 = 0
-class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
+print(train_dataset.seg_meta.keys())
 
-train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 128)
+
+
+
+
+
+
+
+
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-# model = SNN(cfg)
-model =TriNet(cfg)
+
+
 # for param in model.parameters():
 #     param.fast = None
-print(len(train_loader))
+
 model = model.cuda()
 model_dir = cfg.checkpoint.model_dir
 model_dir = normalize_path(model_dir)

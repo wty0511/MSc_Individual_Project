@@ -32,7 +32,7 @@ class ContrastiveLoss(nn.Module):
         # print(cos_sim)
         
         # print(torch.sum(label==0))
-        losses =(1 - label) * torch.pow((1-cos_sim),2.0) + \
+        losses =1/4 * (1 - label) * torch.pow((1-cos_sim),2.0) + \
                  label * torch.pow(cos_sim, 2) * (cos_sim > self.margin).float()
                 
         loss = torch.mean(losses)
