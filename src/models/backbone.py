@@ -129,6 +129,27 @@ class ConvBlock_nobn(nn.Module):
     def forward(self,x):
         out = self.trunk(x)
         return out
+
+
+class PretrainClassifier(nn.Module):
+    def __init__(self, depth = 3):
+        super(PretrainClassifier,self).__init__()
+        self.conv = ConvNetfw_large(depth = 4)
+        self.fc = Linear_fw(512, 19)
+        # init.xavier_uniform_(self.fc.weight)
+
+        # print(self.fc.weight.data)
+        # print(self.fc.bias.data)
+        self.fc.bias.data.fill_(0)
+        # print('weight',self.fc.bias.data)
+        
+    def forward(self,x):
+        out = self.conv(x)
+        # print('out',out.shape)
+        out = self.fc(out)
+        return out
+
+
     
 
 class ConvNetClassifierfw(nn.Module):

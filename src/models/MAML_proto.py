@@ -45,6 +45,8 @@ class MAML_proto(BaseModel):
         init_bias = -torch.norm(prototypes, dim=1)**2
         output_weight = init_weight.detach().requires_grad_()
         output_bias = init_bias.detach().requires_grad_()
+        # output_weight = prototypes.detach().requires_grad_()
+        # output_bias = torch.zeros(prototypes.shape[0]).to(self.device).detach().requires_grad_()
         
         fast_parameters = list(self.feature_extractor.parameters())
         classifier_head = [output_weight, output_bias]
@@ -73,7 +75,7 @@ class MAML_proto(BaseModel):
             
             
             fast_parameters = []
-                
+            
             for k, weight in enumerate(self.parameters()):
                 #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                 if weight.fast is None:
@@ -81,8 +83,8 @@ class MAML_proto(BaseModel):
                 else:
                     weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                 fast_parameters.append(weight.fast) # update the fast_parameters
-            output_weight = output_weight - 0.1 * grad_head[0]
-            output_bias = output_bias - 0.1 * grad_head[1]
+            output_weight = output_weight - 0.01 * grad_head[0]
+            output_bias = output_bias - 0.01 * grad_head[1]
             
             classifier_head = [output_weight, output_bias]
         #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item()))
@@ -143,7 +145,7 @@ class MAML_proto(BaseModel):
         if mode == 'train':
             loss = F.cross_entropy(preds, labels)
         else:
-            loss = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 1), 1.0]).to(self.device))
+            loss = F.cross_entropy(preds, labels, weight=torch.tensor([neg_num/pos_num, 1.0]).to(self.device))
 
         # print(F.softmax(preds, dim = 1))
         acc = (preds.argmax(dim=1) == labels).float()
@@ -164,6 +166,7 @@ class MAML_proto(BaseModel):
         return preds
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
+        loss_epoch = []
         for i, task_batch in tqdm(enumerate(data_loader)):
             loss_all = []
             acc_all = []
@@ -216,10 +219,11 @@ class MAML_proto(BaseModel):
             opt.zero_grad()
             print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
             print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
+        return np.mean(loss_epoch)
 
     def train_loop(self, data_loader, optimizer):
         
-        self.outer_loop(data_loader, mode = 'train', opt = optimizer)
+        return self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
     def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
         best_res_all = []
@@ -259,6 +263,8 @@ class MAML_proto(BaseModel):
                 pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 pos_feat = []
+                for weight in self.feature_extractor.parameters():
+                    weight.fast = None
                 for batch in pos_loader:
                     p_data, _ = batch
                     feat = self.forward(p_data)
@@ -279,6 +285,8 @@ class MAML_proto(BaseModel):
 
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
+                    for weight in self.feature_extractor.parameters():
+                        weight.fast = None
                     neg_feat = []
                     for batch in neg_loader:
                         n_data, _ = batch
@@ -415,6 +423,7 @@ class MAML_proto(BaseModel):
         print('losses', np.mean(all_loss))
         print(self.average_res(best_res_all))
         print(np.mean(best_threshold_all))
+        # print(all_loss)
         return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all) , np.mean(all_loss)
     
     

@@ -127,7 +127,7 @@ class ExperimentBuilder(object):
                 total_losses[key] = [float(value)]
             else:
                 total_losses[key].append(float(value))
-        print(losses)
+        print(losses['loss'])
         train_losses = self.build_summary_dict(total_losses=total_losses, phase="train")
         train_output_update = self.build_loss_summary_string(losses)
 
@@ -363,7 +363,7 @@ class ExperimentBuilder(object):
     
     def test(self, check_point_path):
         checkpoint = torch.load(check_point_path)
-        self.model.load_state_dict(checkpoint['state'])
+        # self.model.load_state_dict(checkpoint['state'])
         
         
         self.config = checkpoint['config']

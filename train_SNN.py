@@ -40,16 +40,16 @@ print('preparing training dataset')
 model_name = "TNN"
 
 if model_name == 'SNN':
+    cfg = compose(config_name="config_snn.yaml")
     train_dataset = ClassPairDataset(cfg, mode = 'train', same_class_in_different_file=True, debug= debug)
     class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
     train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 128)
-    cfg = compose(config_name="config_snn.yaml")
     model = SNN(cfg)
 elif model_name == 'TNN':
     cfg = compose(config_name="config_tnn.yaml")
     train_dataset = ClassDataset(cfg, mode = 'TNN', same_class_in_different_file=True, debug= debug)
     class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
-    train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 512)
+    train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 256)
     model =TriNet(cfg)
 
 print(len(train_loader))
@@ -88,15 +88,15 @@ for epoch in range(100):
         os.makedirs(model_dir)
     model.eval()
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
-    if epoch % 10 == 0:
-        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
+    # if epoch % 10 == 0:
+    #     torch.save({'state':model.state_dict(), 'config':cfg}, save_file)
     df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold = 0.5)
     f1 = report['overall_scores']['fmeasure (percentage)']
     if f1 > best_f1:
         best_f1 = f1
         save_file = os.path.join(model_dir, 'best_model.pth')
         print(save_file)
-        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'model_name':'ProtoMAML', 'threshold' : threshold}, save_file)
+        torch.save({'state':model.state_dict(), 'config':cfg, 'threshold' : threshold}, save_file)
         print("best model! save...")
         report_dir = normalize_path(cfg.checkpoint.report_dir)
         report_dir = os.path.join(report_dir,'val_report_best.json')

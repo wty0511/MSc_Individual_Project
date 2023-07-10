@@ -63,16 +63,16 @@ class MAMLFewShotClassifierWithHead(nn.Module):
             names_weights_dict=self.get_inner_loop_parameter_dict(params= params_classifier))
         # self.inner_loop_optimizer.initialise(
             # names_weights_dict=self.get_inner_loop_parameter_dict(params=self.named_parameters()))
-        # print("Inner Loop parameters")
-        # for key, value in self.inner_loop_optimizer.named_parameters():
-        #     print(key, value.shape)
+        print("Inner Loop parameters")
+        for key, value in self.inner_loop_optimizer.named_parameters():
+            print(key, value.shape)
 
       
         self.to(self.device)
-        # print("Outer Loop parameters")
-        # for name, param in self.named_parameters():
-        #     if param.requires_grad:
-        #         print(name, param.shape, param.device, param.requires_grad)
+        print("Outer Loop parameters")
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                print(name, param.shape, param.device, param.requires_grad)
 
 
         self.optimizer = optim.Adam(self.trainable_parameters(), lr= cfg.train.lr, amsgrad=False)
@@ -184,7 +184,8 @@ class MAMLFewShotClassifierWithHead(nn.Module):
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = {'loss': torch.sum(torch.stack(total_losses))}
-
+        # print(sum(total_accuracies)/len(total_accuracies))
+        
         return losses
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):
@@ -220,14 +221,14 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 pos_data, neg_data = task 
                 classes, data_pos, _ =pos_data
                 _, data_neg, _ =neg_data
-                support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
+                # support_feat, query_feat = self.split_support_query_feature(data_pos, data_neg, is_data = True)
                 support_data, query_data = self.split_support_query_data(data_pos, data_neg)
                 support_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_support)).long().to(self.device)
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way*2),self.n_query)).long().to(self.device)
             else:
                 pos_data = task 
                 classes, data_pos, _ =pos_data
-                support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
+                # support_feat, query_feat = self.split_support_query_feature(data_pos, None, is_data = True)
                 support_data, query_data = self.split_support_query_data(data_pos, None)
                 support_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_support)).long().to(self.device)
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
@@ -390,14 +391,6 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                         neg_seg_sample = neg_sup[1]
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-                    neg_feat = []
-                    for batch in neg_loader:
-                        n_data, _ = batch
-                        # print(neg_data.shape)
-                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics=False, output_features=False)
-                        # print(feat.shape)
-                        neg_feat.append(feat.mean(0))
-                    neg_feat = torch.stack(neg_feat, dim=0).mean(0)
 
 
                     self.num_classes_per_set = self.config.train.n_way
@@ -432,9 +425,6 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                     
                     support_label = np.concatenate((np.zeros((m,)), np.ones((n,))))
                     support_label = torch.from_numpy(support_label).long().to(self.device)
-                    per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
-                    
-                    # params_head = {'weight': output_weight, 'bias': output_bias}.items()
                     params_classifier = self.classifier.named_parameters()
                     # all_params = itertools.chain(params_head, params_classifier)
                     names_weights_copy = self.get_inner_loop_parameter_dict(params_classifier)
@@ -460,12 +450,12 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                                                                         current_step_idx=num_step)
                         # print(names_weights_copy['weight'])
                         # print('~~~~')
-                        preds = self.classifier(support_data, num_step=self.config.train.inner_step - 1, training=True, backup_running_statistics=True, output_features=False)
+                        # preds = self.classifier(support_data, num_step=self.config.train.inner_step - 1, training=True, backup_running_statistics=True, output_features=False)
                         # head_weight = names_weights_copy['weight']
                         # head_bias = names_weights_copy['bias']
                         # preds = F.linear(preds_feat, head_weight, head_bias)
-                        preds = F.softmax(preds, dim = 1)
-                        preds = preds.argmax(dim=1).detach().cpu().numpy()
+                        # preds = F.softmax(preds, dim = 1)
+                        # preds = preds.argmax(dim=1).detach().cpu().numpy()
     
                         # print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=5))
                         
@@ -476,7 +466,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                             query_data, _ = batch
                             preds = self.classifier.forward(x=query_data, params=names_weights_copy,
                                             training=True,
-                                            backup_running_statistics=True, num_step=self.config.train.inner_step - 1)
+                                            backup_running_statistics=False, num_step=self.config.train.inner_step - 1)
                             # head_weight = names_weights_copy['weight']
                             # head_bias = names_weights_copy['bias']
                             # preds = F.linear(preds_feat, head_weight, head_bias)
@@ -494,8 +484,12 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                         prob_all = np.concatenate(prob_all, axis=0)
                         prob_all = prob_all[:,0]
                         prob_mean.append(prob_all)
+                    if not training_phase:
+                        self.classifier.restore_backup_stats()
+
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)
                 all_prob[wav_file] = prob_mean
+
             best_res = None
             best_f1 = 0
             best_report = {}
@@ -638,8 +632,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
         neg_num = x[(y == 1)].shape[0]
         
         if test:
-            weights = torch.cat((torch.full((1,), max(neg_num/pos_num, 5), dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
-            loss = F.cross_entropy(input=preds, target=y,weight=weights)
+            loss = F.cross_entropy(preds, y, weight=torch.tensor([neg_num/pos_num, 1.0]).to(self.device))
         else:
             preds = preds
             loss = F.cross_entropy(input=preds, target=y)

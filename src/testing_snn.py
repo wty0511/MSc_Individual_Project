@@ -29,7 +29,7 @@ if not GlobalHydra().is_initialized():
 cfg = compose(config_name="config.yaml")
 model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
-save_file = '/root/task5_2023/Checkpoints/Trinetconvnet_formaml_1/Model/best_model.pth'
+save_file = '/root/task5_2023/Checkpoints/Trinetconvnet_formaml_2/Model/best_model.pth'
 print(save_file)
 
 # 加载模型
@@ -40,16 +40,13 @@ model_state = checkpoint['state']
 config = checkpoint['config']
 # config = cfg
 print(config)
-epoch = checkpoint['epoch']
-print('epoch:', epoch)
-print('f1', checkpoint['f1'])
 print(checkpoint['threshold'])
 # 创建一个新的模型实例
 model = TriNet(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = SNN(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
 # 将保存的状态加载到新的模型实例中
-model.load_state_dict(model_state)
+# model.load_state_dict(model_state)
 model.eval()
 
 val_dataset = FileDataset(cfg,val=False, debug=False)

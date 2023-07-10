@@ -25,7 +25,7 @@ class TriNet(BaseModel):
         super(TriNet, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = TripletLoss(margin=0.3)
+        self.loss_fn = TripletLoss(margin= 1)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
         self.cosloss = nn.CosineEmbeddingLoss(margin= 0.95)
@@ -212,7 +212,7 @@ class TriNet(BaseModel):
             pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
             
             prob_mean = []
-            for i in range(5):
+            for i in range(1):
                 test_loop_neg_sample = self.config.val.test_loop_neg_sample
                 neg_sup[1] = neg_sup[1].squeeze() 
                 

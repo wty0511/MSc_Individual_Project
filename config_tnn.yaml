@@ -81,4 +81,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: formaml_1
+version: formaml_2

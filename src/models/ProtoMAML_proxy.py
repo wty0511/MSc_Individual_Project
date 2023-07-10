@@ -17,7 +17,7 @@ from sklearn.metrics import classification_report, f1_score
 import h5py
 from src.utils.sampler import *
 from src.utils.class_pair_dataset import *
-from pytorch_metric_learning import  losses,reducers
+from pytorch_metric_learning import losses,reducers
 from pytorch_metric_learning.distances import CosineSimilarity, LpDistance
 from src.utils.distance import NormMinusLpDistance
 
@@ -228,7 +228,7 @@ class ProtoMAML_proxy(BaseModel):
         if mode == 'train':
             loss1 = F.cross_entropy(preds, labels)
         else:
-            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
+            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([neg_num/pos_num, 1.0]).to(self.device))
         
 
             # print(pos_feat.shape)
@@ -310,7 +310,7 @@ class ProtoMAML_proxy(BaseModel):
         if mode == 'train':
             loss1 = F.cross_entropy(preds, labels)
         else:
-            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 5), 1.0]).to(self.device))
+            loss1 = F.cross_entropy(preds, labels, weight=torch.tensor([neg_num/pos_num, 1.0]).to(self.device))
         
         # acc = (preds.argmax(dim=1) == labels).float().mean()
         # print('acc', acc)

@@ -29,7 +29,7 @@ class ContrastiveLoss(nn.Module):
         # print(cos_sim)
         
         # print(torch.sum(label==0))
-        losses = 1/4 * (1 - label) * torch.pow((1-cos_sim),2.0) + \
+        losses = (1 - label) * torch.pow((1-cos_sim),2.0) + \
                  label * torch.pow(cos_sim, 2) * (cos_sim > self.margin).float()
                 
         loss = torch.mean(losses)
@@ -41,105 +41,10 @@ class SNN(BaseModel):
         super(SNN, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = ContrastiveLoss(margin= 0.2)
-        self.approx = True
+        self.loss_fn = ContrastiveLoss(margin= self.config.train.margin)
         self.ce = nn.CrossEntropyLoss()
         self.cosloss = nn.CosineEmbeddingLoss(margin= 0.95)
-    # def inner_loop(self, support_data, support_label = None, mode = 'train'):
-    #     local_model = deepcopy(self.feature_extractor)
-    #     local_model.train()
-    #     local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
-    #     local_optim.zero_grad()
-    #     fast_parameters = list(local_model.parameters())
-    #     if mode == 'test':
-    #         support_label = support_label.cpu().numpy()
-    #     for i in range(100):
-    #         if mode == 'train':
-    #             label = random.randint(0, 1)
-    #             # same class
-    #             if label == 0:               
-    #                 class1 = random.randint(0, self.n_way - 1)
-    #                 indices1 = [i for i in range(len(support_data)) if i % self.n_way == class1]
-    #                 index1, index2 = random.sample(indices1, 2)
 
-    #                 sampl1 = support_data[index1]
-    #                 sampl2 = support_data[index2]
-
-    #             else:
-    #                 class1, class2 = random.sample(range(self.n_way), 2)
-                    
-    #                 indices1 = [i for i in range(len(support_data)) if i % self.n_way == class1]
-    #                 indices2 = [i for i in range(len(support_data)) if i % self.n_way == class2]
-                    
-    #                 # Randomly select two different indices
-    #                 index1 = random.sample(indices1, 1)
-    #                 index2 = random.sample(indices2, 1)
-                    
-    #                 sampl1 = support_data[index1[0]]
-    #                 sampl2 = support_data[index2[0]]
-
-
-    #         else:
-
-
-    #             label = random.randint(0, 1)
-    #             # same class
-    #             if label == 0:               
-    #                 class1 = random.randint(0, 1)
-    #                 indices1 = np.where(support_label == class1)[0].tolist()
-    #                 index1, index2 = random.sample(indices1, 2)
-                    
-    #                 sampl1 = support_data[index1]
-    #                 sampl2 = support_data[index2]
-    #             else:
-    #                 class1 = 0
-    #                 class2 = 1
-                                        
-    #                 indices1 = np.where(support_label == class1)[0].tolist()
-
-    #                 indices2 = np.where(support_label == class2)[0].tolist()
-
-                    
-    #                 # Randomly select two different indices
-    #                 index1 = random.sample(indices1, 1)
-    #                 index2 = random.sample(indices2, 1)
-                    
-    #                 sampl1 = support_data[index1[0]]
-    #                 sampl2 = support_data[index2[0]]
-    #         sampl1 = sampl1.unsqueeze(0)
-    #         sampl2 = sampl2.unsqueeze(0)
-    #         # print('label:{}'.format(label))
-    #         # print(sampl1.shape)
-    #         # print(sampl2.shape)
-    #         # print('~~~~~~~~~~~')
-    #         feat1 = local_model(sampl1)
-    #         feat2 = local_model(sampl2)
-    #         loss = self.loss_fn(feat1, feat2, label)
-    #         if self.approx:
-    #             grad = torch.autograd.grad(loss, fast_parameters)
-    #         else:
-    #             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
-    #         for k, weight in enumerate(local_model.parameters()):
-    #             # for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py
-    #             weight.grad = grad[k]
-    #         local_optim.step()
-    #         local_optim.zero_grad()
-    #         loss = loss.detach()
-    #     if mode != 'train':
-    #         print('inner loop: loss:{:.3f}'.format(loss.item()))
-    #     if mode != 'train':    
-    #         print('!!!!!!!!!')
-    #     return local_model 
-    
-    # def euclidean_dist(self,query, support):
-    #     n = query.size(0)
-    #     m = support.size(0)
-        
-    #     query = query.unsqueeze(1).expand(n, m, -1)
-    #     support = support.unsqueeze(0).expand(n, m, -1)
-
-    #     return torch.pow(query - support, 2).sum(2)
-    
         
     def cos_sim(self,query, support):
         n = query.size(0)
@@ -152,74 +57,6 @@ class SNN(BaseModel):
         return F.cosine_similarity(query, support, dim=2)
 
 
-    # def cossim(self, query, support):
-    #     cos_sim = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
-    #     n = query.size(0)
-    #     m = support.size(0)
-    #     query = query.unsqueeze(1).expand(n, m, -1)
-    #     support = support.unsqueeze(0).expand(n, m, -1)
-    #     return cos_sim(query, support)
-
-    # def feed_forward(self, local_model, support_data, query_data):
-    #     # # Execute a model with given output layer weights and inputs
-    #     # support_feat = local_model(support_data)
-    #     # # nway 不是2nway要注意
-    #     # support_feat = self.split_1d(support_feat)
-    #     # prototype = support_feat.mean(0)
-    #     # query_feat = local_model(query_data)
-    #     # dists = self.euclidean_dist(query_feat, prototype)
-
-    #     # scores = -dists
-
-    #     # preds = scores.argmax(dim=1)
-    #     # y_query = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
-    #     # acc = torch.eq(preds, y_query).float().mean()
-
-        
-    #     # loss = self.ce(scores, y_query)
-    #     # y_query = y_query.cpu().numpy()
-    #     # preds = preds.detach().cpu().numpy()
-    #     # report = classification_report(y_query, preds,zero_division=0, digits=3)
-    #     # print(report)
-    #     loss = 0
-    #     for i in range(100):
-    #         label = random.randint(0, 1)
-    #         # same class
-    #         if label == 0:               
-    #             class1 = random.randint(0, self.n_way - 1)
-    #             indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
-    #             index1, index2 = random.sample(indices1, 2)
-
-    #             sampl1 = query_data[index1]
-    #             sampl2 = query_data[index2]
-
-    #         else:
-    #             class1, class2 = random.sample(range(self.n_way), 2)
-                
-    #             indices1 = [i for i in range(len(query_data)) if i % self.n_way == class1]
-    #             indices2 = [i for i in range(len(query_data)) if i % self.n_way == class2]
-                
-    #             # Randomly select two different indices
-    #             index1 = random.sample(indices1, 1)
-    #             index2 = random.sample(indices2, 1)
-                
-    #             sampl1 = query_data[index1[0]]
-    #             sampl2 = query_data[index2[0]]
-    #         sampl1 = sampl1.unsqueeze(0)
-    #         sampl2 = sampl2.unsqueeze(0)
-    #         # print('label:{}'.format(label))
-    #         # print(sampl1.shape)
-    #         # print(sampl2.shape)
-    #         # print('~~~~~~~~~~~')
-    #         feat1 = local_model(sampl1)
-    #         feat2 = local_model(sampl2)
-    #         loss += self.loss_fn(feat1, feat2, label)
-    #     loss /= 100
-    #     report = None
-    #     acc = torch.tensor(0.0).to(self.device)
-    #     return loss, report, acc
-    
-    
     def feed_forward_test(self, prototype, query_data):
         # Execute a model with given output layer weights and inputs
 
@@ -244,16 +81,15 @@ class SNN(BaseModel):
     def train_loop(self, data_loader, optimizer):
         self.feature_extractor.train()
         for i, pair_batch in tqdm(enumerate(data_loader)):
-            data, labels = pair_batch
-            anchor, pos, neg = data
+            data1, data2 , labels = pair_batch
             self.feature_extractor.zero_grad()
-            anchor_feat = self.feature_extractor(anchor)
-            pos_feat = self.feature_extractor(pos)
-            neg_feat = self.feature_extractor(neg)
-            pos_feat = F.normalize(pos_feat, dim=1)
-            neg_feat = F.normalize(neg_feat, dim=1)
-            loss = self.loss_fn(anchor_feat, pos_feat, torch.zeros(anchor.shape[0]).to(self.device))
-            loss = loss + self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor.shape[0]).to(self.device))
+            data1 = self.feature_extractor(data1)
+            data2 = self.feature_extractor(data2)
+            data1 = F.normalize(data1, dim=1)
+            data2 = F.normalize(data2, dim=1)
+
+            loss = self.loss_fn(data1, data2, labels)
+   
             # loss = self.cosloss(anchor_feat, pos_feat, torch.ones(anchor.shape[0]).to(self.device)) + self.cosloss(anchor_feat, neg_feat, -torch.ones(anchor.shape[0]).to(self.device))
             loss.backward()
             optimizer.step()

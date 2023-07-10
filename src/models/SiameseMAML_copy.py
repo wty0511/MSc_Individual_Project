@@ -32,7 +32,7 @@ class ContrastiveLoss(nn.Module):
         # print(cos_sim)
         
         # print(torch.sum(label==0))
-        losses =1/4 * (1 - label) * torch.pow((1-cos_sim),2.0) + \
+        losses =(1 - label) * torch.pow((1-cos_sim),2.0) + \
                  label * torch.pow(cos_sim, 2) * (cos_sim > self.margin).float()
                 
         loss = torch.mean(losses)
@@ -45,7 +45,7 @@ class SNNMAML(BaseModel):
         super(SNNMAML, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = ContrastiveLoss(margin = 0.1)
+        self.loss_fn = ContrastiveLoss(margin = 0.3)
         # self.loss_fn = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
@@ -79,74 +79,31 @@ class SNNMAML(BaseModel):
             weight.fast = None
         self.feature_extractor.zero_grad()
         
-        # sampler = IntClassSampler(self.config, support_label, 50)
-        # dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        # dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
-        # # self.config.train.lr_inner = 0.01
-        # for i in range(5):
-        #     for batch in dataloader:
-        #         data, lable = batch
-        #         anchor, pos, neg = data
-        #         anchor_feat = self.feature_extractor(anchor)
-        #         pos_feat = self.feature_extractor(pos)
-        #         neg_feat = self.feature_extractor(neg)
-        #         anchor = F.normalize(anchor_feat, dim=1)
-        #         pos_feat = F.normalize(pos_feat, dim=1)
-        #         neg_feat = F.normalize(neg_feat, dim=1)
+        sampler = IntClassSampler(self.config, support_label, 50)
+        dataset =  PairDataset(self.config, support_data, support_label, debug = False)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
+        # self.config.train.lr_inner = 0.01
+        for i in range(5):
+            for batch in dataloader:
+                data, lable = batch
+                anchor, pos, neg = data
+                anchor_feat = self.feature_extractor(anchor)
+                pos_feat = self.feature_extractor(pos)
+                neg_feat = self.feature_extractor(neg)
+                anchor = F.normalize(anchor_feat, dim=1)
+                pos_feat = F.normalize(pos_feat, dim=1)
+                neg_feat = F.normalize(neg_feat, dim=1)
                 
-        #         loss = self.loss_fn(anchor_feat, pos_feat, torch.zeros(anchor_feat.shape[0]).long().to(self.device))
-        #         # print('inner loop: loss:{:.3f}'.format(loss.item()))
-        #         loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
-        #         # print(loss.item())
-        #         grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
-        #         if self.approx:
-        #             grad = [ g.detach()  for g in grad ] 
-        #         fast_parameters = []
-                
-        #         for k, weight in enumerate(self.parameters()):
-        #             #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
-        #             if weight.fast is None:
-        #                 weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
-        #             else:
-        #                 weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
-        #             fast_parameters.append(weight.fast) # update the fast_parameters
-        #         loss = loss.detach()
-        #         # print(loss)
-        #         # print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-
-        # # print('~~~~~~~~~~~~~~~')
-        # # loss = torch.stack(losses, dim=0).mean()
-        # # print('inner loop: loss:{:.3f}'.format(loss.item()))
-        # # print('~~~~~~~~~~~~~~~')
-        
-        data1, data2, pair_labels= self.get_contrastive_pairs(support_data, support_label)
-        data_all = torch.stack([data1, data2], dim=1)
-        # print(data_all.shape)
-        dataset = TensorDataset(data_all, pair_labels)
-        data_loader = DataLoader(dataset, batch_size= 256, shuffle=False)
-        for i in range(self.config.train.inner_step):
-            for batch in data_loader:
-                data, label = batch
-                data1 = data[:, 0, :, :]
-                data2 = data[:, 1, :, :]
-                # print(data1.shape)
-                # print(data2.shape)
-                feat1 = self.feature_extractor(data1)
-                feat2 = self.feature_extractor(data2)
-                # print(len(support_data))
-                feat1 = F.normalize(feat1, dim=1)
-                feat2 = F.normalize(feat2, dim=1)
-                # print(len(pair_labels))
-                loss = self.loss_fn(feat1, feat2, label)
-                # print('loss', loss)
-
+                loss = self.loss_fn(anchor_feat, pos_feat, torch.zeros(anchor_feat.shape[0]).long().to(self.device))
+                # print('inner loop: loss:{:.3f}'.format(loss.item()))
+                loss += self.loss_fn(anchor_feat, neg_feat, torch.ones(anchor_feat.shape[0]).long().to(self.device))
+                # print(loss.item())
                 grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
                 if self.approx:
                     grad = [ g.detach()  for g in grad ] 
                 fast_parameters = []
                 
                 for k, weight in enumerate(self.parameters()):
-                    # print(grad[k])
                     #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
                     if weight.fast is None:
                         weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
@@ -154,10 +111,53 @@ class SNNMAML(BaseModel):
                         weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
                     fast_parameters.append(weight.fast) # update the fast_parameters
                 loss = loss.detach()
-            # print(loss)
-            # print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-        
+                # print(loss)
+                # print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+
         # print('~~~~~~~~~~~~~~~')
+        # loss = torch.stack(losses, dim=0).mean()
+        # print('inner loop: loss:{:.3f}'.format(loss.item()))
+        # print('~~~~~~~~~~~~~~~')
+        
+        # data1, data2, pair_labels= self.get_contrastive_pairs(support_data, support_label)
+        # data_all = torch.stack([data1, data2], dim=1)
+        # # print(data_all.shape)
+        # dataset = TensorDataset(data_all, pair_labels)
+        # data_loader = DataLoader(dataset, batch_size= 256, shuffle=False)
+        # for i in range(self.config.train.inner_step):
+        #     for batch in data_loader:
+        #         data, label = batch
+        #         data1 = data[:, 0, :, :]
+        #         data2 = data[:, 1, :, :]
+        #         # print(data1.shape)
+        #         # print(data2.shape)
+        #         feat1 = self.feature_extractor(data1)
+        #         feat2 = self.feature_extractor(data2)
+        #         # print(len(support_data))
+        #         feat1 = F.normalize(feat1, dim=1)
+        #         feat2 = F.normalize(feat2, dim=1)
+        #         # print(len(pair_labels))
+        #         loss = self.loss_fn(feat1, feat2, label)
+        #         # print('loss', loss)
+
+        #         grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
+        #         if self.approx:
+        #             grad = [ g.detach()  for g in grad ] 
+        #         fast_parameters = []
+                
+        #         for k, weight in enumerate(self.parameters()):
+        #             # print(grad[k])
+        #             #for usage of weight.fast, please see Linear_fw, Conv_fw in backbone.py 
+        #             if weight.fast is None:
+        #                 weight.fast = weight - self.config.train.lr_inner * grad[k] #create weight.fast 
+        #             else:
+        #                 weight.fast = weight.fast - self.config.train.lr_inner * grad[k] #create an updated weight.fast, note the '-' is not merely minus value, but to create a new weight.fast 
+        #             fast_parameters.append(weight.fast) # update the fast_parameters
+        #         loss = loss.detach()
+        #     # print(loss)
+        #     # print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+        
+        # # print('~~~~~~~~~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f}'.format(loss.item()))
         if mode != 'train':    

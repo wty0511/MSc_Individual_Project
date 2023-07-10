@@ -17,6 +17,7 @@ from src.how_to_train.meta_optimizer import LSLRGradientDescentLearningRule, Gra
 from src.how_to_train.meta_neural_net_work_architectures import Convnet
 from src.utils.class_pair_dataset import *
 from src.models.triplet_loss import TripletLoss
+import time
 
     
 
@@ -45,11 +46,11 @@ class TNNMAMLFewShotClassifier(nn.Module):
         # params_head = self.classifier_head.named_parameters()
         params_classifier = self.classifier.named_parameters()
         # all_params = itertools.chain(params_head, params_classifier)
-        self.loss_fn = TripletLoss(margin= 0.2)
+        self.loss_fn = TripletLoss(margin= 0.5)
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps= cfg.train.inner_step,
-                                                                    use_learnable_learning_rates= True)
+                                                                    use_learnable_learning_rates= self.config.train.learnable_per_layer_per_step_inner_loop_learning_rate,)
         self.sr = cfg.features.sr
         self.fps = self.sr / cfg.features.hop_length
         # print(self.config)
@@ -312,7 +313,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
-        print(losses)
+        # print(losses)
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
 
@@ -327,7 +328,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         query = query.unsqueeze(1).expand(n, m, -1)
         support = support.unsqueeze(0).expand(n, m, -1)
 
-        return torch.sqrt(torch.pow(query - support, 2).sum(2))
+        return torch.pow(query - support, 2).sum(2)
 
 
     def forward_test(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, fix_shreshold = None, mode ='test'):
@@ -370,7 +371,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                 pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-                query_loader = DataLoader(query_dataset, batch_size=16, shuffle=False)
+                query_loader = DataLoader(query_dataset, batch_size=128, shuffle=False)
                 pos_feat = []
 
                 
@@ -418,7 +419,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                     self.classifier.zero_grad()
                     # self.classifier_head.zero_grad()
                     for num_step in range(num_steps):
-
+                        # print('step',num_step)
                         support_loss = self.net_forward(
                             x=support_data,
                             y=support_label,
@@ -444,7 +445,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                         p_data, _ = batch
                         feat = self.classifier.forward(x=p_data, params=names_weights_copy,
                                             training=True,
-                                            backup_running_statistics=True, num_step=self.config.train.inner_step - 1)
+                                            backup_running_statistics=False, num_step=self.config.train.inner_step - 1)
                         # print(feat.shape)
                         pos_feat.append(feat.mean(0))
                     # pos = torch.cat(pos_feat, dim=0)
@@ -459,7 +460,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                             n_data, _ = batch
                             feat = self.classifier.forward(x=n_data, params=names_weights_copy,
                                             training=True,
-                                            backup_running_statistics=True, num_step=self.config.train.inner_step - 1)
+                                            backup_running_statistics=False, num_step=self.config.train.inner_step - 1)
                             # print(feat.shape)
                             neg_feat.append(feat.mean(0))
                     # neg = torch.cat(neg_feat, dim=0)
@@ -475,7 +476,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                             query_data, _ = batch
                             preds_feat = self.classifier.forward(x=query_data, params=names_weights_copy,
                                             training=True,
-                                            backup_running_statistics=True, num_step=self.config.train.inner_step - 1)
+                                            backup_running_statistics=False, num_step=self.config.train.inner_step - 1)
                             dists = self.euclidean_dist(preds_feat, proto)
 
                             pred = dists.argmin(-1)
@@ -497,7 +498,9 @@ class TNNMAMLFewShotClassifier(nn.Module):
                         prob_mean.append(prob_all)
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)
                 all_prob[wav_file] = prob_mean
-            
+
+                self.classifier.restore_backup_stats()
+                
             best_res = None
             best_f1 = 0
             best_report = {}
@@ -709,12 +712,16 @@ class TNNMAMLFewShotClassifier(nn.Module):
         prototype = torch.stack(prototype)
         # print(prototype.shape)
         # print(out_put.shape)
+        
         dist = self.euclidean_dist(out_put, prototype)
         score = -dist
+        score = score 
+        # print(F.softmax(score, dim = 1))
         # print(dist.shape)
         acc = (torch.sum(torch.argmax(score, dim=1) == y).float() / y.size(0)).item()
+
+        # score = score * 3
         # print(F.softmax(score, dim = 1))
-        
         loss = self.ce(score, y)
         return loss, acc
         

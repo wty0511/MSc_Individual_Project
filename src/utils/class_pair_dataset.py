@@ -75,17 +75,23 @@ class ClassPairDataset(Dataset):
             self.length = int(0.03 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
         else:
             # self.length = int(3 * 3600 / (self.config.features.segment_len_frame * (1/self.fps)))
-            self.length = 5000
+            self.length = 10000
             
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     def __getitem__(self, class_name):
         if isinstance(class_name, str):
             # 0 同类， 1 异类
-            label = random.choices([0, 1], weights=[1, 4], k=1)[0]
+            label = random.choices([0, 1], weights=[1, 1], k=1)[0]
             label = torch.tensor(label).to(self.device)
+            anchor, pos, neg = self.get_sample(class_name, self.config.features.segment_len_frame) 
+            
+            if label == 0:
+                return  anchor, pos , label
+            if label == 1:
+                return anchor, neg, label
+            # return self.get_sample(class_name, self.config.features.segment_len_frame)  , label
 
-            return self.get_sample(class_name, self.config.features.segment_len_frame), label
         else:
             raise ValueError('Unknown type')
     

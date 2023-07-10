@@ -20,6 +20,7 @@ from src.utils.class_pair_dataset import *
 from src.utils.file_dataset import *
 from src.training_pipeline import train
 from src.models.ConvNet import *
+from src.models.backbone import PretrainClassifier
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -35,7 +36,7 @@ debug = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
-cfg = compose(config_name="config.yaml")
+cfg = compose(config_name="config_pretrain.yaml")
 print('preparing training dataset')
 
 train_dataset = ClassDataset(cfg, mode = 'pretrain', same_class_in_different_file=True, debug= debug)
@@ -47,7 +48,8 @@ class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 64)
 
-model = PretrainClassifier()
+model = PretrainClassifier_large()
+# model = PretrainClassifier()
 model = model.cuda()
 model_dir = cfg.checkpoint.model_dir
 model_dir = normalize_path(model_dir)
@@ -72,9 +74,11 @@ for epoch in range(50):
     print('epoch',epoch,'acc',acc_epoch)
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
     if epoch % 10 == 0:
-        torch.save({'epoch':epoch, 'state':model.encoder.state_dict(), 'config':cfg}, save_file)
+        # torch.save({'epoch':epoch, 'state':model.encoder.state_dict(), 'config':cfg}, save_file)
+        torch.save({'epoch':epoch, 'state':model.conv.state_dict(), 'config':cfg}, save_file)
     if acc_epoch > acc_best:
         acc_best = acc_epoch
         save_file = os.path.join(model_dir, 'best_model.pth')
-        torch.save({'epoch':epoch, 'state':model.encoder.state_dict(), 'config':cfg}, save_file)
+        torch.save({'epoch':epoch, 'state':model.conv.state_dict(), 'config':cfg}, save_file)
+        # torch.save({'epoch':epoch, 'state':model.encoder.state_dict(), 'config':cfg}, save_file)
         print("best model! save...")

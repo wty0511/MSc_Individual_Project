@@ -49,7 +49,8 @@ class FileDataset(Dataset):
         self.mean = 0.50484073
         self.std =  0.36914015
         
-
+        # self.mean = 0.0
+        # self.std =  1
     def __getitem__(self, idx):
 
         class_name = self.classes[idx]
@@ -293,7 +294,7 @@ class FileDataset(Dataset):
         # seg_len = 3
         # hop_seg = 1
         
-        print('max_len', max_len)
+        # print('max_len', max_len)
         if max_len < 8:
             seg_len = 8
         elif max_len < 30:# 30 0.4

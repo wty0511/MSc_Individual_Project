@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.init import _calculate_fan_in_and_fan_out
+from copy import deepcopy
 # modified from how to train your maml
 
 
@@ -238,10 +239,15 @@ class MetaBatchNormLayer(nn.Module):
 
 
         if backup_running_statistics and self.use_per_step_bn_statistics:
-            self.backup_running_mean.data = copy(self.running_mean.data)
-            self.backup_running_var.data = copy(self.running_var.data)
+            self.backup_running_mean.data = deepcopy(self.running_mean.data)
+            self.backup_running_var.data = deepcopy(self.running_var.data)
 
         momentum = self.momentum
+        # print(input.device, running_mean.device, running_var.device, weight.device, bias.device)
+        # running_mean = torch.zeros(self.running_mean.shape).to(device=self.running_mean.device)
+        # running_var = torch.ones(self.running_var.shape).to(device=self.running_mean.device)
+        
+        # momentum = 1
         # print(input.shape, running_mean.shape, running_var.shape, weight.shape, bias.shape)
         return F.batch_norm(input, running_mean, running_var, weight, bias,
                               training=True, momentum=momentum, eps=self.eps)
@@ -836,26 +842,27 @@ class ConvnetClassifier(nn.Module):
         """
         Reset stored batch statistics from the stored backup.
         """
-        for name, module in self.named_modules():
-            if type(module) == MetaBatchNormLayer:
-                module.restore_backup_stats()
+        for i in range(self.num_stages):
+            self.layer_dict['conv{}'.format(i)].restore_backup_stats()
 
     def zero_grad(self, params=None):
         if params is None:
             for param in self.parameters():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            # print(param.grad)
-                            param.grad.zero_()
+                if (
+                    param.requires_grad == True
+                    and param.grad is not None
+                    and torch.sum(param.grad) > 0
+                ):
+                    print(param.grad)
+                    param.grad.zero_()
         else:
             for name, param in params.items():
-                # print(name)
-                # print(param.is_leaf)
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            # print(param.grad)
-                            param.grad.zero_()
-                            params[name].grad = None
+                if (
+                    param.requires_grad == True
+                    and param.grad is not None
+                    and torch.sum(param.grad) > 0
+                ):
+                    print(param.grad)
+                    param.grad.zero_()
+                    params[name].grad = None
 

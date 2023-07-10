@@ -37,7 +37,7 @@ class MAML(BaseModel):
         
         
     def inner_loop(self, support_data, support_label, mode = 'train'):
-        
+        # self.config.train.lr_inner = 0.001
         fast_parameters = list(self.feature_extractor.parameters())
         for weight in self.feature_extractor.parameters():
             weight.fast = None

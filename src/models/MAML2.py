@@ -113,7 +113,7 @@ class MAML2(BaseModel):
         # print(labels.shape)
         if self.config.train.neg_prototype or mode == 'test':
 
-            loss = F.cross_entropy(preds, labels, weight=torch.tensor([max(neg_num/pos_num, 1), 1.0]).to(self.device))
+            loss = F.cross_entropy(preds, labels, weight=torch.tensor([neg_num/pos_num, 1.0]).to(self.device))
         else:
             loss = F.cross_entropy(preds, labels)
         # print(preds.argmax(dim=1))

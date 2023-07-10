@@ -26,9 +26,13 @@ from src.utils.file_dataset import *
 from src.training_pipeline import train
 from src.models.MAML2 import *
 from src.models.ProtoMAML_lr import *
+from src.models.MAML_lr import *
+from src.models.MAML_proto_lr import *
 # from src.models.TrinetMAML import *
 from src.models.ProtoMAMLfw import *
 from src.models.TrinetMAML_copy import *
+from src.models.MAML_proxy import MAML_proxy
+
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -51,11 +55,16 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'TNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML
+model_name = 'SNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
 
+if model_name == 'MAML_proxy':
+    cfg = compose(config_name="config_maml_proxy.yaml")
+    model = MAML_proxy(cfg)
+    
 if model_name == 'ProtoMAML':
     cfg = compose(config_name="config_protomaml.yaml")
     model = ProtoMAML(cfg)
+    
     
 if model_name == 'ProtoMAML_lr':
     cfg = compose(config_name="config_protomaml_lr.yaml")
@@ -75,6 +84,10 @@ elif model_name == 'ProtoMAML_proxy':
 elif model_name == 'MAML':
     cfg = compose(config_name="config_maml.yaml")
     model = MAML(cfg)
+    
+elif model_name == 'MAML_lr':
+    cfg = compose(config_name="config_maml.yaml")
+    model = MAML_lr(cfg)
 
 elif model_name == 'MAML2':
     cfg = compose(config_name="config_maml2.yaml")
@@ -84,6 +97,10 @@ elif model_name == 'MAML2':
 elif model_name == 'MAML_proto':
     cfg = compose(config_name="config_maml_proto.yaml")
     model = MAML_proto(cfg)
+    
+elif model_name == 'MAML_proto_lr':
+    cfg = compose(config_name="config_maml_proto_lr.yaml")
+    model = MAML_proto_lr(cfg)
     
 elif model_name == 'TNNMAML':
     cfg = compose(config_name="config_mamltnn.yaml")
@@ -107,9 +124,10 @@ batch_sampler = TaskBatchSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
-pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain/Model/best_model.pth')
-pretrain_dict = pretrain_model['state']
-pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
+# pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain_conv/Model/best_model.pth')
+# pretrain_dict = pretrain_model['state']
+# pretrain_dict = {f'encoder.{k}': v for k, v in pretrain_dict.items()}
+
 
 test_dataset = FileDataset(cfg,val=False, debug= debug)
 test_loader = DataLoader(test_dataset, batch_size = 1, shuffle = False)
@@ -126,7 +144,7 @@ test_loader = DataLoader(test_dataset, batch_size = 1, shuffle = False)
 # model = TNNMAML(cfg)
 # model =ProtoMAML_proxy(cfg)
 # model = ProtoMAMLfw(cfg)
-print(pretrain_model['state'].keys())
+# print(pretrain_model['state'].keys())
 # model.feature_extractor.load_state_dict(pretrain_dict)
 
 print(len(train_loader))
@@ -161,15 +179,16 @@ config_dir = os.path.join(config_dir,'config.json')
 with open(config_dir, 'w') as outfile:
     json.dump( omegaconf.OmegaConf.to_container(cfg, resolve=True), outfile,indent=2)
     
-for epoch in range(20):
+for epoch in range(10):
     model.train()
     train_loss = model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
+    print(train_loss)
     train_loss_list.append(train_loss)
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
-    if epoch % cfg.checkpoint.save_freq == 0:
-        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
+    # if epoch % cfg.checkpoint.save_freq == 0:
+    #     torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
     df_all_time, report, threshold, val_loss = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
     val_loss_list.append(val_loss)
@@ -182,7 +201,7 @@ for epoch in range(20):
         best_f1 = f1
         save_file = os.path.join(model_dir, 'best_model.pth')
         print(save_file)
-        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'model_name':'ProtoMAML', 'threshold' : threshold}, save_file)
+        torch.save({'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'threshold' : threshold}, save_file)
         print("best model! save...")
         report_dir = normalize_path(cfg.checkpoint.report_dir)
         report_dir = os.path.join(report_dir,'val_report_best.json')
@@ -192,6 +211,7 @@ for epoch in range(20):
             json.dump(report, outfile)
 
     df_all_time, report, threshold, test_loss = model.test_loop(test_loader, mode = 'test', fix_shreshold=0.5)
+    print(test_loss)
     test_loss_list.append(test_loss)
     f1 = report['overall_scores']['fmeasure (percentage)']/100
     test_f1_list.append(f1)
