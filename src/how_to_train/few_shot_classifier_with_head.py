@@ -182,10 +182,11 @@ class MAMLFewShotClassifierWithHead(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
-
-        losses = {'loss': torch.sum(torch.stack(total_losses))}
-        # print(sum(total_accuracies)/len(total_accuracies))
         
+        losses = {'loss': torch.mean(torch.stack(total_losses))}
+
+        losses['accuracy'] = np.mean(total_accuracies)
+
         return losses
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):

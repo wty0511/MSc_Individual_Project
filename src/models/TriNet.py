@@ -25,7 +25,7 @@ class TriNet(BaseModel):
         super(TriNet, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = TripletLoss(margin= 1)
+        self.loss_fn = TripletLoss(margin= self.config.train.margin)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
         self.cosloss = nn.CosineEmbeddingLoss(margin= 0.95)

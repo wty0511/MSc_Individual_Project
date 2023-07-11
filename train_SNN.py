@@ -9,7 +9,6 @@ from src.models.SiameseNet import *
 from src.models.TriNet import *
 import os
 import sys
-
 import numpy as np
 import torch
 import torch.optim
@@ -20,6 +19,7 @@ from hydra.core.global_hydra import GlobalHydra
 from src.utils.class_pair_dataset import *
 from src.utils.file_dataset import *
 from src.training_pipeline import train
+import omegaconf
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -81,6 +81,18 @@ if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 print('len',len(train_dataset))
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
+
+    
+config_dir = normalize_path(cfg.checkpoint.exp_dir)
+config_dir = os.path.join(config_dir,'config.json')
+print('config_dir:', config_dir)
+if not os.path.exists(os.path.dirname(config_dir)):
+    os.makedirs(os.path.dirname(config_dir))
+
+with open(config_dir, 'w') as outfile:
+    json.dump( omegaconf.OmegaConf.to_container(cfg, resolve=True), outfile,indent=2)
+
+
 for epoch in range(100):
     model.train()
     model.train_loop(train_loader, optimizer)

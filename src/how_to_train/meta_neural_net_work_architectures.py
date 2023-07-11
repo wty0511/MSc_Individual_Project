@@ -566,13 +566,13 @@ class Convnet(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.total_layers = 0
         self.upscale_shapes = []
-        self.cnn_filters = 128
+        self.cnn_filters = 64
         self.config = cfg
         self.num_stages = 4
         self.conv_stride = 1
     
         self.meta_classifier = meta_classifier
-        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
         self.build_network()
         print("meta network params")
         for name, param in self.named_parameters():
@@ -584,7 +584,7 @@ class Convnet(nn.Module):
         self.im_shape tuple. Then passes that through the network and dynamically computes input shapes and
         sets output shapes for each layer.
         """
-        x = torch.zeros((1, 1, 8, 128))
+        x = torch.zeros((1, 1, 128, 8))
         out = x
         self.layer_dict = nn.ModuleDict()
         self.upscale_shapes.append(x.shape)

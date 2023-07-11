@@ -22,7 +22,7 @@ features:
   fmin: 50
   fmax: 11025
   feature_list: pcen #&logmel&pcen&mfcc
-  segment_length: 0.2
+  segment_length: 0.5
   segment_len_frame: 17
   inchannel: 8
 
@@ -39,7 +39,7 @@ train:
   lr: 0.001
   lr_inner: 0.01
   momentum: 0.9
-  margin: 0.2
+  margin: 1
   weight_decay: 0.0005
   optimizer: Adam
   task_batch_size: 20
@@ -80,5 +80,5 @@ checkpoint:
 
 team_name: tw1022
 dataset: EVAL
-version: 1
+version: 3
 #EVAL or VAL

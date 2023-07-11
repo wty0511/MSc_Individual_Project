@@ -111,11 +111,12 @@ class LSLRGradientDescentLearningRule(nn.Module):
         # print('keys',names_grads_wrt_params_dict.keys())
         # print('key',self.names_learning_rates_dict.keys())
         # print(names_weights_dict.keys())
-        return {
-            key: names_weights_dict[key]
-            - self.names_learning_rates_dict[key.replace(".", "-")][num_step]
-            * names_grads_wrt_params_dict[key]
-            for key in names_grads_wrt_params_dict.keys()
-        }
-
-
+        res = {}
+        
+        for key in names_grads_wrt_params_dict.keys():
+            if key =='weight' or key =='bias':
+                # print('key',key)
+                res[key] = names_weights_dict[key] - 0.01 * names_grads_wrt_params_dict[key]
+            else:
+                res[key] = names_weights_dict[key] - self.names_learning_rates_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
+        return res

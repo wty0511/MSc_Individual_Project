@@ -35,7 +35,7 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 22
+SEED = 42
 set_seed(SEED)
 
 cfg = compose(config_name="configmamlpp_proto.yaml")
@@ -48,4 +48,4 @@ data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 maml_system.run_experiment()
 ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnetlarge_2/Model/best_model.pth"
-maml_system.test(ckpt)
+# maml_system.test(ckpt)

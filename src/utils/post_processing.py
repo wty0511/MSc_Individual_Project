@@ -53,7 +53,7 @@ def post_processing(df, cfg, mode):
                 dict_duration[audiofile] = min_duration
     # print(dict_duration)
     new_df = pd.DataFrame(columns=['Audiofilename', 'Starttime', 'Endtime'])
-    print(dict_duration)
+    # print(dict_duration)
     for i, row in df.iterrows():
         if row['Endtime'] - row['Starttime'] >= dict_duration[row['Audiofilename']] * 0.6:
             new_df = pd.concat([new_df, pd.DataFrame([row])], ignore_index=True)

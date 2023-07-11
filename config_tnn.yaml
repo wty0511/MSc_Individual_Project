@@ -54,6 +54,7 @@ train:
   learnable_bn_beta: True
   per_step_bn_statistics: True
   norm_layer: batch_norm
+  margin: 0.2
 
 val:
   seg_len_base: 30
@@ -81,4 +82,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: formaml_2
+version: formaml_3

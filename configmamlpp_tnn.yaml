@@ -31,7 +31,7 @@ train:
   neg_prototype: False
   n_way: 10
   n_support: 5
-  n_query: 5
+  n_query: 15
   # backbone:  convclassifierfw
   backbone:  convnetlarge
   model_type: protonet
@@ -69,7 +69,7 @@ checkpoint:
   resume: false
   best_model_dir: ${checkpoint.model_dir}/model_best.pth.tar
   start_epoch: 0
-  experiment_name: MAMLPP_TNN${train.n_way}way_${train.inner_step}step_${train.backbone}_${version}
+  experiment_name: MAMLPP_TNN${train.n_way}way_${train.inner_step}step_${train.backbone}_${train.margin}_${version}
   # experiment_name: anchornet
   # experiment_name: protnnet_10way_5shot_res
   # experiment_name: test

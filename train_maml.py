@@ -55,7 +55,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'SNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
+model_name = 'TNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
 
 if model_name == 'MAML_proxy':
     cfg = compose(config_name="config_maml_proxy.yaml")
@@ -179,7 +179,7 @@ config_dir = os.path.join(config_dir,'config.json')
 with open(config_dir, 'w') as outfile:
     json.dump( omegaconf.OmegaConf.to_container(cfg, resolve=True), outfile,indent=2)
     
-for epoch in range(10):
+for epoch in range(40):
     model.train()
     train_loss = model.train_loop(train_loader, optimizer)
     if not os.path.exists(model_dir):

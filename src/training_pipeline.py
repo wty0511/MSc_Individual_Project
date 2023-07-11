@@ -53,6 +53,7 @@ def train(train_loader, val_loader, config):
     print('optimizer:', config.train.optimizer)
     best_acc = 0       
     model_dir = config.checkpoint.model_dir
+
     config_dir = normalize_path(config.checkpoint.exp_dir)
     config_dir = os.path.join(config_dir,'config.json')
     print('config_dir:', config_dir)

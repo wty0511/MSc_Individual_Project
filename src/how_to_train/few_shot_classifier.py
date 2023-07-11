@@ -297,6 +297,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                   names_weights_copy=names_weights_copy,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
+                
                 # print('first layer after update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                 # print('~~~~')
                 if use_multi_step_loss_optimization and training_phase and epoch < self.config.train.multi_step_loss_num_epochs:
@@ -391,7 +392,7 @@ class MAMLFewShotClassifier(nn.Module):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     # self.train()
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
@@ -651,6 +652,7 @@ class MAMLFewShotClassifier(nn.Module):
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
         head_weight = weights['weight']
         head_bias = weights['bias']
+        # print(head_weight[0])
         preds = F.linear(preds_feat, head_weight, head_bias)
         # preds = self.classifier_head.forward(preds_feat)
         # print(preds)
@@ -658,7 +660,7 @@ class MAMLFewShotClassifier(nn.Module):
         neg_num = x[(y == 1)].shape[0]
         
         if test:
-            weights = torch.cat((torch.full((1,), neg_num/pos_num, dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((1,),neg_num/pos_num, dtype=torch.float), torch.full((1,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(input=preds, target=y,weight=weights)
         else:
             preds = preds
@@ -728,7 +730,6 @@ class MAMLFewShotClassifier(nn.Module):
         self.optimizer.step()
         # for name, param in self.classifier.named_parameters():
         #     if param.requires_grad:
-        #         if 'inner_loop_optimizer.names_learning_rates_dict.layer_dict-conv0-conv-weight' in name:
         #             print(name, param)
 
         # print('meta_update')
