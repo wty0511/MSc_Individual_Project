@@ -324,11 +324,11 @@ class MAML2(BaseModel):
                     
                     proto = torch.stack([pos_feat,neg_feat], dim=0).unsqueeze(0)
                 
-                    # with h5py.File(feat_file, 'w') as f:
-                    #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                    #     f.create_dataset("labels", data=label.squeeze().cpu().numpy())
-                    #     f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
-                    #     f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                    with h5py.File(feat_file, 'w') as f:
+                        f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                        f.create_dataset("labels", data=label.squeeze().cpu().numpy())
+                        f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                        f.create_dataset("labels_t", data=support_label.cpu().numpy())
                     # prob_all = []
                     # for batch in tqdm(query_loader):
                     #     query_data, _ = batch
@@ -347,15 +347,15 @@ class MAML2(BaseModel):
                     prob_all = []
                     for batch in tqdm(query_loader):
                         query_data, _ = batch
-                        prob = self.feed_forward_test2(local_model, query_data, pos_feat, neg_feat)
-                        # with h5py.File(feat_file, 'a') as f:
+                        prob, feats = self.feed_forward_test2(local_model, query_data, pos_feat, neg_feat)
+                        with h5py.File(feat_file, 'a') as f:
                             
-                        #     size = f['features'].shape[0]
-                        #     nwe_size = f['features'].shape[0] + feats.shape[0]
+                            size = f['features'].shape[0]
+                            nwe_size = f['features'].shape[0] + feats.shape[0]
 
-                        #     f['features'].resize((nwe_size, 512))
+                            f['features'].resize((nwe_size, 512))
 
-                        #     f['features'][size:nwe_size] = feats
+                            f['features'][size:nwe_size] = feats
                         prob_all.append(prob)
                     prob_all = np.concatenate(prob_all, axis=0)
                     
