@@ -169,6 +169,9 @@ class ConvNetClassifierfw(nn.Module):
         # print('out',out.shape)
         out = self.fc(out)
         return out
+    def get_feature(self,x):
+        out = self.conv(x)
+        return out
 
 
 class ConvNetClassifierfw_nobn(nn.Module):

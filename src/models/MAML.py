@@ -16,6 +16,7 @@ from src.utils.post_processing import *
 from sklearn.metrics import classification_report, f1_score
 import time
 
+import h5py
 
 class MAML(BaseModel):
     
@@ -244,6 +245,21 @@ class MAML(BaseModel):
                     # support_label = np.zeros((m,))
                     # support_label = torch.from_numpy(support_label).long().to(self.device)
                     self.inner_loop(support_data, support_label, mode = 'test')
+                    
+                    feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
+                    feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
+                    if os.path.isfile(feat_file):
+                        os.remove(feat_file)
+                    dims = (len(query_dataset), 512)
+                    
+                    directory = os.path.dirname(feat_file)
+                    if not os.path.exists(directory):
+                        os.makedirs(directory)
+                    with h5py.File(feat_file, 'w') as f:
+                        f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                        f.create_dataset("labels", data=label.squeeze().cpu().numpy())
+                        f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                        f.create_dataset("labels_t", data=support_label.cpu().numpy())
                     
                     
                     prob_all = []
