@@ -208,7 +208,7 @@ pyrightconfig.json
 .history
 .ionide
 *.zip
-*.ipynb
+# *.ipynb
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db

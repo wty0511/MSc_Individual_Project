@@ -44,7 +44,7 @@ set_seed(SEED)
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 
-save_file = r"/root/task5_2023/Checkpoints/TNN_MAML_10way_5step_convnetfwlarge_1_3/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/MAML_proxy_10way_5step_convnetfwlarge_32_0.1_2/Model/best_model.pth"
 
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
 # 加载模型
@@ -79,8 +79,8 @@ print('f1:', checkpoint['f1'])
 
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-# model = MAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = MAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
 # for name, param in model.named_parameters():
 #     print(name)
