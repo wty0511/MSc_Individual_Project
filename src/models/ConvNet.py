@@ -287,12 +287,23 @@ class ConvClassifier(nn.Module):
         # print('x_shape ',x.shape)
         x = self.avgpool(x)
         x = x.view(x.size(0),-1)
+        feat = x
         # print(x.shape)
         # x = nn.MaxPool2d(2)(x)
         x = self.fc(x)
         
         return x
+    def get_feature(self, x):
+        (num_samples,seq_len,mel_bins) = x.shape
 
+        x = x.view(-1,1,seq_len,mel_bins)
+        x = self.encoder(x)
+
+        # print('x_shape ',x.shape)
+        x = self.avgpool(x)
+        x = x.view(x.size(0),-1)
+        return x
+    
 # class ConvClassifier(nn.Module):
 #     def __init__(self):
 #         super(ConvClassifier,self).__init__()

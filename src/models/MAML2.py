@@ -35,7 +35,12 @@ class MAML2(BaseModel):
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
 
-    
+    def euclidean_dist(self,query, support):
+        n = query.size(0)
+        m = support.size(0)
+        query = query.unsqueeze(1).expand(n, m, -1)
+        support = support.unsqueeze(0).expand(n, m, -1)
+        return torch.pow(query - support, 2).sum(2)
     
     def inner_loop(self, support_data, support_label, mode = 'train'):
         
@@ -68,7 +73,7 @@ class MAML2(BaseModel):
         # print('~~~~~~~')
         if mode != 'train':
             print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
-            print(preds)
+            # print(preds)
         if mode != 'train':    
             print('!!!!!!!!!')
         # support_feat = local_model(support_data)
@@ -141,6 +146,17 @@ class MAML2(BaseModel):
         preds = preds.detach().cpu().numpy()
         return preds
     
+    def feed_forward_test2(self, local_model,  data, pos_proto, neg_proto):
+        # Execute a model with given output layer weights and inputs
+        local_model.eval()
+        feat = local_model.get_feature(data)
+        # preds = F.linear(feat, torch.stack([pos_proto, neg_proto], dim=0))
+        preds = self.euclidean_dist(feat, torch.stack([pos_proto, neg_proto], dim=0))
+        preds = -preds
+        preds = preds.detach().cpu().numpy()
+        # print(preds)
+        return preds
+    
     def outer_loop(self, data_loader, mode = 'train', opt = None):
 
         
@@ -168,7 +184,8 @@ class MAML2(BaseModel):
                 # print(data_pos.shape)
                 # print(data_neg.shape)
 
-                local_model, support_feats = self.inner_loop(support_data, support_label, mode = mode)
+                # local_model, support_feats = self.inner_loop(support_data, support_label, mode = mode)
+                local_model = deepcopy(self.feature_extractor)
                 
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
                 # print('after inner loop')
@@ -211,6 +228,7 @@ class MAML2(BaseModel):
     def test_loop(self, test_loader,fix_shreshold = None, mode = 'test' ):
         best_res_all = []
         best_threshold_all = []
+        all_loss = []
         for i in range(1):
             all_prob = {}
             all_meta = {}
@@ -243,13 +261,7 @@ class MAML2(BaseModel):
                 # print(len(pos_dataset))
                 # print(len(neg_dataset))
                 # print(len(query_dataset))
-                pos_feat = []
-                for batch in pos_loader:
-                    p_data, _ = batch
-                    feat = self.forward(p_data)
-                    # print(feat.shape)
-                    pos_feat.append(feat.mean(0))
-                pos_feat = torch.stack(pos_feat, dim=0).mean(0)
+
 
                 prob_mean = []
                 for i in range(5):
@@ -274,17 +286,10 @@ class MAML2(BaseModel):
                         neg_seg_sample = neg_sup[1]
                     neg_dataset = TensorDataset(neg_seg_sample, torch.zeros(neg_seg_sample.shape[0]))
                     neg_loader = DataLoader(neg_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-                    neg_feat = []
-                    for batch in neg_loader:
-                        n_data, _ = batch
-                        # print(neg_data.shape)
-                        feat = self.forward(n_data)
-                        # print(feat.shape)
-                        neg_feat.append(feat.mean(0))
-                    neg_feat = torch.stack(neg_feat, dim=0).mean(0)
+
                     #########################################################################
                     # use less unsqueeze, used to match the dimension of inner loop
-                    proto = torch.stack([pos_feat,neg_feat], dim=0).unsqueeze(0)
+                    
 
                     support_data = torch.cat([pos_data, neg_seg_sample], dim=0)
                     # support_data = pos_data
@@ -299,15 +304,50 @@ class MAML2(BaseModel):
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
                     local_model, support_feats = self.inner_loop(support_data,  support_label, mode = 'test')
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
+                    
+                    pos_feat = []
+                    for batch in pos_loader:
+                        p_data, _ = batch
+                        feat = local_model.get_feature(p_data)
+                        # print(feat.shape)
+                        pos_feat.append(feat.mean(0))
+                    pos_feat = torch.stack(pos_feat, dim=0).mean(0)
+                    
+                    neg_feat = []
+                    for batch in neg_loader:
+                        n_data, _ = batch
+                        # print(neg_data.shape)
+                        feat = local_model.get_feature(n_data)
+                        # print(feat.shape)
+                        neg_feat.append(feat.mean(0))
+                    neg_feat = torch.stack(neg_feat, dim=0).mean(0)
+                    
+                    proto = torch.stack([pos_feat,neg_feat], dim=0).unsqueeze(0)
+                
                     # with h5py.File(feat_file, 'w') as f:
                     #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
                     #     f.create_dataset("labels", data=label.squeeze().cpu().numpy())
                     #     f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
                     #     f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                    # prob_all = []
+                    # for batch in tqdm(query_loader):
+                    #     query_data, _ = batch
+                    #     prob = self.feed_forward_test(local_model, query_data)
+                    #     # with h5py.File(feat_file, 'a') as f:
+                            
+                    #     #     size = f['features'].shape[0]
+                    #     #     nwe_size = f['features'].shape[0] + feats.shape[0]
+
+                    #     #     f['features'].resize((nwe_size, 512))
+
+                    #     #     f['features'][size:nwe_size] = feats
+                    #     prob_all.append(prob)
+                    # prob_all = np.concatenate(prob_all, axis=0)
+                    
                     prob_all = []
                     for batch in tqdm(query_loader):
                         query_data, _ = batch
-                        prob = self.feed_forward_test(local_model, query_data)
+                        prob = self.feed_forward_test2(local_model, query_data, pos_feat, neg_feat)
                         # with h5py.File(feat_file, 'a') as f:
                             
                         #     size = f['features'].shape[0]
@@ -318,8 +358,17 @@ class MAML2(BaseModel):
                         #     f['features'][size:nwe_size] = feats
                         prob_all.append(prob)
                     prob_all = np.concatenate(prob_all, axis=0)
+                    
                     #########################################################################
                     
+                    temp_prob = torch.from_numpy(prob_all).to(self.device)
+                    # print(all_meta[wav_file]['label'])
+                    pos_num =torch.sum(all_meta[wav_file]['label']==0)
+                    neg_num = torch.sum(all_meta[wav_file]['label']==1)
+                    
+                    loss = F.cross_entropy(temp_prob,all_meta[wav_file]['label'].to(self.device),weight = torch.tensor([neg_num/pos_num, 1]).to(self.device)).to(self.device)
+                    print('loss', loss.item())
+                    all_loss.append(loss.detach().cpu().numpy())
                     prob_all = prob_all[:,0]
                     print(np.sum(prob_all>0.9))
                     # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
@@ -409,9 +458,10 @@ class MAML2(BaseModel):
             best_res_all.append(best_res)
             # print('best_threshold', best_threshold)
             # print('~~~~~~~~~~~~~~~')
+        print('losses', np.mean(all_loss))
         print(best_res_all[0])
         print(np.mean(best_threshold_all))
-        return df_all_time, best_res_all[0], np.mean(best_threshold_all)
+        return df_all_time, best_res_all[0], np.mean(best_threshold_all), np.mean(all_loss)
     
     def average_res (self, res_list):
         avg = deepcopy(res_list[0])

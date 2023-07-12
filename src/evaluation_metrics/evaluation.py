@@ -317,14 +317,14 @@ def evaluate(pred_csv, ref_file_path, team_name, dataset, savepath, metadata=[])
                 # if 'DC' in audiofile:
                     
                 #     print(audiofile,counts_per_audiofile[audiofile])
-                #     print(audiofile, counts_per_set[data_set])
                 
+                print(audiofile, counts_per_set[data_set])
             #  compute scores per subset
             tp_all = tp_all + tp
             fn_all = fn_all + fn
             fp_all = fp_all + fp
             scores_per_set[data_set] = compute_scores_from_counts(counts_per_set[data_set])
-                    
+                
     overall_scores = {"precision" : stats.hmean([scores_per_set[dt]["precision"] for dt in scores_per_set.keys()]), 
                     "recall":  stats.hmean([scores_per_set[dt]["recall"] for dt in scores_per_set.keys()]) ,
                     "fmeasure (percentage)": np.round(stats.hmean([scores_per_set[dt]["f-measure"] for dt in scores_per_set.keys()])*100, 3)

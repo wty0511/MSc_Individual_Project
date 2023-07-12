@@ -55,7 +55,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'TNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
+model_name = 'MAML2'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
 
 if model_name == 'MAML_proxy':
     cfg = compose(config_name="config_maml_proxy.yaml")
@@ -190,7 +190,7 @@ for epoch in range(40):
     # if epoch % cfg.checkpoint.save_freq == 0:
     #     torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
-    df_all_time, report, threshold, val_loss = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
+    df_all_time, report, threshold, val_loss = model.test_loop(val_loader, mode = 'val', fix_shreshold=None)
     val_loss_list.append(val_loss)
     f1 = report['overall_scores']['fmeasure (percentage)']/100
     val_f1_list.append(f1)
