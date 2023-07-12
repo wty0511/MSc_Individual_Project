@@ -51,7 +51,7 @@ print_loss = False
 if not GlobalHydra().is_initialized():
     initialize(config_path="./")
 # Compose the configuration
-
+# F
 
 # cfg = compose(config_name="config.yaml")
 
