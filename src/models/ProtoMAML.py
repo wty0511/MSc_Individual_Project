@@ -118,13 +118,12 @@ class ProtoMAML(BaseModel):
         support_dataset = TensorDataset(support_data, torch.zeros(support_data.shape[0]))
         support_data_loader = DataLoader(support_dataset, batch_size=1, shuffle=False)
         
-        # support_feat = []
-        # for batch in support_data_loader:
-        #     data, _ = batch
-        #     support_feat.append(local_model(data))
+        support_feat = []
+        for batch in support_data_loader:
+            data, _ = batch
+            support_feat.append(local_model(data))
             
-        # support_feat = torch.cat(support_feat, dim=0)
-        support_feat = torch.empty(1, 512)
+        support_feat = torch.cat(support_feat, dim=0)
         # print('end inner loop')
         return local_model, output_weight, output_bias, support_feat
     
@@ -320,7 +319,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):
@@ -367,24 +366,24 @@ class ProtoMAML(BaseModel):
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
                     local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, proto, support_label, mode = 'test')
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
-                    # with h5py.File(feat_file, 'w') as f:
-                    #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                    #     f.create_dataset("labels", data=label.squeeze().cpu().numpy())
-                    #     f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
-                    #     f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                    with h5py.File(feat_file, 'w') as f:
+                        f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                        f.create_dataset("labels", data=label.squeeze().cpu().numpy())
+                        f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                        f.create_dataset("labels_t", data=support_label.cpu().numpy())
                     prob_all = []
                     for batch in tqdm(query_loader):
                         query_data, _ = batch
                         prob, feats = self.feed_forward_test(local_model, output_weight, output_bias, query_data)
                         feats = feats.detach().cpu().numpy()
-                        # with h5py.File(feat_file, 'a') as f:
+                        with h5py.File(feat_file, 'a') as f:
                             
-                        #     size = f['features'].shape[0]
-                        #     nwe_size = f['features'].shape[0] + feats.shape[0]
+                            size = f['features'].shape[0]
+                            nwe_size = f['features'].shape[0] + feats.shape[0]
 
-                        #     f['features'].resize((nwe_size, 512))
+                            f['features'].resize((nwe_size, 512))
 
-                        #     f['features'][size:nwe_size] = feats
+                            f['features'][size:nwe_size] = feats
                         prob_all.append(prob)
                         
                     prob_all = np.concatenate(prob_all, axis=0)

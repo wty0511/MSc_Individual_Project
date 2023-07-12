@@ -249,8 +249,12 @@ class MetaBatchNormLayer(nn.Module):
         
         # momentum = 1
         # print(input.shape, running_mean.shape, running_var.shape, weight.shape, bias.shape)
-        return F.batch_norm(input, running_mean, running_var, weight, bias,
-                              training=True, momentum=momentum, eps=self.eps)
+        if self.train():
+            return F.batch_norm(input, running_mean, running_var, weight, bias,
+                                training=True, momentum=momentum, eps=self.eps)
+        else:
+            return F.batch_norm(input, running_mean, running_var, weight, bias,
+                                training=False, momentum=momentum, eps=self.eps)
 
     def restore_backup_stats(self):
         """

@@ -10,7 +10,7 @@ def pairwise_distance_torch(embeddings, device):
     Returns:
       pairwise_distances: 2-D Tensor of size [number of data, number of data].
     """
-
+  
     # pairwise distance matrix with precise embeddings
     precise_embeddings = embeddings.to(dtype=torch.float32)
 
