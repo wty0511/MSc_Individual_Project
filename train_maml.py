@@ -190,7 +190,7 @@ for epoch in range(40):
     # if epoch % cfg.checkpoint.save_freq == 0:
     #     torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
-    df_all_time, report, threshold, val_loss = model.test_loop(val_loader, mode = 'val', fix_shreshold=None)
+    df_all_time, report, threshold, val_loss = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
     val_loss_list.append(val_loss)
     f1 = report['overall_scores']['fmeasure (percentage)']/100
     val_f1_list.append(f1)
