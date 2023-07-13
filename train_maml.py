@@ -210,7 +210,7 @@ for epoch in range(40):
             os.makedirs(os.path.dirname(report_dir))
         with open(report_dir, 'w') as outfile:
             json.dump(report, outfile)
-
+    model.eval()
     df_all_time, report, threshold, test_loss = model.test_loop(test_loader, mode = 'test', fix_shreshold=0.5)
     print(test_loss)
     test_loss_list.append(test_loss)
