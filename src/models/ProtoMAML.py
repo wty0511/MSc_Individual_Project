@@ -35,7 +35,7 @@ class ProtoMAML(BaseModel):
         super(ProtoMAML, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size        
-
+        # self.test_loop_batch_size =  128
     
     
     def inner_loop(self, support_data, support_feature, support_label, mode = 'train'):
@@ -51,7 +51,10 @@ class ProtoMAML(BaseModel):
         # self.config.train.lr_inner = 0.001
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
-
+        # if mode == 'train':
+        #     local_model.train()
+        # else:
+        #     local_model.eval()
         local_model.train()
         
         local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay)
@@ -321,7 +324,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):
@@ -373,22 +376,23 @@ class ProtoMAML(BaseModel):
                         f.create_dataset("labels", data=label.squeeze().cpu().numpy())
                         f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
                         f.create_dataset("labels_t", data=support_label.cpu().numpy())
-                    prob_all = []
-                    for batch in tqdm(query_loader):
-                        query_data, _ = batch
-                        prob, feats = self.feed_forward_test(local_model, output_weight, output_bias, query_data)
-                        feats = feats.detach().cpu().numpy()
-                        with h5py.File(feat_file, 'a') as f:
+                    with torch.no_grad():
+                        prob_all = []
+                        for batch in tqdm(query_loader):
+                            query_data, _ = batch
+                            prob, feats = self.feed_forward_test(local_model, output_weight, output_bias, query_data)
+                            feats = feats.detach().cpu().numpy()
+                            with h5py.File(feat_file, 'a') as f:
+                                
+                                size = f['features'].shape[0]
+                                nwe_size = f['features'].shape[0] + feats.shape[0]
+
+                                f['features'].resize((nwe_size, 512))
+
+                                f['features'][size:nwe_size] = feats
+                            prob_all.append(prob)
                             
-                            size = f['features'].shape[0]
-                            nwe_size = f['features'].shape[0] + feats.shape[0]
-
-                            f['features'].resize((nwe_size, 512))
-
-                            f['features'][size:nwe_size] = feats
-                        prob_all.append(prob)
-                        
-                    prob_all = np.concatenate(prob_all, axis=0)
+                        prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################
 
                     
