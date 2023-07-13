@@ -57,7 +57,7 @@ train:
   norm_layer: batch_norm
   alpha: 32
   margin: 0.1
-  scale: 1
+  scale: 20
   temperature: 10
 
 val:
@@ -87,5 +87,5 @@ checkpoint:
 
 team_name: tw1022
 dataset: EVAL
-version: 2
+version: 3
 #EVAL or VAL
