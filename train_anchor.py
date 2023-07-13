@@ -74,25 +74,25 @@ config_dir = os.path.join(config_dir,'config.json')
 with open(config_dir, 'w') as outfile:
     json.dump( omegaconf.OmegaConf.to_container(cfg, resolve=True), outfile,indent=2)
     
-for epoch in range(50):
+for epoch in range(100):
     model.train()
     model.train_loop(train_loader, loss_optimizer, model_optimizer)
 
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
-    if epoch % cfg.checkpoint.save_freq == 0:
-        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
+    # if epoch % cfg.checkpoint.save_freq == 0:
+    #     torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
     df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold = 0.5)
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
-    if no_imporve == 30:
+    if no_imporve == 10:
         break
     if f1 > best_f1:
         no_imporve = 0
         best_f1 = f1
         save_file = os.path.join(model_dir, 'best_model.pth')
         print(save_file)
-        # torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'threshold' : threshold}, save_file)
+        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg, 'f1':best_f1, 'threshold' : threshold}, save_file)
         print("best model! save...")
         report_dir = normalize_path(cfg.checkpoint.report_dir)
         report_dir = os.path.join(report_dir,'val_report_best.json')

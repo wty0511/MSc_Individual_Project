@@ -39,7 +39,8 @@ class TNNMAML(BaseModel):
         #                 smooth_loss=False,
         #                 triplets_per_anchor= 'all',
         #                 distance = LpDistance(normalize_embeddings=True, p=2, power=2))
-        self.loss_fn = TripletLoss(margin= self.config.train.margin)
+        # self.loss_fn = TripletLoss(margin= self.config.train.margin)
+        self.loss_fn = TripletLossHard(margin= self.config.train.margin)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
@@ -233,7 +234,7 @@ class TNNMAML(BaseModel):
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 
                 prob_mean = []
-                for i in range(1):
+                for i in range(5):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     # test_loop_neg_sample = 200
                     neg_sup[1] = neg_sup[1].squeeze() 

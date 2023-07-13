@@ -34,9 +34,7 @@ class ProtoMAML(BaseModel):
         self.approx = True
         super(ProtoMAML, self).__init__(config)
         self.config = config
-        self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.test_loop_batch_size = 128
-        
+        self.test_loop_batch_size = config.val.test_loop_batch_size        
 
     
     
@@ -171,7 +169,7 @@ class ProtoMAML(BaseModel):
         preds = preds / temperature
         if self.config.train.neg_prototype or mode == 'test':
             
-            weights = torch.cat((torch.full((half_size,), neg_num/pos_num, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
+            weights = torch.cat((torch.full((half_size,),neg_num/pos_num, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             # weights = torch.cat((torch.full((half_size,), 1, dtype=torch.float), torch.full((half_size,), 1, dtype=torch.float))).to(self.device)
             loss = F.cross_entropy(preds, labels, weight=weights)
         else:

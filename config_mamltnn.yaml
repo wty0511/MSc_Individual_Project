@@ -69,7 +69,7 @@ checkpoint:
   resume: false
   best_model_dir: ${checkpoint.model_dir}/model_best.pth.tar
   start_epoch: 0
-  experiment_name:  TNN_MAML_${train.n_way}way_${train.inner_step}step_${train.backbone}_${train.margin}_${version}
+  experiment_name:  TNN_MAML_Hard_${train.n_way}way_${train.inner_step}step_${train.backbone}_${train.margin}_${version}
   # experiment_name: anchornet
   # experiment_name: protnnet_10way_5shot_res
   # experiment_name: test
@@ -80,5 +80,5 @@ checkpoint:
 
 team_name: tw1022
 dataset: EVAL
-version: 3
+version: 2
 #EVAL or VAL
