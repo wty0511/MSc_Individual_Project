@@ -44,8 +44,9 @@ set_seed(SEED)
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 
-save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_10way_5step_convnet/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_5way_5step_convnet_3/Model/best_model.pth"
 
+save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_10way_5step_convnet_2/Model/best_model.pth"
 
 
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"

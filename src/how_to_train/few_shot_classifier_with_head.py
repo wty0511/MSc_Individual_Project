@@ -371,7 +371,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-                query_loader = DataLoader(query_dataset, batch_size=16, shuffle=False)
+                query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 pos_feat = []
                 for batch in pos_loader:
                     p_data, _ = batch

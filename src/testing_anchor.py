@@ -23,7 +23,7 @@ def set_seed(seed):
 SEED = 42
 set_seed(SEED)
 
-save_file = r"/root/task5_2023/Checkpoints/anchor_convnet/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/anchor_convnet_2/Model/best_model.pth"
 checkpoint = torch.load(save_file)
 cfg = checkpoint['config']
 # cfg = compose(config_name="config.yaml")
