@@ -179,26 +179,26 @@ class AnchorNet(BaseModel):
                     proto = torch.stack([pos_feat,neg_feat], dim=0)
                     
                     
-                
-                prob_all = []
-                for batch in query_loader:
-                    query_data, _ = batch
-                    prob, feats  = self.feed_forward_test(proto, query_data)
-                    prob_all.append(prob)
-                    # with h5py.File(feat_file, 'a') as f:
-                            
-                    #         size = f['features'].shape[0]
-                    #         nwe_size = f['features'].shape[0] + feats.shape[0]
+                with torch.no_grad():
+                    prob_all = []
+                    for batch in query_loader:
+                        query_data, _ = batch
+                        prob, feats  = self.feed_forward_test(proto, query_data)
+                        prob_all.append(prob)
+                        # with h5py.File(feat_file, 'a') as f:
+                                
+                        #         size = f['features'].shape[0]
+                        #         nwe_size = f['features'].shape[0] + feats.shape[0]
 
-                    #         f['features'].resize((nwe_size, 512))
+                        #         f['features'].resize((nwe_size, 512))
 
-                    #         f['features'][size:nwe_size] = feats.detach().cpu().numpy()
-                prob_all = np.concatenate(prob_all, axis=0)
-                #########################################################################
-                  
-                prob_all = prob_all[:,0]
-                # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
-                prob_mean.append(prob_all)
+                        #         f['features'][size:nwe_size] = feats.detach().cpu().numpy()
+                    prob_all = np.concatenate(prob_all, axis=0)
+                    #########################################################################
+                    
+                    prob_all = prob_all[:,0]
+                    # prob_all = np.where(prob_all>self.config.val.threshold, 1, 0)
+                    prob_mean.append(prob_all)
             prob_mean = np.stack(prob_mean, axis=0).mean(0)
             all_prob[wav_file] = prob_mean
         
