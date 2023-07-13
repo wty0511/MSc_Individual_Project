@@ -35,6 +35,8 @@ class ProtoMAML(BaseModel):
         super(ProtoMAML, self).__init__(config)
         self.config = config
         self.test_loop_batch_size = config.val.test_loop_batch_size
+        self.test_loop_batch_size = 128
+        
 
     
     
@@ -51,7 +53,9 @@ class ProtoMAML(BaseModel):
         # self.config.train.lr_inner = 0.001
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
+
         local_model.train()
+        
         local_optim = optim.SGD(local_model.parameters(), self.config.train.lr_inner, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay)
         # local_optim = optim.SGD(local_model.parameters(), 0.001, momentum = self.config.train.momentum, weight_decay=self.config.train.weight_decay) 
         local_optim.zero_grad()
