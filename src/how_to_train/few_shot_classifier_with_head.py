@@ -15,7 +15,7 @@ from src.utils.post_processing import *
 from copy import deepcopy
 from src.how_to_train.meta_optimizer import LSLRGradientDescentLearningRule
 from src.how_to_train.meta_neural_net_work_architectures import Convnet, ConvnetClassifier
-
+import time
 # def set_torch_seed(seed):
 #     """
 #     Sets the pytorch seeds for current experiment run
@@ -383,6 +383,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 prob_mean = []
                 for i in range(5):
                     
+
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     if neg_sup[1].shape[0] > test_loop_neg_sample:
@@ -431,6 +432,8 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                     names_weights_copy = self.get_inner_loop_parameter_dict(params_classifier)
                     self.classifier.zero_grad()
                     # self.classifier_head.zero_grad()
+                    
+                    
                     for num_step in range(num_steps):
 
                         support_loss, support_preds = self.net_forward(
@@ -459,11 +462,13 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                         # preds = preds.argmax(dim=1).detach().cpu().numpy()
     
                         # print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=5))
+       
                         
-                        
+                    start_time = time.time()
                     with torch.no_grad():
                         prob_all = []
                         for batch in query_loader:
+                            
                             query_data, _ = batch
                             preds = self.classifier.forward(x=query_data, params=names_weights_copy,
                                             training=True,
@@ -485,9 +490,13 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                         prob_all = np.concatenate(prob_all, axis=0)
                         prob_all = prob_all[:,0]
                         prob_mean.append(prob_all)
+                        
+
                     if not training_phase:
                         self.classifier.restore_backup_stats()
-
+                    end_time = time.time()
+                    execution_time = end_time - start_time
+                    print("代码执行时间：", execution_time, "秒")
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)
                 all_prob[wav_file] = prob_mean
 

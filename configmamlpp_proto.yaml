@@ -33,7 +33,7 @@ train:
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
-  backbone:  convnetsmall
+  backbone:  convnet
   model_type: protonet
   epoches: 40
   lr: 0.005

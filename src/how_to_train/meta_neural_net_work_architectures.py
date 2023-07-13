@@ -570,13 +570,13 @@ class Convnet(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.total_layers = 0
         self.upscale_shapes = []
-        self.cnn_filters = 64
+        self.cnn_filters = 128
         self.config = cfg
         self.num_stages = 4
         self.conv_stride = 1
     
         self.meta_classifier = meta_classifier
-        self.avgpool = nn.AdaptiveAvgPool2d((8,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((4,1))
         self.build_network()
         print("meta network params")
         for name, param in self.named_parameters():

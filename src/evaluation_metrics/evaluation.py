@@ -318,7 +318,7 @@ def evaluate(pred_csv, ref_file_path, team_name, dataset, savepath, metadata=[])
                     
                 #     print(audiofile,counts_per_audiofile[audiofile])
                 
-                print(audiofile, counts_per_set[data_set])
+                print(audiofile, counts_per_audiofile[audiofile])
             #  compute scores per subset
             tp_all = tp_all + tp
             fn_all = fn_all + fn
