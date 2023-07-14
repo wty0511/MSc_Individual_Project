@@ -234,8 +234,8 @@ class MetaBatchNormLayer(nn.Module):
                 bias = self.bias[num_step]
                 weight = self.weight[num_step]
         else:
-            running_mean = None
-            running_var = None
+            running_mean = self.running_mean
+            running_var = self.running_var
 
 
         if backup_running_statistics and self.use_per_step_bn_statistics:
@@ -244,17 +244,17 @@ class MetaBatchNormLayer(nn.Module):
 
         momentum = self.momentum
         # print(input.device, running_mean.device, running_var.device, weight.device, bias.device)
-        # running_mean = torch.zeros(self.running_mean.shape).to(device=self.running_mean.device)
-        # running_var = torch.ones(self.running_var.shape).to(device=self.running_mean.device)
+        running_mean = torch.zeros(self.running_mean.shape).to(device=self.running_mean.device)
+        running_var = torch.ones(self.running_var.shape).to(device=self.running_mean.device)
         
-        # momentum = 1
+        momentum = 1
         # print(input.shape, running_mean.shape, running_var.shape, weight.shape, bias.shape)
         if self.train():
             return F.batch_norm(input, running_mean, running_var, weight, bias,
                                 training=True, momentum=momentum, eps=self.eps)
         else:
             return F.batch_norm(input, running_mean, running_var, weight, bias,
-                                training=False, momentum=momentum, eps=self.eps)
+                                training=True, momentum=momentum, eps=self.eps)
 
     def restore_backup_stats(self):
         """

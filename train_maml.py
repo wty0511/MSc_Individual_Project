@@ -55,7 +55,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'ProtoMAML_proxy'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
+model_name = 'TNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
 
 if model_name == 'MAML_proxy':
     cfg = compose(config_name="config_maml_proxy.yaml")
@@ -86,7 +86,7 @@ elif model_name == 'MAML':
     model = MAML(cfg)
     
 elif model_name == 'MAML_lr':
-    cfg = compose(config_name="config_maml.yaml")
+    cfg = compose(config_name="config_maml_lr.yaml")
     model = MAML_lr(cfg)
 
 elif model_name == 'MAML2':
@@ -154,6 +154,7 @@ model_dir = normalize_path(model_dir)
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
+p
 
 # optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr)
 # if model_name == 'MAML':
@@ -209,7 +210,7 @@ for epoch in range(40):
             os.makedirs(os.path.dirname(report_dir))
         with open(report_dir, 'w') as outfile:
             json.dump(report, outfile)
-
+    model.eval()
     df_all_time, report, threshold, test_loss = model.test_loop(test_loader, mode = 'test', fix_shreshold=0.5)
     print(test_loss)
     test_loss_list.append(test_loss)
