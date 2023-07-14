@@ -48,8 +48,9 @@ if model_name == 'SNN':
 elif model_name == 'TNN':
     cfg = compose(config_name="config_tnn.yaml")
     train_dataset = ClassDataset(cfg, mode = 'TNN', same_class_in_different_file=True, debug= debug)
-    class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
-    train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 256)
+    class_sampler = ClassSamplerFixed(cfg, train_dataset.classes, len(train_dataset), 10)
+    # class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
+    train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 500)
     model =TriNet(cfg)
 
 print(len(train_loader))

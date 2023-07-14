@@ -34,6 +34,33 @@ class ClassSampler(Sampler):
     def __len__(self):
         return self.len
 
+
+class ClassSamplerFixed(Sampler):
+    def __init__(self, config, classes, data_set_len, shot):
+        self.config = config
+        self.class_list = list(classes)
+        self.len = data_set_len
+        self.counter = 0
+        self.shot = shot
+        self.last_class = None
+        self.recent_class = set()
+    def __iter__(self):
+        for _ in range(self.len):
+            if self.counter % self.shot == 0:
+                self.last_class = np.random.choice(self.class_list, 1, replace=False)[0]
+                while self.last_class in self.recent_class:
+                    self.last_class = np.random.choice(self.class_list, 1, replace=False)[0]
+                self.recent_class.add(self.last_class)
+            if len(self.recent_class) == self.shot:
+                self.recent_class = set()
+            self.counter += 1
+
+            yield self.last_class
+            
+    def __len__(self):
+        return self.len
+    
+    
 class IntClassSampler(Sampler):
     def __init__(self, config, classes, data_set_len, mode='train'):
         self.config = config

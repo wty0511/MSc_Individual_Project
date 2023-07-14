@@ -47,7 +47,7 @@ class ProtoMAML(BaseModel):
         expanded_norms = norms.expand_as(prototypes)
         # print(norms.shape)
         
-        prototypes = prototypes / expanded_norms
+        # prototypes = prototypes / expanded_norms
         # self.config.train.lr_inner = 0.001
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)

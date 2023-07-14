@@ -32,6 +32,7 @@ from src.models.MAML_proto_lr import *
 from src.models.ProtoMAMLfw import *
 from src.models.TrinetMAML_copy import *
 from src.models.MAML_proxy import MAML_proxy
+from src.models.TrinetMAML_lr import TNNMAML_lr
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -55,7 +56,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'ProtoMAML_proxy'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
+model_name = 'ProtoMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
 
 if model_name == 'MAML_proxy':
     cfg = compose(config_name="config_maml_proxy.yaml")
@@ -86,7 +87,7 @@ elif model_name == 'MAML':
     model = MAML(cfg)
     
 elif model_name == 'MAML_lr':
-    cfg = compose(config_name="config_maml.yaml")
+    cfg = compose(config_name="config_maml_lr.yaml")
     model = MAML_lr(cfg)
 
 elif model_name == 'MAML2':
@@ -106,6 +107,10 @@ elif model_name == 'TNNMAML':
     cfg = compose(config_name="config_mamltnn.yaml")
     model = TNNMAML(cfg)
 
+elif model_name == 'TNNMAML_lr':
+    cfg = compose(config_name="config_mamltnn_lr.yaml")
+    model = TNNMAML_lr(cfg)
+    
 elif model_name == 'SNNMAML':
     cfg = compose(config_name="config_mamlsnn.yaml")
     model = SNNMAML(cfg)
@@ -120,6 +125,7 @@ print('preparing val dataset')
 val_dataset = FileDataset(cfg,val=True, debug= debug)
 print(val_dataset.seg_meta.keys())
 best_f1 = 0
+
 batch_sampler = TaskBatchSampler(cfg, train_dataset.classes, len(train_dataset))
 
 train_loader = DataLoader(train_dataset, batch_sampler= batch_sampler,collate_fn=batch_sampler.get_collate_fn())
@@ -154,6 +160,7 @@ model_dir = normalize_path(model_dir)
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.lr)
+
 
 # optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr)
 # if model_name == 'MAML':
