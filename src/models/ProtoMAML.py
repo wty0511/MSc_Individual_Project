@@ -76,6 +76,7 @@ class ProtoMAML(BaseModel):
         # print('inner loop')
         # Optimize inner loop model on support set
         for i in range(self.config.train.inner_step):
+            
             start_time = time.time()
             # Determine loss on the support set
             # print(torch.norm(output_weight,dim=1))
@@ -110,9 +111,9 @@ class ProtoMAML(BaseModel):
             # print(execution_time)
 
         # print('~~~~~~~')
-        if mode != 'train':
-            print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
-            print(preds)
+        # if mode != 'train':
+        #     print('inner loop: loss:{:.3f} acc:{:.3f}'.format(loss.item(), torch.mean(acc).item())) 
+        #     print(preds)
         if mode != 'train':    
             print('!!!!!!!!!')
         # Re-attach computation graph of prototypes
