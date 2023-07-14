@@ -51,8 +51,9 @@ class TNNMAML(BaseModel):
             weight.fast = None
         self.feature_extractor.zero_grad()
         support_label = torch.from_numpy(support_label).long().to(self.device)
+        
         for i in range(self.config.train.inner_step):
-            
+            break
             feat = F.normalize(self.feature_extractor(support_data), dim=1)
             loss = self.loss_fn(feat, support_label)
             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
@@ -75,8 +76,8 @@ class TNNMAML(BaseModel):
         
         
         # print('!!!!!!!')
-        if mode != 'train':
-            print('inner loop: loss:{:.3f}'.format(loss.item()))
+        # if mode != 'train':
+        #     print('inner loop: loss:{:.3f}'.format(loss.item()))
         if mode != 'train':    
             print('!!!!!!!!!')
         return
@@ -234,7 +235,7 @@ class TNNMAML(BaseModel):
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 
                 prob_mean = []
-                for i in range(5):
+                for i in range(3):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     # test_loop_neg_sample = 200
                     neg_sup[1] = neg_sup[1].squeeze() 
