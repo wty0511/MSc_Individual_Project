@@ -176,8 +176,7 @@ class TNNMAML(BaseModel):
             # for i in self.parameters():
             #     print(i.grad)
             # for name, param in self.feature_extractor.named_parameters():
-            #     if param.grad is not None:
-            #         print(name, param.grad)
+            #     print(name, param.grad)
             opt.step()
             opt.zero_grad()
             print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))

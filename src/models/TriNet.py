@@ -25,7 +25,9 @@ class TriNet(BaseModel):
         super(TriNet, self).__init__(config)
         
         self.test_loop_batch_size = config.val.test_loop_batch_size
-        self.loss_fn = TripletLoss(margin= self.config.train.margin)
+        self.loss_fn = TripletLossHard(margin= self.config.train.margin)
+        # self.loss_fn = TripletLoss(margin= self.config.train.margin)
+        
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
         self.cosloss = nn.CosineEmbeddingLoss(margin= 0.95)
@@ -168,6 +170,7 @@ class TriNet(BaseModel):
             #     print(i.grad)
             optimizer.step()
             print('loss:{:.3f}'.format(loss.item()))
+            # print('~~~~~~~~~~~')
 
     def test_loop(self, test_loader , fix_shreshold = None, mode = 'test'):
         self.feature_extractor.eval()

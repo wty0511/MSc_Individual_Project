@@ -186,7 +186,7 @@ class MetaBatchNormLayer(nn.Module):
                                        requires_grad=self.learnable_gamma)
         else:
             self.running_mean = nn.Parameter(torch.zeros(num_features), requires_grad=False)
-            self.running_var = nn.Parameter(torch.zeros(num_features), requires_grad=False)
+            self.running_var = nn.Parameter(torch.ones(num_features), requires_grad=False)
             self.bias = nn.Parameter(torch.zeros(num_features),
                                      requires_grad=self.learnable_beta)
             self.weight = nn.Parameter(torch.ones(num_features),
@@ -241,19 +241,23 @@ class MetaBatchNormLayer(nn.Module):
         if backup_running_statistics and self.use_per_step_bn_statistics:
             self.backup_running_mean.data = deepcopy(self.running_mean.data)
             self.backup_running_var.data = deepcopy(self.running_var.data)
-
+            
         momentum = self.momentum
         # print(input.device, running_mean.device, running_var.device, weight.device, bias.device)
         running_mean = torch.zeros(self.running_mean.shape).to(device=self.running_mean.device)
         running_var = torch.ones(self.running_var.shape).to(device=self.running_mean.device)
         
-        momentum = 1
+        # momentum = 1
         # print(input.shape, running_mean.shape, running_var.shape, weight.shape, bias.shape)
-        if self.train():
-            return F.batch_norm(input, running_mean, running_var, weight, bias,
-                                training=True, momentum=momentum, eps=self.eps)
-        else:
-            return F.batch_norm(input, running_mean, running_var, weight, bias,
+        # if torch.sum(running_mean) == 0:
+        #     print('running mean is zero')
+        
+        running_mean = nn.Parameter(torch.zeros(self.num_features), requires_grad=False).to(device=input.device)
+        running_var = nn.Parameter(torch.ones(self.num_features), requires_grad=False).to(device=input.device)
+
+
+        # print(input.device, running_mean.device, running_var.device, weight.device, bias.device)
+        return F.batch_norm(input, running_mean, running_var, weight, bias,
                                 training=True, momentum=momentum, eps=self.eps)
 
     def restore_backup_stats(self):
@@ -263,6 +267,8 @@ class MetaBatchNormLayer(nn.Module):
         if self.use_per_step_bn_statistics:
             self.running_mean = nn.Parameter(self.backup_running_mean.to(device=self.device), requires_grad=False)
             self.running_var = nn.Parameter(self.backup_running_var.to(device=self.device), requires_grad=False)
+        self.running_mean = nn.Parameter(torch.zeros(self.num_features).to(device=self.device), requires_grad=False)
+        self.running_var = nn.Parameter(torch.ones(self.num_features).to(device=self.device), requires_grad=False)
 
     def extra_repr(self):
         return '{num_features}, eps={eps}, momentum={momentum}, affine={affine}, ' \

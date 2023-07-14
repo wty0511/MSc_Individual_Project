@@ -64,7 +64,7 @@ class ClassDataset(Dataset):
             self.length = 500
         
         if mode == 'pretrain' or mode == 'TNN':
-            self.length = 50000
+            self.length = 5000
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.recent_return_sample = {}
         for key in self.seg_meta.keys():
