@@ -48,7 +48,7 @@ train_dataset.length = 5000
 print(train_dataset.seg_meta.keys())
 # select classes for training
 class_sampler = ClassSampler(cfg, train_dataset.classes, len(train_dataset))
-train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 64)
+train_loader = DataLoader(train_dataset, sampler= class_sampler, batch_size = 512)
 # each time sample one validation file
 val_dataset = FileDataset(cfg,val=True, debug= debug)
 val_loader = DataLoader(val_dataset, batch_size = 1, shuffle = False)
@@ -85,7 +85,7 @@ for epoch in range(100):
     df_all_time, report, threshold = model.test_loop(val_loader, mode = 'val', fix_shreshold = 0.5)
     f1 = report['overall_scores']['fmeasure (percentage)']
     no_imporve +=1
-    if no_imporve == 10:
+    if no_imporve == 15:
         break
     if f1 > best_f1:
         no_imporve = 0

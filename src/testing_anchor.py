@@ -60,6 +60,6 @@ print(report_dir)
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
     
-with open(report_dir, 'w') as outfile:
-    json.dump(report, outfile)
+# with open(report_dir, 'w') as outfile:
+#     json.dump(report, outfile)
     

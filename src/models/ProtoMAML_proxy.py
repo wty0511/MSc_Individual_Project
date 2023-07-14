@@ -142,7 +142,7 @@ class ProtoMAML_proxy(BaseModel):
             # loss_optimizer.zero_grad()
             # output_weight.grad.fill_(0)
             # output_bias.grad.fill_(0)
-            print('loss', loss)
+            # print('loss', loss)
             acc = torch.mean(acc).detach()
 
             # print(proxies)
@@ -153,7 +153,7 @@ class ProtoMAML_proxy(BaseModel):
         if mode != 'train':    
             print('!!!!!!!!!')
         # Re-attach computation graph of prototypes
-        # output_weight = (output_weight - init_weight).detach() + init_weight
+        output_weight = (output_weight - init_weight).detach() + init_weight
         # output_bias = (output_bias - init_bias).detach() + init_bias
 
         # support_feat = local_model(support_data)
@@ -381,7 +381,7 @@ class ProtoMAML_proxy(BaseModel):
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
 
-        
+        loss_epoch = []
         for i, task_batch in tqdm(enumerate(data_loader)):
             accuracies = []
             losses = []
@@ -436,6 +436,7 @@ class ProtoMAML_proxy(BaseModel):
                 # print("loss: ", loss, "acc: ", acc)
                 accuracies.append(acc)
                 losses.append(loss)
+                loss_epoch.append(np.mean(losses))
             if i % 1 == 0:
                 print("loss: ", np.mean(losses), "acc: ", np.mean(accuracies))
             if mode == "train":
@@ -449,11 +450,14 @@ class ProtoMAML_proxy(BaseModel):
                 #     print(name, parameter.grad)
                 #     break
                 # print('~~~~~~')
+        return np.mean(loss_epoch)
+    
     def train_loop(self, data_loader, optimizer):
         
-        self.outer_loop(data_loader, mode = 'train', opt = optimizer)
+        return self.outer_loop(data_loader, mode = 'train', opt = optimizer)
 
     def test_loop(self, test_loader,fix_shreshold = None, mode = 'test'):
+        loss_all = []
         best_res_all = []
         best_threshold_all = []
         for i in range(1):
@@ -499,7 +503,7 @@ class ProtoMAML_proxy(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 # print(pos_feat)
                 prob_mean = []
-                for i in range(5):
+                for i in range(3):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):
@@ -573,6 +577,14 @@ class ProtoMAML_proxy(BaseModel):
                     # if 'DCASE2021-ML_72010931.wav' in wav_file:
                     #     break
                     #########################################################################
+                    temp_prob = torch.from_numpy(prob_all).to(self.device)
+                    pos_num =torch.sum(all_meta[wav_file]['label']==0)
+                    neg_num = torch.sum(all_meta[wav_file]['label']==1)
+                    acc = torch.sum(temp_prob.argmax(dim=1)==all_meta[wav_file]['label'].to(self.device))/len(temp_prob)
+                    print(acc)
+                    loss = F.cross_entropy(temp_prob,all_meta[wav_file]['label'].to(self.device),weight = torch.tensor([neg_num/pos_num, 1]).to(self.device)).to(self.device)
+                    loss_all.append(loss.detach().cpu().numpy())
+                    print('loss', loss.item())
                     
                     prob_all = prob_all[:,0]
                     print(np.sum(prob_all>0.9))
@@ -664,7 +676,7 @@ class ProtoMAML_proxy(BaseModel):
             # print('~~~~~~~~~~~~~~~')
         print(self.average_res(best_res_all))
         print(np.mean(best_threshold_all))
-        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all)
+        return df_all_time, self.average_res(best_res_all), np.mean(best_threshold_all), np.mean(loss_all)
     def cos_dist(self,query, support):
         n = query.size(0)
         m = support.size(0)
