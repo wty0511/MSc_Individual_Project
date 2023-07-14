@@ -23,6 +23,8 @@ from src.models.ProtoMAML_refine import *
 from src.models.MAML_proto import *
 from src.models.MAML_proto_lr import *
 from src.models.MAML_proxy import *
+from src.models.MAML_lr import *
+
 if not GlobalHydra().is_initialized():
     initialize(config_path="../")
 # Compose the configuration
@@ -46,7 +48,9 @@ set_seed(SEED)
 
 save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_10way_5step_convnet_2/Model/best_model.pth"
 
+save_file = r"/root/task5_2023/Checkpoints/Proxy_MAML_10way_5step_convnet_alpha32_2/Model/best_model.pth"
 
+>>>>>>> 07b87901c58201da2e692146144eab941fdae202
 
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
 # 加载模型
@@ -77,7 +81,7 @@ model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML2(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
 # model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-# model = MAML_proto_lr(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = MAML_proto_lr(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
@@ -87,6 +91,7 @@ model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # for name, param in model.named_parameters():
 #     print(name)
 #     print(param.shape)
+# model = MAML_lr(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 model.load_state_dict(model_state)
 # pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain_conv/Model/best_model.pth')
 # pretrain_dict = pretrain_model['state']
@@ -109,8 +114,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))

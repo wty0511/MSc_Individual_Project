@@ -243,11 +243,11 @@ class MetaBatchNormLayer(nn.Module):
             self.backup_running_var.data = deepcopy(self.running_var.data)
             
         momentum = self.momentum
-        # 
-        # running_mean = torch.zeros(self.running_mean.shape).to(device=self.running_mean.device)
-        # running_var = torch.ones(self.running_var.shape).to(device=self.running_mean.device)
+        # print(input.device, running_mean.device, running_var.device, weight.device, bias.device)
+        running_mean = torch.zeros(self.running_mean.shape).to(device=self.running_mean.device)
+        running_var = torch.ones(self.running_var.shape).to(device=self.running_mean.device)
         
-        momentum = 1
+        # momentum = 1
         # print(input.shape, running_mean.shape, running_var.shape, weight.shape, bias.shape)
         # if torch.sum(running_mean) == 0:
         #     print('running mean is zero')

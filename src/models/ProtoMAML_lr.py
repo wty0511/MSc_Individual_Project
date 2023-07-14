@@ -41,6 +41,7 @@ class ProtoMAML_lr(BaseModel):
                                                             init_learning_rate=self.config.train.lr_inner,
                                                             total_num_inner_loop_steps= self.config.train.inner_step,
                                                             use_learnable_learning_rates= True)
+        
         self.approx = True
         self.inner_loop_optimizer.initialise(
             names_weights_dict=self.get_inner_loop_parameter_dict(self.feature_extractor.named_parameters()))
@@ -111,14 +112,13 @@ class ProtoMAML_lr(BaseModel):
             
             model_parameters_name = [name for name, weight in local_model.named_parameters() if weight.requires_grad]
             names_grads_copy = dict(zip(model_parameters_name, grad))
-
+            
             
             for k, (name, weight) in enumerate(local_model.named_parameters()):
                 if weight.requires_grad:
                     weight.data = weight.data - self.inner_loop_optimizer.names_learning_rates_dict[name.replace(".", "-")][i]* names_grads_copy[name]
-                    # print(name)
-                else:
-                    weight.data = weight.data
+                    
+                            
             output_weight.data = output_weight.data - self.config.train.lr_inner * grad_head[0]
             output_bias.data = output_bias.data - self.config.train.lr_inner * grad_head[1]
             
@@ -127,6 +127,7 @@ class ProtoMAML_lr(BaseModel):
             # local_optim.zero_grad()
             # output_weight.grad.fill_(0)
             # output_bias.grad.fill_(0)
+            
             loss = loss.detach()
             # print('loss', loss)
             acc = torch.mean(acc).detach()
@@ -296,6 +297,8 @@ class ProtoMAML_lr(BaseModel):
                 #     print(name, parameter[0])
                 #     break
                 # for name, parameter in self.inner_loop_optimizer.named_parameters():
+                    
+                #     print(parameter.requires_grad)
                 #     print(name, parameter.grad)
                 #     break
                 opt.step()

@@ -132,11 +132,9 @@ def get_triplets(pdist_matrix, labels):
 
     lshape = labels.shape
     labels = torch.reshape(labels, [lshape[0], 1])
-
-    
-
     # Build pairwise binary adjacency matrix.
     adjacency = torch.eq(labels, labels.transpose(0, 1))
+
     # print(adjacency.shape)
     # Invert so we can select negatives only.
     adjacency_not = adjacency.logical_not()
@@ -148,7 +146,6 @@ def get_triplets(pdist_matrix, labels):
     # For each anchor, find the hardest positive and hardest negative
     max_pos_dist, _ = pdist_matrix.masked_fill(adjacency_not, float('-inf')).max(1)
     min_neg_dist, _ = pdist_matrix.masked_fill(adjacency, float('inf')).min(1)
-
     return max_pos_dist, min_neg_dist
 
 def TripletHardLoss(y_true, y_pred, device, margin=0.2):
@@ -156,6 +153,7 @@ def TripletHardLoss(y_true, y_pred, device, margin=0.2):
     labels, embeddings = y_true, y_pred
     lshape = labels.shape
     labels = torch.reshape(labels, [lshape[0], 1])
+    
     pdist_matrix = pairwise_distance_torch(embeddings, device)
     max_pos_dist, min_neg_dist = get_triplets(pdist_matrix, labels)
     # print(max_pos_dist)

@@ -503,7 +503,7 @@ class ProtoMAML_proxy(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 # print(pos_feat)
                 prob_mean = []
-                for i in range(5):
+                for i in range(3):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):
