@@ -328,8 +328,8 @@ class MAMLFewShotClassifier(nn.Module):
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
-            
-            self.classifier.restore_backup_stats()
+            if not training_phase:
+                self.classifier.restore_backup_stats()
 
             # self.classifier.restore_backup_stats()
             
@@ -393,7 +393,7 @@ class MAMLFewShotClassifier(nn.Module):
                 
                 prob_mean = []
                 for i in range(5):
-                    self.train()
+                    # self.train()
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     if neg_sup[1].shape[0] > test_loop_neg_sample:
@@ -488,7 +488,7 @@ class MAMLFewShotClassifier(nn.Module):
                         
                         # print(torch.norm(head_weight,dim=1))
                     print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=3))
-                    self.eval()
+                    # self.eval()
                     with torch.no_grad():
                         prob_all = []
                         for batch in query_loader:
