@@ -29,7 +29,7 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 10
+  n_way: 2
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
@@ -55,7 +55,7 @@ train:
   learnable_bn_beta: True
   per_step_bn_statistics: True
   norm_layer: batch_norm
-  alpha: 16
+  alpha: 32
   margin: 0.1
   scale: 20
   temperature: 10
@@ -87,5 +87,5 @@ checkpoint:
 
 team_name: tw1022
 dataset: EVAL
-version: 2
+version: 3
 #EVAL or VAL
