@@ -21,21 +21,22 @@
     "fmin": 50,
     "fmax": 11025,
     "feature_list": "pcen",
-    "segment_length": 0.2,
+    "segment_length": 0.5,
     "segment_len_frame": 17,
     "inchannel": 8
   },
   "train": {
     "neg_prototype": false,
-    "n_way": 2,
+    "n_way": 5,
     "n_support": 5,
     "n_query": 5,
-    "backbone": "convnet",
+    "backbone": "convnetfwlarge",
     "model_type": "protonet",
     "epoches": 51,
     "lr": 0.001,
     "lr_inner": 0.01,
     "momentum": 0.9,
+    "margin": 0.2,
     "weight_decay": 0.0005,
     "optimizer": "Adam",
     "task_batch_size": 20,
@@ -49,11 +50,7 @@
     "learnable_bn_gamma": true,
     "learnable_bn_beta": true,
     "per_step_bn_statistics": true,
-    "norm_layer": "batch_norm",
-    "alpha": 32,
-    "margin": 0.1,
-    "scale": 20,
-    "temperature": 10
+    "norm_layer": "batch_norm"
   },
   "val": {
     "seg_len_base": 30,
@@ -65,13 +62,13 @@
   "checkpoint": {
     "save_freq": 5,
     "resume": false,
-    "best_model_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Model/model_best.pth.tar",
+    "best_model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_5way_5step_convnetfwlarge_0.2_1/Model/model_best.pth.tar",
     "start_epoch": 0,
-    "experiment_name": "Proxy_MAML_2way_5step_convnet_alpha32_1",
-    "exp_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1",
-    "model_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Model",
-    "pred_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Predictions",
-    "report_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Reports"
+    "experiment_name": "TNN_MAML_SEMI_5way_5step_convnetfwlarge_0.2_1",
+    "exp_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_5way_5step_convnetfwlarge_0.2_1",
+    "model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_5way_5step_convnetfwlarge_0.2_1/Model",
+    "pred_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_5way_5step_convnetfwlarge_0.2_1/Predictions",
+    "report_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_5way_5step_convnetfwlarge_0.2_1/Reports"
   },
   "team_name": "tw1022",
   "dataset": "EVAL",

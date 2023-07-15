@@ -65,15 +65,15 @@
   "checkpoint": {
     "save_freq": 5,
     "resume": false,
-    "best_model_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Model/model_best.pth.tar",
+    "best_model_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_3/Model/model_best.pth.tar",
     "start_epoch": 0,
-    "experiment_name": "Proxy_MAML_2way_5step_convnet_alpha32_1",
-    "exp_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1",
-    "model_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Model",
-    "pred_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Predictions",
-    "report_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_1/Reports"
+    "experiment_name": "Proxy_MAML_2way_5step_convnet_alpha32_3",
+    "exp_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_3",
+    "model_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_3/Model",
+    "pred_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_3/Predictions",
+    "report_dir": "/root/task5_2023/Checkpoints/Proxy_MAML_2way_5step_convnet_alpha32_3/Reports"
   },
   "team_name": "tw1022",
   "dataset": "EVAL",
-  "version": 1
+  "version": 3
 }
