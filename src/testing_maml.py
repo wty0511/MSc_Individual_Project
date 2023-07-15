@@ -48,7 +48,7 @@ set_seed(SEED)
 
 
 
-save_file = r"/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/TNN_MAML_SEMI_2way_5step_convnetfwlarge_0.2_1/Model/best_model.pth"
 
 
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
@@ -113,8 +113,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))
