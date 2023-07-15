@@ -56,7 +56,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'MAML_proto_lr'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
+model_name = 'TNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
 
 if model_name == 'MAML_proxy':
     cfg = compose(config_name="config_maml_proxy.yaml")
@@ -65,8 +65,6 @@ if model_name == 'MAML_proxy':
 if model_name == 'ProtoMAML':
     cfg = compose(config_name="config_protomaml.yaml")
     model = ProtoMAML(cfg)
-    
-    
 if model_name == 'ProtoMAML_lr':
     cfg = compose(config_name="config_protomaml_lr.yaml")
     model = ProtoMAML_lr(cfg)

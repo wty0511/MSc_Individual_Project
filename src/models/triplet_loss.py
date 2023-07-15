@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import random
+
 # code from https://github.com/alfonmedela/triplet-loss-pytorch/blob/master/loss_functions/triplet_loss.py
 # original code from https://github.com/tensorflow/tensorflow/blob/r1.15/tensorflow/contrib/losses/python/metric_learning/metric_loss_ops.py
 def pairwise_distance_torch(embeddings, device):
@@ -37,7 +39,7 @@ def pairwise_distance_torch(embeddings, device):
     pairwise_distances = torch.mul(pairwise_distances.to(device), mask_offdiagonals.to(device))
     return pairwise_distances
 
-def TripletSemiHardLoss(y_true, y_pred, device, margin=0.2):
+def TripletSemiHardLoss(y_true, y_pred, device, margin=0.2, sampling_num = None):
     """Computes the triplet loss_functions with semi-hard negative mining.
        The loss_functions encourages the positive distances (between a pair of embeddings
        with the same labels) to be smaller than the minimum negative distance
@@ -103,21 +105,38 @@ def TripletSemiHardLoss(y_true, y_pred, device, margin=0.2):
 
     loss_mat = margin + pdist_matrix - semi_hard_negatives
 
+        
     mask_positives = adjacency.to(dtype=torch.float32) - torch.diag(torch.ones(batch_size)).to(device)
+    if sampling_num is not None:
+        mask_positives = select_positives(mask_positives, sampling_num)
     num_positives = mask_positives.sum()
     # print(num_positives)
+    # print(num_positives)
+    # if sampling_num is not None:
+    #     loss_mat = random_sample_rows(loss_mat, sampling_num)
+        
     triplet_loss = (torch.max(torch.mul(loss_mat, mask_positives), torch.tensor([0.]).to(device))).sum() / num_positives
     triplet_loss = triplet_loss.to(dtype=embeddings.dtype)
     return triplet_loss
 
+def select_positives(input, n):
+    
+    positive_indices = torch.nonzero(input == 1)
+    num_positives = positive_indices.size(0)
+    if num_positives <= n:
+        return input
+    select_indices = torch.randperm(num_positives)[:n]
+    mask = torch.zeros_like(input)
+    mask[positive_indices[select_indices][:, 0], positive_indices[select_indices][:, 1]] = 1
+    return mask
 
 class TripletLoss(nn.Module):
     def __init__(self, margin=1):
         super().__init__()
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.margin = margin
-    def forward(self, input, target, **kwargs):
-        return TripletSemiHardLoss(target, input, self.device, self.margin)
+    def forward(self, input, target, sampling_num = None):
+        return TripletSemiHardLoss(target, input, self.device, self.margin, sampling_num)
 
 class TripletLossHard(nn.Module):
     def __init__(self, margin=1):

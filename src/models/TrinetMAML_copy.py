@@ -39,8 +39,8 @@ class TNNMAML(BaseModel):
         #                 smooth_loss=False,
         #                 triplets_per_anchor= 'all',
         #                 distance = LpDistance(normalize_embeddings=True, p=2, power=2))
-        # self.loss_fn = TripletLoss(margin= self.config.train.margin)
-        self.loss_fn = TripletLossHard(margin= self.config.train.margin)
+        self.loss_fn = TripletLoss(margin= self.config.train.margin)
+        # self.loss_fn = TripletLossHard(margin= self.config.train.margin)
         self.approx = True
         self.ce = nn.CrossEntropyLoss()
     def inner_loop(self, support_data, support_label = None, mode = 'train'):
@@ -53,9 +53,8 @@ class TNNMAML(BaseModel):
         support_label = torch.from_numpy(support_label).long().to(self.device)
         
         for i in range(self.config.train.inner_step):
-            break
             feat = F.normalize(self.feature_extractor(support_data), dim=1)
-            loss = self.loss_fn(feat, support_label)
+            loss = self.loss_fn(feat, support_label, len(support_data))
             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
             if self.approx:
                 grad = [ g.detach()  for g in grad ]

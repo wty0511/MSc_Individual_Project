@@ -46,18 +46,10 @@ set_seed(SEED)
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
 
-<<<<<<< HEAD
-save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_10way_5step_convnet_3/Model/best_model.pth"
-=======
-save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_5way_5step_convnet_3/Model/best_model.pth"
 
-<<<<<<< HEAD
-save_file = r"/root/task5_2023/Checkpoints/MAML_proto_lr_5way_5step_convnetfwlarge_1/Model/best_model.pth"
-=======
-save_file = r"/root/task5_2023/Checkpoints/Proxy_MAML_10way_5step_convnet_alpha32_2/Model/best_model.pth"
->>>>>>> 537ee32ee5c55ad1f97e4014fa57d8cc13764db1
+save_file = r"/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1/Model/best_model.pth"
 
->>>>>>> 07b87901c58201da2e692146144eab941fdae202
+
 
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
 # 加载模型
@@ -81,7 +73,7 @@ print('f1:', checkpoint['f1'])
 # model = ProtoMAML_temp(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
-model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_refine(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
@@ -91,8 +83,8 @@ model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML_proto_lr(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-# model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
 # for name, param in model.named_parameters():
@@ -121,8 +113,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-with open(report_dir, 'w') as outfile:
-    json.dump(report, outfile)
+# with open(report_dir, 'w') as outfile:
+#     json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))

@@ -54,14 +54,14 @@ train:
   learnable_bn_beta: True
   per_step_bn_statistics: True
   norm_layer: batch_norm
-  margin: 0.1
+  margin: 0.2
 
 val:
   seg_len_base: 30
   hop_len_frac: 3
   test_loop_batch_size: 1024
   test_loop_neg_sample: 50
-  threshold: 0.5
+  threshold: 0.2
 
 
 
@@ -82,4 +82,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: _formal_hard1
+version: _semi_1

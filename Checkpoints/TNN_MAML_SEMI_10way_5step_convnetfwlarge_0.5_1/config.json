@@ -21,7 +21,7 @@
     "fmin": 50,
     "fmax": 11025,
     "feature_list": "pcen",
-    "segment_length": 0.2,
+    "segment_length": 0.5,
     "segment_len_frame": 17,
     "inchannel": 8
   },
@@ -30,12 +30,13 @@
     "n_way": 10,
     "n_support": 5,
     "n_query": 5,
-    "backbone": "convnet",
+    "backbone": "convnetfwlarge",
     "model_type": "protonet",
     "epoches": 51,
     "lr": 0.001,
     "lr_inner": 0.01,
     "momentum": 0.9,
+    "margin": 0.5,
     "weight_decay": 0.0005,
     "optimizer": "Adam",
     "task_batch_size": 20,
@@ -49,8 +50,7 @@
     "learnable_bn_gamma": true,
     "learnable_bn_beta": true,
     "per_step_bn_statistics": true,
-    "norm_layer": "batch_norm",
-    "margin": 0.1
+    "norm_layer": "batch_norm"
   },
   "val": {
     "seg_len_base": 30,
@@ -62,15 +62,15 @@
   "checkpoint": {
     "save_freq": 5,
     "resume": false,
-    "best_model_dir": "/root/task5_2023/Checkpoints/Trinetconvnet__formal_hard1/Model/model_best.pth.tar",
+    "best_model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1/Model/model_best.pth.tar",
     "start_epoch": 0,
-    "experiment_name": "Trinetconvnet__formal_hard1",
-    "exp_dir": "/root/task5_2023/Checkpoints/Trinetconvnet__formal_hard1",
-    "model_dir": "/root/task5_2023/Checkpoints/Trinetconvnet__formal_hard1/Model",
-    "pred_dir": "/root/task5_2023/Checkpoints/Trinetconvnet__formal_hard1/Predictions",
-    "report_dir": "/root/task5_2023/Checkpoints/Trinetconvnet__formal_hard1/Reports"
+    "experiment_name": "TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1",
+    "exp_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1",
+    "model_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1/Model",
+    "pred_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1/Predictions",
+    "report_dir": "/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.5_1/Reports"
   },
   "team_name": "tw1022",
   "dataset": "EVAL",
-  "version": "_formal_hard1"
+  "version": 1
 }
