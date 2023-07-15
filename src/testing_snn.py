@@ -29,7 +29,9 @@ if not GlobalHydra().is_initialized():
 cfg = compose(config_name="config.yaml")
 model_dir = cfg.checkpoint.model_dir
 # save_file = os.path.join(model_dir, 'best_model.pth')
+
 save_file = '/root/task5_2023/Checkpoints/Siameseconvnet_0.3_cossim1_1:1/Model/best_model.pth'
+
 print(save_file)
 
 # 加载模型

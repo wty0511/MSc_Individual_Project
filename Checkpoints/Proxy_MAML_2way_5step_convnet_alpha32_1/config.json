@@ -52,7 +52,7 @@
     "norm_layer": "batch_norm",
     "alpha": 32,
     "margin": 0.1,
-    "scale": 1,
+    "scale": 20,
     "temperature": 10
   },
   "val": {

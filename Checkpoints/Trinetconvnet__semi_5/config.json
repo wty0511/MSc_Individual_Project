@@ -50,7 +50,7 @@
     "learnable_bn_beta": true,
     "per_step_bn_statistics": true,
     "norm_layer": "batch_norm",
-    "margin": 0.5
+    "margin": 0.2
   },
   "val": {
     "seg_len_base": 30,

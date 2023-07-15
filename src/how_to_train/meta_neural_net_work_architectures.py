@@ -144,7 +144,7 @@ class MetaLinearLayer(nn.Module):
         return F.linear(input=x, weight=weight, bias=bias)
 
 class MetaBatchNormLayer(nn.Module):
-    def __init__(self, num_features, device, cfg, eps=1e-5, momentum=0.1, affine=True,
+    def __init__(self, num_features, device, args, eps=1e-5, momentum=0.1, affine=True,
                  track_running_stats=True, meta_batch_norm=True, no_learnable_params=False,
                  use_per_step_bn_statistics=False):
         """
@@ -154,6 +154,7 @@ class MetaBatchNormLayer(nn.Module):
         learning setting. Also has the additional functionality of being able to store per step running stats and per step beta and gamma.
         :param num_features:
         :param device:
+        :param args:
         :param eps:
         :param momentum:
         :param affine:
@@ -165,34 +166,35 @@ class MetaBatchNormLayer(nn.Module):
         super(MetaBatchNormLayer, self).__init__()
         self.num_features = num_features
         self.eps = eps
-        self.config = cfg
+
         self.affine = affine
         self.track_running_stats = track_running_stats
         self.meta_batch_norm = meta_batch_norm
         self.num_features = num_features
         self.device = device
         self.use_per_step_bn_statistics = use_per_step_bn_statistics
-        self.learnable_gamma = self.config.train.learnable_bn_gamma
-        self.learnable_beta = self.config.train.learnable_bn_beta
+        self.args = args
+        self.learnable_gamma = self.args.learnable_bn_gamma
+        self.learnable_beta = self.args.learnable_bn_beta
 
         if use_per_step_bn_statistics:
-            self.running_mean = nn.Parameter(torch.zeros(self.config.train.inner_step, num_features),
+            self.running_mean = nn.Parameter(torch.zeros(args.number_of_training_steps_per_iter, num_features),
                                              requires_grad=False)
-            self.running_var = nn.Parameter(torch.ones(self.config.train.inner_step, num_features),
+            self.running_var = nn.Parameter(torch.ones(args.number_of_training_steps_per_iter, num_features),
                                             requires_grad=False)
-            self.bias = nn.Parameter(torch.zeros(self.config.train.inner_step, num_features),
+            self.bias = nn.Parameter(torch.zeros(args.number_of_training_steps_per_iter, num_features),
                                      requires_grad=self.learnable_beta)
-            self.weight = nn.Parameter(torch.ones(self.config.train.inner_step, num_features),
+            self.weight = nn.Parameter(torch.ones(args.number_of_training_steps_per_iter, num_features),
                                        requires_grad=self.learnable_gamma)
         else:
             self.running_mean = nn.Parameter(torch.zeros(num_features), requires_grad=False)
-            self.running_var = nn.Parameter(torch.ones(num_features), requires_grad=False)
+            self.running_var = nn.Parameter(torch.zeros(num_features), requires_grad=False)
             self.bias = nn.Parameter(torch.zeros(num_features),
                                      requires_grad=self.learnable_beta)
             self.weight = nn.Parameter(torch.ones(num_features),
                                        requires_grad=self.learnable_gamma)
 
-        if self.config.train.enable_inner_loop_optimizable_bn_params:
+        if self.args.enable_inner_loop_optimizable_bn_params:
             self.bias = nn.Parameter(torch.zeros(num_features),
                                      requires_grad=self.learnable_beta)
             self.weight = nn.Parameter(torch.ones(num_features),
@@ -229,36 +231,23 @@ class MetaBatchNormLayer(nn.Module):
             running_var = self.running_var[num_step]
             if (
                 params is None
-                and not self.config.train.enable_inner_loop_optimizable_bn_params
+                and not self.args.enable_inner_loop_optimizable_bn_params
             ):
                 bias = self.bias[num_step]
                 weight = self.weight[num_step]
         else:
-            running_mean = self.running_mean
-            running_var = self.running_var
+            running_mean = None
+            running_var = None
 
 
         if backup_running_statistics and self.use_per_step_bn_statistics:
             self.backup_running_mean.data = deepcopy(self.running_mean.data)
             self.backup_running_var.data = deepcopy(self.running_var.data)
-            
+
         momentum = self.momentum
-        # print(input.device, running_mean.device, running_var.device, weight.device, bias.device)
-        running_mean = torch.zeros(self.running_mean.shape).to(device=self.running_mean.device)
-        running_var = torch.ones(self.running_var.shape).to(device=self.running_mean.device)
-        
-        # momentum = 1
-        # print(input.shape, running_mean.shape, running_var.shape, weight.shape, bias.shape)
-        # if torch.sum(running_mean) == 0:
-        #     print('running mean is zero')
-        
-        running_mean = nn.Parameter(torch.zeros(self.num_features), requires_grad=False).to(device=input.device)
-        running_var = nn.Parameter(torch.ones(self.num_features), requires_grad=False).to(device=input.device)
 
-
-        # print(input.device, running_mean.device, running_var.device, weight.device, bias.device)
         return F.batch_norm(input, running_mean, running_var, weight, bias,
-                                training=True, momentum=momentum, eps=self.eps)
+                              training=True, momentum=momentum, eps=self.eps)
 
     def restore_backup_stats(self):
         """
@@ -267,8 +256,6 @@ class MetaBatchNormLayer(nn.Module):
         if self.use_per_step_bn_statistics:
             self.running_mean = nn.Parameter(self.backup_running_mean.to(device=self.device), requires_grad=False)
             self.running_var = nn.Parameter(self.backup_running_var.to(device=self.device), requires_grad=False)
-        self.running_mean = nn.Parameter(torch.zeros(self.num_features).to(device=self.device), requires_grad=False)
-        self.running_var = nn.Parameter(torch.ones(self.num_features).to(device=self.device), requires_grad=False)
 
     def extra_repr(self):
         return '{num_features}, eps={eps}, momentum={momentum}, affine={affine}, ' \
