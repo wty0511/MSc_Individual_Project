@@ -87,9 +87,11 @@ model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
-# for name, param in model.named_parameters():
-#     print(name)
-#     print(param.shape)
+# for name, module in model.named_modules():
+#     # 判断当前模块是否是 Batch Normalization 层
+#     if isinstance(module, torch.nn.BatchNorm2d) or isinstance(module, torch.nn.BatchNorm1d):
+#         print("Batch Normalization layer found:", name)
+#         print(module.running_var)
 # model = MAML_lr(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 model.load_state_dict(model_state)
 # pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain_conv/Model/best_model.pth')
@@ -117,8 +119,8 @@ report_dir = os.path.join(report_dir,'test_report_best.json')
 if not os.path.exists(os.path.dirname(report_dir)):
     os.makedirs(os.path.dirname(report_dir))
 print(report)
-# with open(report_dir, 'w') as outfile:
-#     json.dump(report, outfile)
+with open(report_dir, 'w') as outfile:
+    json.dump(report, outfile)
 
 # val_dataset = ClassDataset(cfg, mode = 'val',same_class_in_different_file = False)
 # val_loader = DataLoader(val_dataset, batch_sampler=BatchSampler(cfg, val_dataset.classes, len(val_dataset)))

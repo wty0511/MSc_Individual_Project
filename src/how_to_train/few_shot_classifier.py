@@ -499,7 +499,9 @@ class MAMLFewShotClassifier(nn.Module):
                             head_weight = names_weights_copy['weight']
                             head_bias = names_weights_copy['bias']
                             preds = F.linear(preds_feat, head_weight, head_bias)
+                            print(preds)
                             preds = F.softmax(preds, dim = 1)
+        
                             # print(preds)
                             preds = preds.detach().cpu().numpy()
                             # with h5py.File(feat_file, 'a') as f:
