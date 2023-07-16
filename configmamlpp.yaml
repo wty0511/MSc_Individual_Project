@@ -36,24 +36,24 @@ train:
   backbone:  convnetlarge
   model_type: protonet
   epoches: 40
-  lr: 0.001
+  lr: 0.005
   lr_inner: 0.01
   momentum: 0.9
   weight_decay: 0.0005
   optimizer: Adam
-  task_batch_size: 20
+  task_batch_size: 5
   inner_step: 5
   min_lr: 0.0001
   multi_step_loss_num_epochs: 15
   first_order_to_second_order_epoch: 100
   enable_inner_loop_optimizable_bn_params: False
   second_order: False
-  use_multi_step_loss_optimization: False
+  use_multi_step_loss_optimization: True
   learnable_bn_gamma: True
   learnable_bn_beta: True
-  per_step_bn_statistics: False
+  per_step_bn_statistics: True
   norm_layer: batch_norm
-  learnable_per_layer_per_step_inner_loop_learning_rate: False
+  learnable_per_layer_per_step_inner_loop_learning_rate: True  
 
 val:
   seg_len_base: 30

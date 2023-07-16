@@ -46,7 +46,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
         # params_head = self.classifier_head.named_parameters()
         params_classifier = self.classifier.named_parameters()
         # all_params = itertools.chain(params_head, params_classifier)
-        self.loss_fn = TripletLoss(margin= 0.5)
+        self.loss_fn = TripletLoss(margin= cfg.train.margin)
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=self.device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps= cfg.train.inner_step,
@@ -658,7 +658,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
         # print(out_put.shape)
         feat = F.normalize(out_put, dim=1)
-        loss = self.loss_fn(feat, y)
+        loss = self.loss_fn(feat, y, len(y))
         
         return loss
     

@@ -186,7 +186,7 @@ class MAMLFewShotClassifier(nn.Module):
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
         
-        losses = {'loss': torch.sum(torch.stack(total_losses))}
+        losses = {'loss': torch.mean(torch.stack(total_losses))}
 
         losses['accuracy'] = np.mean(total_accuracies)
 
@@ -328,8 +328,8 @@ class MAMLFewShotClassifier(nn.Module):
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
-            
-            self.classifier.restore_backup_stats()
+            if not training_phase:
+                self.classifier.restore_backup_stats()
 
             # self.classifier.restore_backup_stats()
             
@@ -384,16 +384,15 @@ class MAMLFewShotClassifier(nn.Module):
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 query_loader = DataLoader(query_dataset, batch_size=16, shuffle=False)
                 pos_feat = []
-                for batch in pos_loader:
+                for k, batch in enumerate(pos_loader):
                     p_data, _ = batch
-                    feat = self.classifier(p_data, num_step=0, training=False, backup_running_statistics=True, output_features=False)
+                    feat = self.classifier(p_data, num_step=0, training=False, backup_running_statistics = k==0, output_features=False)
                     # print(feat.shape)
                     pos_feat.append(feat.mean(0))
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 
                 prob_mean = []
-                for i in range(5):
-                    self.train()
+                for i in range(3):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     if neg_sup[1].shape[0] > test_loop_neg_sample:
@@ -407,7 +406,7 @@ class MAMLFewShotClassifier(nn.Module):
                     for i, batch in enumerate(neg_loader):
                         n_data, _ = batch
                         # print(neg_data.shape)
-                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics= i==0, output_features=False)
+                        feat = self.classifier(n_data, num_step=0, training=False, backup_running_statistics= False, output_features=False)
                         # print(feat.shape)
                         neg_feat.append(feat.mean(0))
                     neg_feat = torch.stack(neg_feat, dim=0).mean(0)
@@ -488,7 +487,7 @@ class MAMLFewShotClassifier(nn.Module):
                         
                         # print(torch.norm(head_weight,dim=1))
                     print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=3))
-                    self.eval()
+
                     with torch.no_grad():
                         prob_all = []
                         for batch in query_loader:
@@ -720,7 +719,7 @@ class MAMLFewShotClassifier(nn.Module):
                 # print(name, param.grad)
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
-        #         if param.requires_grad:
+        #         if param.requires_grad:train(
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
         # for name, param in self.named_parameters():
             # print(name)

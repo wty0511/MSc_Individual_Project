@@ -496,7 +496,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                         self.classifier.restore_backup_stats()
                     end_time = time.time()
                     execution_time = end_time - start_time
-                    print("代码执行时间：", execution_time, "秒")
+                    # print("代码执行时间：", execution_time, "秒")
                 prob_mean = np.stack(prob_mean, axis=0).mean(0)
                 all_prob[wav_file] = prob_mean
 

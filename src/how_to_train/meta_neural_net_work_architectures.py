@@ -143,8 +143,9 @@ class MetaLinearLayer(nn.Module):
             bias = None
         return F.linear(input=x, weight=weight, bias=bias)
 
+                
 class MetaBatchNormLayer(nn.Module):
-    def __init__(self, num_features, device, args, eps=1e-5, momentum=0.1, affine=True,
+    def __init__(self, num_features, device, cfg, eps=1e-5, momentum=0.1, affine=True,
                  track_running_stats=True, meta_batch_norm=True, no_learnable_params=False,
                  use_per_step_bn_statistics=False):
         """
@@ -173,18 +174,19 @@ class MetaBatchNormLayer(nn.Module):
         self.num_features = num_features
         self.device = device
         self.use_per_step_bn_statistics = use_per_step_bn_statistics
-        self.args = args
-        self.learnable_gamma = self.args.learnable_bn_gamma
-        self.learnable_beta = self.args.learnable_bn_beta
+        self.cfg = cfg
+        
+        self.learnable_gamma = self.cfg.train.learnable_bn_gamma
+        self.learnable_beta = self.cfg.train.learnable_bn_beta
 
         if use_per_step_bn_statistics:
-            self.running_mean = nn.Parameter(torch.zeros(args.number_of_training_steps_per_iter, num_features),
+            self.running_mean = nn.Parameter(torch.zeros(cfg.train.inner_step, num_features),
                                              requires_grad=False)
-            self.running_var = nn.Parameter(torch.ones(args.number_of_training_steps_per_iter, num_features),
+            self.running_var = nn.Parameter(torch.ones(cfg.train.inner_step, num_features),
                                             requires_grad=False)
-            self.bias = nn.Parameter(torch.zeros(args.number_of_training_steps_per_iter, num_features),
+            self.bias = nn.Parameter(torch.zeros(cfg.train.inner_step, num_features),
                                      requires_grad=self.learnable_beta)
-            self.weight = nn.Parameter(torch.ones(args.number_of_training_steps_per_iter, num_features),
+            self.weight = nn.Parameter(torch.ones(cfg.train.inner_step, num_features),
                                        requires_grad=self.learnable_gamma)
         else:
             self.running_mean = nn.Parameter(torch.zeros(num_features), requires_grad=False)
@@ -194,12 +196,12 @@ class MetaBatchNormLayer(nn.Module):
             self.weight = nn.Parameter(torch.ones(num_features),
                                        requires_grad=self.learnable_gamma)
 
-        if self.args.enable_inner_loop_optimizable_bn_params:
+        if self.cfg.train.enable_inner_loop_optimizable_bn_params:
             self.bias = nn.Parameter(torch.zeros(num_features),
                                      requires_grad=self.learnable_beta)
             self.weight = nn.Parameter(torch.ones(num_features),
                                        requires_grad=self.learnable_gamma)
-
+        
         self.backup_running_mean = torch.zeros(self.running_mean.shape)
         self.backup_running_var = torch.ones(self.running_var.shape)
 
@@ -231,7 +233,7 @@ class MetaBatchNormLayer(nn.Module):
             running_var = self.running_var[num_step]
             if (
                 params is None
-                and not self.args.enable_inner_loop_optimizable_bn_params
+                and not self.cfg.train.enable_inner_loop_optimizable_bn_params
             ):
                 bias = self.bias[num_step]
                 weight = self.weight[num_step]
@@ -243,11 +245,14 @@ class MetaBatchNormLayer(nn.Module):
         if backup_running_statistics and self.use_per_step_bn_statistics:
             self.backup_running_mean.data = deepcopy(self.running_mean.data)
             self.backup_running_var.data = deepcopy(self.running_var.data)
-
+        # print(running_mean)
         momentum = self.momentum
-
-        return F.batch_norm(input, running_mean, running_var, weight, bias,
+        if self.training:
+            return F.batch_norm(input, running_mean, running_var, weight, bias,
                               training=True, momentum=momentum, eps=self.eps)
+        else:
+            return F.batch_norm(input, running_mean, running_var, weight, bias,
+                              training=False, momentum=momentum, eps=self.eps)
 
     def restore_backup_stats(self):
         """
