@@ -392,6 +392,7 @@ class MAMLFewShotClassifier(nn.Module):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 
                 prob_mean = []
+
                 for i in range(3):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
@@ -488,6 +489,7 @@ class MAMLFewShotClassifier(nn.Module):
                         # print(torch.norm(head_weight,dim=1))
                     print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=3))
 
+
                     with torch.no_grad():
                         prob_all = []
                         for batch in query_loader:
@@ -498,7 +500,9 @@ class MAMLFewShotClassifier(nn.Module):
                             head_weight = names_weights_copy['weight']
                             head_bias = names_weights_copy['bias']
                             preds = F.linear(preds_feat, head_weight, head_bias)
+                            print(preds)
                             preds = F.softmax(preds, dim = 1)
+        
                             # print(preds)
                             preds = preds.detach().cpu().numpy()
                             # with h5py.File(feat_file, 'a') as f:

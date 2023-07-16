@@ -47,7 +47,7 @@ class ProtoMAML(BaseModel):
         expanded_norms = norms.expand_as(prototypes)
         # print(norms.shape)
         
-        # prototypes = prototypes / expanded_norms
+        prototypes = prototypes / expanded_norms
         # self.config.train.lr_inner = 0.001
         # Create inner-loop model and optimizer
         local_model = deepcopy(self.feature_extractor)
@@ -75,8 +75,10 @@ class ProtoMAML(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
+
+        
         for i in range(self.config.train.inner_step):
-            
+
             start_time = time.time()
             # Determine loss on the support set
             # print(torch.norm(output_weight,dim=1))
@@ -202,6 +204,7 @@ class ProtoMAML(BaseModel):
         local_model.eval()
         feats = local_model(data)
         preds = F.linear(feats, output_weight, output_bias)
+        # print(preds)
         preds = F.softmax(preds, dim = 1)
         preds = preds.detach().cpu().numpy()
         return preds, feats
@@ -216,6 +219,11 @@ class ProtoMAML(BaseModel):
             # for g in self.feature_extractor.parameters():
             #     print(g.grad)
             for task in task_batch:
+                # for name, module in self.feature_extractor.named_modules():
+                # # 判断当前模块是否是 Batch Normalization 层
+                #     if isinstance(module, torch.nn.BatchNorm2d) or isinstance(module, torch.nn.BatchNorm1d):
+                #         print("Batch Normalization layer found:", name)
+                #         print(module.running_var)
                 if self.config.train.neg_prototype:
                     pos_data, neg_data = task 
                     classes, data_pos, _ =pos_data
@@ -232,7 +240,6 @@ class ProtoMAML(BaseModel):
                 # Perform inner loop adaptation
                 # print(data_pos.shape)
                 # print(data_neg.shape)
-
                 support_feat = self.feature_extractor(support_data)
                 support_label_unique = torch.unique(support_label)
                 support_feat = [torch.mean(support_feat[(support_label == label)], dim=0) for label in support_label_unique]
@@ -336,7 +343,7 @@ class ProtoMAML(BaseModel):
                     if not os.path.exists(directory):
                         os.makedirs(directory)
 
-                        
+                    
                         
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
@@ -371,7 +378,7 @@ class ProtoMAML(BaseModel):
 
                     print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
                     local_model, output_weight, output_bias, support_feats = self.inner_loop(support_data, proto, support_label, mode = 'test')
-                    print("Current GPU Memory Usage By PyTorch: {} GB".format(torch.cuda.memory_allocated(self.device) / 1e9))
+                    
                     with h5py.File(feat_file, 'w') as f:
                         f.create_dataset("features", (0, 512), maxshape=(None, 512))
                         f.create_dataset("labels", data=label.squeeze().cpu().numpy())
@@ -395,7 +402,7 @@ class ProtoMAML(BaseModel):
                             
                         prob_all = np.concatenate(prob_all, axis=0)
                     #########################################################################
-
+                    
                     
                     temp_prob = torch.from_numpy(prob_all).to(self.device)
                     pos_num =torch.sum(all_meta[wav_file]['label']==0)
