@@ -307,6 +307,7 @@ class ExperimentBuilder(object):
         will return the test set evaluation results on the best performing validation model.
         """
         
+        
         model_dir = self.config.checkpoint.model_dir
         model_dir = normalize_path(model_dir)
         if not os.path.exists(model_dir):
