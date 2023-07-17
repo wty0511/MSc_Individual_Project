@@ -372,13 +372,13 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-                pos_feat = []
-                for batch in pos_loader:
-                    p_data, _ = batch
-                    feat = self.classifier(p_data, num_step=0, training=False, backup_running_statistics=False, output_features=False)
-                    # print(feat.shape)
-                    pos_feat.append(feat.mean(0))
-                pos_feat = torch.stack(pos_feat, dim=0).mean(0)
+                # pos_feat = []
+                # for batch in pos_loader:
+                #     p_data, _ = batch
+                #     feat = self.classifier(p_data, num_step=0, training=False, backup_running_statistics=False, output_features=False)
+                #     # print(feat.shape)
+                #     pos_feat.append(feat.mean(0))
+                # pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 
                 prob_mean = []
                 for i in range(5):
