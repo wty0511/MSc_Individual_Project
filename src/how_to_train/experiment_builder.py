@@ -306,7 +306,7 @@ class ExperimentBuilder(object):
         Runs a full training experiment with evaluations of the model on the val set at every epoch. Furthermore,
         will return the test set evaluation results on the best performing validation model.
         """
-        
+       
         model_dir = self.config.checkpoint.model_dir
         model_dir = normalize_path(model_dir)
         if not os.path.exists(model_dir):
@@ -343,7 +343,7 @@ class ExperimentBuilder(object):
                     torch.save({'epoch':epoch, 'state':self.model.state_dict(), 'config':self.config}, save_file)
                 f1 = report['overall_scores']['fmeasure (percentage)']
                 no_imporve +=1
-                if no_imporve == 20:
+                if no_imporve == 25:
                     break
                 if f1 > best_f1:
                     no_imporve = 0
