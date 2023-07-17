@@ -343,7 +343,7 @@ class ExperimentBuilder(object):
                     torch.save({'epoch':epoch, 'state':self.model.state_dict(), 'config':self.config}, save_file)
                 f1 = report['overall_scores']['fmeasure (percentage)']
                 no_imporve +=1
-                if no_imporve == 10:
+                if no_imporve == 20:
                     break
                 if f1 > best_f1:
                     no_imporve = 0

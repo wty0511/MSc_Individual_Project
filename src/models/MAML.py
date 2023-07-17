@@ -255,11 +255,11 @@ class MAML(BaseModel):
                     directory = os.path.dirname(feat_file)
                     if not os.path.exists(directory):
                         os.makedirs(directory)
-                    with h5py.File(feat_file, 'w') as f:
-                        f.create_dataset("features", (0, 512), maxshape=(None, 512))
-                        f.create_dataset("labels", data=label.squeeze().cpu().numpy())
-                        f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
-                        f.create_dataset("labels_t", data=support_label.cpu().numpy())
+                    # with h5py.File(feat_file, 'w') as f:
+                    #     f.create_dataset("features", (0, 512), maxshape=(None, 512))
+                    #     f.create_dataset("labels", data=label.squeeze().cpu().numpy())
+                    #     f.create_dataset("features_t", data = support_feats.detach().cpu().numpy())
+                    #     f.create_dataset("labels_t", data=support_label.cpu().numpy())
                     
                     
                     prob_all = []
