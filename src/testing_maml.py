@@ -48,7 +48,7 @@ set_seed(SEED)
 
 
 
-save_file = r"/root/task5_2023/Checkpoints/Proto_MAML_10way_5step_convnet/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/SNN_MAML_2way_5step_convnetfwlarge_3/Model/best_model.pth"
 
 
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
@@ -73,7 +73,7 @@ print('f1:', checkpoint['f1'])
 # model = ProtoMAML_temp(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # print('f1', checkpoint['f1'])
 # 创建一个新的模型实例
-model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_refine(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
@@ -82,7 +82,7 @@ model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML_proto_lr(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
-# model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
