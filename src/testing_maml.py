@@ -48,7 +48,7 @@ set_seed(SEED)
 
 
 
-save_file = r"/root/task5_2023/Checkpoints/SNN_MAML_2way_5step_convnetfwlarge_3/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/SNN_MAML_5way_5step_convnetfwlarge_2/Model/best_model.pth"
 
 
 # save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
