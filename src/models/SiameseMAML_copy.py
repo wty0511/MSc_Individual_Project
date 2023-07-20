@@ -79,9 +79,9 @@ class SNNMAML(BaseModel):
             weight.fast = None
         self.feature_extractor.zero_grad()
         
-        sampler = IntClassSampler(self.config, support_label, 25)
+        sampler = IntClassSampler(self.config, support_label, 50)
         dataset =  PairDataset(self.config, support_data, support_label, debug = False)
-        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 25)
+        dataloader = DataLoader(dataset, sampler=sampler, batch_size = 50)
         # self.config.train.lr_inner = 0.01
         for i in range(5):
             for batch in dataloader:
