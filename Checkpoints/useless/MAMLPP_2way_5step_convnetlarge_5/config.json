@@ -27,13 +27,13 @@
   },
   "train": {
     "neg_prototype": false,
-    "n_way": 10,
+    "n_way": 2,
     "n_support": 5,
     "n_query": 5,
-    "backbone": "convnet",
+    "backbone": "convnetlarge",
     "model_type": "protonet",
     "epoches": 40,
-    "lr": 0.005,
+    "lr": 0.001,
     "lr_inner": 0.01,
     "momentum": 0.9,
     "weight_decay": 0.0005,
@@ -44,7 +44,7 @@
     "multi_step_loss_num_epochs": 15,
     "first_order_to_second_order_epoch": 100,
     "enable_inner_loop_optimizable_bn_params": false,
-    "second_order": true,
+    "second_order": false,
     "use_multi_step_loss_optimization": true,
     "learnable_bn_gamma": true,
     "learnable_bn_beta": true,
@@ -62,15 +62,15 @@
   "checkpoint": {
     "save_freq": 5,
     "resume": false,
-    "best_model_dir": "/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnet_1/Model/model_best.pth.tar",
+    "best_model_dir": "/root/task5_2023/Checkpoints/MAMLPP_2way_5step_convnetlarge_5/Model/model_best.pth.tar",
     "start_epoch": 0,
-    "experiment_name": "MAMLPP_proto_10way_5step_convnet_1",
-    "exp_dir": "/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnet_1",
-    "model_dir": "/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnet_1/Model",
-    "pred_dir": "/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnet_1/Predictions",
-    "report_dir": "/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnet_1/Reports"
+    "experiment_name": "MAMLPP_2way_5step_convnetlarge_5",
+    "exp_dir": "/root/task5_2023/Checkpoints/MAMLPP_2way_5step_convnetlarge_5",
+    "model_dir": "/root/task5_2023/Checkpoints/MAMLPP_2way_5step_convnetlarge_5/Model",
+    "pred_dir": "/root/task5_2023/Checkpoints/MAMLPP_2way_5step_convnetlarge_5/Predictions",
+    "report_dir": "/root/task5_2023/Checkpoints/MAMLPP_2way_5step_convnetlarge_5/Reports"
   },
   "team_name": "tw1022",
   "dataset": "EVAL",
-  "version": 1
+  "version": 5
 }
