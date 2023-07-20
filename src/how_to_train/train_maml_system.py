@@ -48,7 +48,7 @@ data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 # maml_system.run_experiment()
 
-ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_TNN10way_5step_convnetlarge_0.2_4/Model/best_model.pth"
+ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_TNN10way_5step_convnetlarge_0.2_6/Model/best_model.pth"
 
 maml_system.run_experiment()
 
