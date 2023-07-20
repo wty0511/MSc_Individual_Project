@@ -376,7 +376,7 @@ class TNNMAMLFewShotClassifier(nn.Module):
 
                 
                 prob_mean = []
-                for i in range(5):
+                for i in range(3):
                     
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
