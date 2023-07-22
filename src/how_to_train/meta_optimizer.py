@@ -114,7 +114,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
         res = {}
         
         for key in names_grads_wrt_params_dict.keys():
-            if key =='weight' or key =='bias':
+            if key =='weight' or key =='bias' or key == 'proxy':
                 # print('key',key)
                 res[key] = names_weights_dict[key] - 0.01 * names_grads_wrt_params_dict[key]
             else:
