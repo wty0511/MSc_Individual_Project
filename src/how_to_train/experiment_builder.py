@@ -365,9 +365,10 @@ class ExperimentBuilder(object):
     def test(self, check_point_path):
         checkpoint = torch.load(check_point_path)
         self.model.load_state_dict(checkpoint['state'])
+
         # print('epoch', checkpoint['epoch'])
-        # print(self.model)
-        
+
+
         
         self.config = checkpoint['config']
         pred_df, best_res, threshold = self.evaluation_iteration(val_sample=self.data.get_test_batches(),
