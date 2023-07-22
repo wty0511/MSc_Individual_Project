@@ -31,7 +31,7 @@ train:
   neg_prototype: False
   n_way: 10
   n_support: 5
-  n_query: 15
+  n_query: 5
   # backbone:  convclassifierfw
   backbone:  convnetlarge
   model_type: protonet
@@ -46,7 +46,7 @@ train:
   min_lr: 0.0001
   multi_step_loss_num_epochs: 15
   first_order_to_second_order_epoch: 100
-  enable_inner_loop_optimizable_bn_params: True
+  enable_inner_loop_optimizable_bn_params: False
   second_order: False
   use_multi_step_loss_optimization: True
   learnable_bn_gamma: True
@@ -82,4 +82,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: 1
+version: 5

@@ -41,7 +41,7 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 12
+SEED = 42
 set_seed(SEED)
 
 
@@ -56,7 +56,7 @@ if not GlobalHydra().is_initialized():
 
 # cfg = compose(config_name="config.yaml")
 
-model_name = 'SNNMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
+model_name = 'ProtoMAML'  # ProtoMAML, ProtoMAMLfw, ProtoMAML_query, ProtoMAML_grad, ProtoMAML_temp, ProtoMAML_proxy, MAML, SNNMAML, TNNMAML, MAML_proxy
 
 if model_name == 'MAML_proxy':
     cfg = compose(config_name="config_maml_proxy.yaml")
@@ -138,7 +138,6 @@ test_loader = DataLoader(test_dataset, batch_size = 1, shuffle = False)
 
 
 
-    
 # model = ProtoMAML_temp(cfg)
 # model = ProtoMAML_grad(cfg)
 # model = ProtoMAML_query(cfg)
@@ -192,8 +191,8 @@ for epoch in range(40):
     print(train_loss)
     train_loss_list.append(train_loss)
     save_file = os.path.join(model_dir, '{:d}.pth'.format(epoch))
-    # if epoch % cfg.checkpoint.save_freq == 0:
-    #     torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
+    if epoch % cfg.checkpoint.save_freq == 0:
+        torch.save({'epoch':epoch, 'state':model.state_dict(), 'config':cfg}, save_file)
     model.eval()
     df_all_time, report, threshold, val_loss = model.test_loop(val_loader, mode = 'val', fix_shreshold=0.5)
     val_loss_list.append(val_loss)
@@ -214,12 +213,12 @@ for epoch in range(40):
             os.makedirs(os.path.dirname(report_dir))
         with open(report_dir, 'w') as outfile:
             json.dump(report, outfile)
-    model.eval()
-    df_all_time, report, threshold, test_loss = model.test_loop(test_loader, mode = 'test', fix_shreshold=0.5)
-    print(test_loss)
-    test_loss_list.append(test_loss)
-    f1 = report['overall_scores']['fmeasure (percentage)']/100
-    test_f1_list.append(f1)
+    # model.eval()
+    # df_all_time, report, threshold, test_loss = model.test_loop(test_loader, mode = 'test', fix_shreshold=0.5)
+    # print(test_loss)
+    # test_loss_list.append(test_loss)
+    # f1 = report['overall_scores']['fmeasure (percentage)']/100
+    # test_f1_list.append(f1)
     if no_imporve == 15:
         break
 print('train_loss', train_loss_list)
