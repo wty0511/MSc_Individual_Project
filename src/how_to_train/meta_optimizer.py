@@ -114,9 +114,19 @@ class LSLRGradientDescentLearningRule(nn.Module):
         res = {}
         
         for key in names_grads_wrt_params_dict.keys():
-            if key =='weight' or key =='bias' or key == 'proxy':
-                # print('key',key)
+            # print(key)
+            # print(names_grads_wrt_params_dict[key])
+            if key =='weight' or key =='bias':
+                
                 res[key] = names_weights_dict[key] - 0.01 * names_grads_wrt_params_dict[key]
+            elif key =='proxy':
+                # print(type(names_weights_dict[key]))
+                res[key] = nn.parameter.Parameter(names_weights_dict[key] -  names_grads_wrt_params_dict[key] * 0.01 * 20)
+                # print(type(res[key]))
+                
+            #     # print(res[key])
+            # elif key =='proxy':
+            #     res[key] = names_weights_dict[key]
             else:
                 
                 res[key] = names_weights_dict[key] - self.names_learning_rates_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]

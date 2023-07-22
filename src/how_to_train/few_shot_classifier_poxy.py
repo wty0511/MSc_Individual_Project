@@ -15,8 +15,7 @@ from src.utils.post_processing import *
 from copy import deepcopy
 from src.how_to_train.meta_optimizer import LSLRGradientDescentLearningRule
 from src.how_to_train.meta_neural_net_work_architectures import Convnet
-from pytorch_metric_learning import losses,reducers
-
+import pytorch_metric_learning.losses as losses_py
 
 # def set_torch_seed(seed):
 #     """
@@ -64,7 +63,7 @@ class ProxyMAMLFewShotClassifier(nn.Module):
 
         
         
-        loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
+        loss_func = losses_py.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=512, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
         
         params_head = {'proxy': loss_func.proxies}.items()
         
@@ -157,9 +156,16 @@ class ProxyMAMLFewShotClassifier(nn.Module):
         :return: A dictionary with the updated weights (name, param)
         """
         self.classifier.zero_grad(params=names_weights_copy)
+        # print(type(names_weights_copy['proxy']))
+        # print(names_weights_copy['proxy'].requires_grad)
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
-                                    create_graph=use_second_order, allow_unused=False)
+                                create_graph=use_second_order, allow_unused=False)
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
+
+
+        
+
+
         # print('grads',names_grads_copy)
         #不是多卡，所以不需要这个
         # names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
@@ -170,7 +176,7 @@ class ProxyMAMLFewShotClassifier(nn.Module):
         
         # for key, grad in names_weights_copy.items():
         #     print(key)
-        #     print(grad.shape)
+        #     print(grad.requires_grad)
         
         
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
@@ -242,7 +248,7 @@ class ProxyMAMLFewShotClassifier(nn.Module):
                 query_label = torch.from_numpy(np.tile(np.arange(self.n_way),self.n_query)).long().to(self.device)
                 
             dim = support_feat.shape[-1]
-            loss_func = losses.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
+            loss_func = losses_py.ProxyAnchorLoss(num_classes=self.n_way, embedding_size=dim, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
             
             
             prototypes     = support_feat.mean(0).squeeze()
@@ -252,7 +258,7 @@ class ProxyMAMLFewShotClassifier(nn.Module):
             init_weight =  prototypes
             output_weight = init_weight.detach().requires_grad_()
             loss_func.proxies = nn.parameter.Parameter(output_weight)
-            
+            loss_func.train()
             # self.classifier_head = nn.Linear(512, self.n_way).to(device=self.device)
             # self.classifier_head.weight= nn.Parameter(output_weight, requires_grad=True)
             # self.classifier_head.bias = nn.Parameter(output_bias, requires_grad=True)
@@ -296,19 +302,19 @@ class ProxyMAMLFewShotClassifier(nn.Module):
                     backup_running_statistics=num_step,
                     training=True,
                     num_step=num_step,
-                    loss_fun = loss_func
+                    loss_func = loss_func
                 )
-
                 # print('first layer before update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                 # print('step',num_step)
+                # print(loss_func.proxies)
+                # print(names_weights_copy['proxy'])
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
                 
                 
-                loss_func.proxies = nn.parameter.Parameter(names_weights_copy['proxy'])
-                
+                loss_func.proxies = names_weights_copy['proxy']         
                 # print('first layer after update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                 # print('~~~~')
                 if use_multi_step_loss_optimization and training_phase and epoch < self.config.train.multi_step_loss_num_epochs:
@@ -392,7 +398,7 @@ class ProxyMAMLFewShotClassifier(nn.Module):
                 pos_dataset = TensorDataset(pos_data,  torch.zeros(pos_data.shape[0]))
                 query_dataset = TensorDataset(query, torch.zeros(query.shape[0]))
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
-                query_loader = DataLoader(query_dataset, batch_size=16, shuffle=False)
+                query_loader = DataLoader(query_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 pos_feat = []
                 for k, batch in enumerate(pos_loader):
                     p_data, _ = batch
@@ -436,7 +442,7 @@ class ProxyMAMLFewShotClassifier(nn.Module):
                     #                       x_target_set,
                     #                       y_target_set)):
 
-                    loss_func = losses.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
+                    loss_func = losses_py.ProxyAnchorLoss(num_classes=2, embedding_size=512, alpha = self.config.train.alpha, margin = self.config.train.margin).to(torch.device('cuda'))
                     
                     prototypes = torch.stack([pos_feat,neg_feat], dim=0)
 
@@ -448,7 +454,7 @@ class ProxyMAMLFewShotClassifier(nn.Module):
                     init_weight =  prototypes
                     output_weight = init_weight.detach().requires_grad_()
                     loss_func.proxies = nn.parameter.Parameter(output_weight)
-                    
+                    loss_func.train()
                     # self.classifier_head = nn.Linear(512, 2).to(device=self.device)
                     # self.classifier_head.weight = nn.Parameter(output_weight)
                     # self.classifier_head.bias = nn.Parameter(output_bias)
@@ -493,20 +499,13 @@ class ProxyMAMLFewShotClassifier(nn.Module):
                                                                         names_weights_copy=names_weights_copy,
                                                                         use_second_order=use_second_order,
                                                                         current_step_idx=num_step)
-                        # print(names_weights_copy['weight'])
+                        loss_func.proxies = names_weights_copy['proxy']    
+                        # print(names_weights_copy['proxy'])
                         # print('~~~~')
-                        preds_feat = self.classifier(support_data, num_step=self.config.train.inner_step - 1, training=True, backup_running_statistics=False, output_features=False)
-                        head_weight = names_weights_copy['weight']
-                        head_bias = names_weights_copy['bias']
-                        preds = F.linear(preds_feat, head_weight, head_bias)
-                        preds = F.softmax(preds, dim = 1)
+  
                         # print(head_weight)
                         # print(torch.norm(head_weight,dim=1))
-                        
-                        preds = preds.argmax(dim=1).detach().cpu().numpy()
-                        
                         # print(torch.norm(head_weight,dim=1))
-                    print(classification_report(support_label.detach().cpu().numpy(), preds,zero_division=0, digits=3))
 
 
                     with torch.no_grad():
@@ -516,9 +515,8 @@ class ProxyMAMLFewShotClassifier(nn.Module):
                             preds_feat = self.classifier.forward(x=query_data, params=names_weights_copy,
                                             training=True,
                                             backup_running_statistics=False, num_step=self.config.train.inner_step - 1)
-                            head_weight = names_weights_copy['weight']
-                            head_bias = names_weights_copy['bias']
-                            preds = F.linear(preds_feat, head_weight, head_bias)
+                            proxies = names_weights_copy['proxy']
+                            preds = self.cos_dist(preds_feat, proxies)
                             # print(preds)
                             preds = F.softmax(preds, dim = 1)
         
@@ -727,12 +725,12 @@ class ProxyMAMLFewShotClassifier(nn.Module):
         
 
         
-        proxies = weights['proxy']
-        preds = self.cos_dist(preds_feat, proxies)
-        preds = preds * self.config.train.temperature
+        # proxies = weights['proxy']
+        # preds = self.cos_dist(preds_feat, proxies)
+        # preds = preds * self.config.train.temperature
         loss = loss_func(preds_feat, y)
-        
-        return loss, preds
+        # print(loss)
+        return loss, None
     
     def trainable_parameters(self):
         """
