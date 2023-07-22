@@ -29,7 +29,7 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 10
+  n_way: 2
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
@@ -69,7 +69,7 @@ checkpoint:
   best_model_dir: ${checkpoint.model_dir}/model_best.pth.tar
   start_epoch: 0
   # experiment_name: protomaml_large_2way
-  experiment_name: Proto_MAML_${train.n_way}way_${train.inner_step}step_${train.backbone}_${version}
+  experiment_name: Proto_MAML_Nonorm_${train.n_way}way_${train.inner_step}step_${train.backbone}_${version}
   # experiment_name: protnnet_10way_5shot_res
   # experiment_name: test
   exp_dir: ${path.root_dir}/Checkpoints/${checkpoint.experiment_name}
@@ -80,4 +80,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: 4
+version: 1
