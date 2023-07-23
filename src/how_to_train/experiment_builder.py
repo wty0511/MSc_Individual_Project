@@ -306,6 +306,7 @@ class ExperimentBuilder(object):
         Runs a full training experiment with evaluations of the model on the val set at every epoch. Furthermore,
         will return the test set evaluation results on the best performing validation model.
         """
+        
         model_dir = self.config.checkpoint.model_dir
         model_dir = normalize_path(model_dir)
         if not os.path.exists(model_dir):
