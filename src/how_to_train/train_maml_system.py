@@ -48,7 +48,7 @@ cfg = compose(config_name="configmamlpp_proxy.yaml")
 model = ProxyMAMLFewShotClassifier(cfg)
 data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
-maml_system.run_experiment()
+# maml_system.run_experiment()
 
 ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proxy_10way_5step_convnet_5/Model/best_model.pth"
 
