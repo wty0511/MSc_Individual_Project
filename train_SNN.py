@@ -37,7 +37,7 @@ if not GlobalHydra().is_initialized():
 # Compose the configuration
 
 print('preparing training dataset')
-model_name = "SNN"
+model_name = "TNN"
 
 if model_name == 'SNN':
     cfg = compose(config_name="config_snn.yaml")

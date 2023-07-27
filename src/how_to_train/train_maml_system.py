@@ -50,7 +50,7 @@ data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 # maml_system.run_experiment()
 
-ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proxy_10way_5step_convnet_1/Model/best_model.pth"
+ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnet_3/Model/best_model.pth"
 
 maml_system.run_experiment()
 
