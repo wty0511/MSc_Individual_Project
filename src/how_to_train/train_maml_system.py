@@ -39,19 +39,19 @@ def set_seed(seed):
 SEED = 42
 set_seed(SEED)
 
-cfg = compose(config_name="configmamlpp_proxy.yaml")
+cfg = compose(config_name="configmamlpp_proto.yaml")
 
 # Combines the arguments, model, data and experiment builders to run an experiment
-# model = MAMLFewShotClassifier(cfg)
+model = MAMLFewShotClassifier(cfg)
 # model =TNNMAMLFewShotClassifier(cfg)
 # model = MAMLFewShotClassifierWithHead(cfg)
-model = ProxyMAMLFewShotClassifier(cfg)
+# model = ProxyMAMLFewShotClassifier(cfg)
 data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
 # maml_system.run_experiment()
 
-ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proxy_10way_5step_convnet_5/Model/best_model.pth"
+ckpt = r"/root/task5_2023/Checkpoints/MAMLPP_proto_10way_5step_convnet_3/Model/best_model.pth"
 
-# maml_system.run_experiment()
+maml_system.run_experiment()
 
-maml_system.test(ckpt)
+# maml_system.test(ckpt)
