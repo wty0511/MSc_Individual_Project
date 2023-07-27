@@ -35,7 +35,7 @@ def set_seed(seed):
     # torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-SEED = 22
+SEED = 42
 set_seed(SEED)
 
 # cfg = compose(config_name="config.yaml")
@@ -45,6 +45,7 @@ set_seed(SEED)
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_2way/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/proxyMAML_10way3/Model/best_model.pth"
 # save_file = r"/root/task5_2023/Checkpoints/FOMAMLTNN_5way/Model/best_model.pth"
+
 
 
 
