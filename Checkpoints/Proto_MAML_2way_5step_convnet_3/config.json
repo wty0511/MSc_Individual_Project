@@ -61,15 +61,15 @@
   "checkpoint": {
     "save_freq": 5,
     "resume": false,
-    "best_model_dir": "/root/task5_2023/Checkpoints/Proto_MAML_2way_5step_convnet_3/Model/model_best.pth.tar",
+    "best_model_dir": "/root/task5_2023/Checkpoints/Proto_MAML_Nonorm_2way_5step_convnet_13/Model/model_best.pth.tar",
     "start_epoch": 0,
-    "experiment_name": "Proto_MAML_2way_5step_convnet_3",
-    "exp_dir": "/root/task5_2023/Checkpoints/Proto_MAML_2way_5step_convnet_3",
-    "model_dir": "/root/task5_2023/Checkpoints/Proto_MAML_2way_5step_convnet_3/Model",
-    "pred_dir": "/root/task5_2023/Checkpoints/Proto_MAML_2way_5step_convnet_3/Predictions",
-    "report_dir": "/root/task5_2023/Checkpoints/Proto_MAML_2way_5step_convnet_3/Reports"
+    "experiment_name": "Proto_MAML_Nonorm_2way_5step_convnet_13",
+    "exp_dir": "/root/task5_2023/Checkpoints/Proto_MAML_Nonorm_2way_5step_convnet_13",
+    "model_dir": "/root/task5_2023/Checkpoints/Proto_MAML_Nonorm_2way_5step_convnet_13/Model",
+    "pred_dir": "/root/task5_2023/Checkpoints/Proto_MAML_Nonorm_2way_5step_convnet_13/Predictions",
+    "report_dir": "/root/task5_2023/Checkpoints/Proto_MAML_Nonorm_2way_5step_convnet_13/Reports"
   },
   "team_name": "tw1022",
   "dataset": "EVAL",
-  "version": 3
+  "version": 13
 }
