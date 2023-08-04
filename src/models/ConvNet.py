@@ -365,7 +365,16 @@ class PretrainClassifier_large(nn.Module):
         )
         self.avgpool = nn.AdaptiveAvgPool2d((4,1))
         self.fc = nn.Linear(512, 19)
+    def get_feature(self, x):
+        (num_samples,seq_len,mel_bins) = x.shape
         
+        x = x.view(-1,1,seq_len,mel_bins)
+        x = self.encoder(x)
+        # print('x_shape ',x.shape)
+        x = self.avgpool(x)
+        x = x.view(x.size(0),-1)
+        return x
+    
     def forward(self,x):
         
         (num_samples,seq_len,mel_bins) = x.shape

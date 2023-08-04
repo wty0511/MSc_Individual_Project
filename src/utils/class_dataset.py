@@ -30,7 +30,7 @@ class ClassDataset(Dataset):
         elif mode == 'test':
             self.data_dir = normalize_path(config.path.test_dir)
         elif mode == 'pretrain':
-            self.data_dir = normalize_path(config.path.pretrain_dir)
+            self.data_dir = normalize_path(config.path.train_dir)
         else:
             raise ValueError('Unknown mode')
         self.mode = mode
