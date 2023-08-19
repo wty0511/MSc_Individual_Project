@@ -42,9 +42,9 @@ set_seed(SEED)
 cfg = compose(config_name="configmamlpp_proto.yaml")
 
 # Combines the arguments, model, data and experiment builders to run an experiment
-model = MAMLFewShotClassifier(cfg)
+# model = MAMLFewShotClassifier(cfg)
 # model =TNNMAMLFewShotClassifier(cfg)
-# model = MAMLFewShotClassifierWithHead(cfg)
+model = MAMLFewShotClassifierWithHead(cfg)
 # model = ProxyMAMLFewShotClassifier(cfg)
 data = MetaLearningSystemDataLoader(cfg)
 maml_system = ExperimentBuilder(cfg = cfg, model=model, data=data)
