@@ -32,7 +32,7 @@ class MAML(BaseModel):
         
         super(MAML, self).__init__(config)
         self.config = config
-        self.approx = True
+        self.approx = False
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.test_loop_batch_size = 128
         
@@ -162,8 +162,8 @@ class MAML(BaseModel):
             opt.step()
             opt.zero_grad()
             loss_epoch.append(loss_q.item()/len(task_batch))
-            print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
-            print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
+            # print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
+            # print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
         return np.mean(loss_epoch)
     
     def train_loop(self, data_loader, optimizer):
@@ -208,7 +208,7 @@ class MAML(BaseModel):
 
 
                 prob_mean = []
-                for i in range(1):
+                for i in range(3):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     
