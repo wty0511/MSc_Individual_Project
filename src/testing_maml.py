@@ -50,10 +50,10 @@ set_seed(SEED)
 
 
 
-save_file = r"/root/task5_2023/Checkpoints/MAML_2way_5step_convclassifierfw_second_order_5/Model/best_model.pth"
+save_file = r"/root/task5_2023/Checkpoints/TNN_MAML_SEMI_10way_5step_convnetfwlarge_0.2_6/Model/best_model.pth"
 
 
-# save_file = r"/root/task5_2023/Checkpoints/recent/FOMAML/Model/best_model.pth"
+# save_file = r"/root/task5_2023/Checkpoints/MAML_2way_5step_convclassifierfw_first_order/Model/best_model.pth"
 # 加载模型
 checkpoint = torch.load(save_file)
 print(checkpoint.keys())
@@ -78,7 +78,7 @@ print('f1:', checkpoint['f1'])
 # model = ProtoMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_refine(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAMLfw(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+# model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML2(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
 # model = MAML_proto(config).to('cuda' if torch.cuda.is_available() else 'cpu')
@@ -86,7 +86,7 @@ model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 
 # model = SNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = ProtoMAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
-# model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+model = TNNMAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # model = MAML_proxy(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 # 将保存的状态加载到新的模型实例中
 # for name, module in model.named_modules():
@@ -95,6 +95,8 @@ model = MAML(config).to('cuda' if torch.cuda.is_available() else 'cpu')
 #         print("Batch Normalization layer found:", name)
 #         print(module.running_var)
 # model = MAML_lr(config).to('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 model.load_state_dict(model_state)
 # pretrain_model = torch.load('/root/task5_2023/Checkpoints/pretrain_conv/Model/best_model.pth')
 # pretrain_dict = pretrain_model['state']

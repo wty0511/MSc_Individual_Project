@@ -29,7 +29,7 @@ features:
 
 train:
   neg_prototype: False
-  n_way: 10
+  n_way: 5
   n_support: 5
   n_query: 5
   # backbone:  convclassifierfw
@@ -79,5 +79,5 @@ checkpoint:
 
 team_name: tw1022
 dataset: EVAL
-version: 1
+version: 2
 #EVAL or VAL

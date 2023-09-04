@@ -75,8 +75,6 @@ class ProtoMAML(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
-
-        
         for i in range(self.config.train.inner_step):
 
             start_time = time.time()
@@ -263,6 +261,7 @@ class ProtoMAML(BaseModel):
                             print('None')
                             continue
                         # print(p_global.grad)
+
                         p_global.grad += p_local.grad  # First-order approx. -> add gradients of finetuned and base model
                 loss = loss.detach().cpu().item()
                 acc = acc.mean().detach().cpu().item()

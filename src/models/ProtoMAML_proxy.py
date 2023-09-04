@@ -112,6 +112,7 @@ class ProtoMAML_proxy(BaseModel):
         # return local_model, output_weight, output_bias, support_feat
         # print('inner loop')
         # Optimize inner loop model on support set
+        # return local_model, loss_func, None
         for i in range(self.config.train.inner_step):
             
             proxies = loss_func.proxies

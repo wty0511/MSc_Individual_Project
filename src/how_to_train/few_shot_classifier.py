@@ -301,13 +301,16 @@ class MAMLFewShotClassifier(nn.Module):
                 # print('first layer after update',names_weights_copy['layer_dict.conv0.conv.weight'].shape)
                 # print('~~~~')
                 if use_multi_step_loss_optimization and training_phase and epoch < self.config.train.multi_step_loss_num_epochs:
+                    output_weight = (output_weight - init_weight).detach() + init_weight
+                    output_bias = (output_bias - init_bias).detach() + init_bias
                     target_loss, target_preds = self.net_forward(x=query_data,
                                                                  y=query_label, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
                     # print('last step', num_step)
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
-                
+                    output_weight = output_weight.detach().requires_grad_()
+                    output_bias = output_weight.detach().requires_grad_()
 
             
                 elif num_step == (self.config.train.inner_step - 1):
