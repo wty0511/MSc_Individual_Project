@@ -84,4 +84,4 @@ checkpoint:
 team_name: tw1022
 dataset: EVAL
 #EVAL or VAL
-version: second_order_5
+version: first_order_4

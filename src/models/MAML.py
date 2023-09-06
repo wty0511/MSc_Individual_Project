@@ -32,7 +32,7 @@ class MAML(BaseModel):
         
         super(MAML, self).__init__(config)
         self.config = config
-        self.approx = False
+        self.approx = True
         self.test_loop_batch_size = config.val.test_loop_batch_size
         self.test_loop_batch_size = 128
         
@@ -121,6 +121,7 @@ class MAML(BaseModel):
     
     def outer_loop(self, data_loader, mode = 'train', opt = None):
         loss_epoch = []
+        acc_all_epoch = []
         for i, task_batch in tqdm(enumerate(data_loader)):
             loss_all = []
             acc_all = []
@@ -155,6 +156,9 @@ class MAML(BaseModel):
                 opt.zero_grad()
                 # print(report)
                 acc_all.append(acc)
+                acc_all_epoch.append(acc.mean().item())
+                if len(acc_all_epoch) == 100:
+                    print(acc_all_epoch)
             loss_q = torch.stack(loss_all).sum(0)
             loss_q.backward()
             # for i in self.parameters():
@@ -162,7 +166,8 @@ class MAML(BaseModel):
             opt.step()
             opt.zero_grad()
             loss_epoch.append(loss_q.item()/len(task_batch))
-            # print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
+            print('acc:{:.3f}'.format(torch.cat(acc_all).mean().item()))
+            
             # print('outer loop: loss:{:.3f}'.format(loss_q.item()/len(task_batch)))
         return np.mean(loss_epoch)
     

@@ -211,7 +211,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
         total_accuracies = []
         per_task_target_preds = [[] for i in range(len(data_batch))]
         self.classifier.zero_grad()
-        
+        acc_all = []
         task_accuracies = []
         # for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
         #                       y_support_set,
@@ -317,11 +317,15 @@ class MAMLFewShotClassifierWithHead(nn.Module):
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
+            acc_all.append(accuracy.mean().item())
+
             if not training_phase:
                 self.classifier.restore_backup_stats()
             # output_weight = (output_weight - init_weight).detach() + init_weight
             # output_bias = (output_bias - init_bias).detach() + init_bias
-
+            if len(acc_all) == 20:
+                print(acc_all)
+                
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
 
