@@ -2,7 +2,7 @@
 # from src.models.ProtoMAMLcopy import *
 # from src.models.ProtoMAML_loss import *
 
-
+# This code is modified from https://github.com/wyharveychen/CloserLookFewShot
 
 from src.models.SiameseNet import *
 from src.models.TriNet import *
