@@ -1,5 +1,8 @@
 # This code is modified from https://github.com/KevinMusgrave/pytorch-adapt
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+
+# This code is modified from  DCASE 2022 challenge https://github.com/c4dm/dcase-few-shot-bioacoustic
+
 # This code is modified from https://github.com/wyharveychen/CloserLookFewShot
 # This code is modified from https://github.com/phlippe/uvadlc_notebooks
 from src.models.meta_learning import *
@@ -331,7 +334,7 @@ class ProtoMAML(BaseModel):
                 pos_feat = torch.stack(pos_feat, dim=0).mean(0)
 
                 prob_mean = []
-                for i in range(5):
+                for i in range(3):
                     feat_file = os.path.splitext(os.path.basename(wav_file))[0] + '.hdf5'
                     feat_file = os.path.join('/root/task5_2023/latent_feature/protoMAML', feat_file)
                     if os.path.isfile(feat_file):

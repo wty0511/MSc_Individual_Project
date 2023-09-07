@@ -1,4 +1,7 @@
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+
+# This code is modified from  DCASE 2022 challenge https://github.com/c4dm/dcase-few-shot-bioacoustic
+
 # This code is modified from https://github.com/wyharveychen/CloserLookFewShot
 # This code is modified from https://github.com/phlippe/uvadlc_notebooks
 import torch
@@ -375,7 +378,7 @@ class SNNMAML(BaseModel):
                 pos_loader = DataLoader(pos_dataset, batch_size=self.test_loop_batch_size, shuffle=False)
                 
                 prob_mean = []
-                for i in range(5):
+                for i in range(3):
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample
                     neg_sup[1] = neg_sup[1].squeeze() 
                     

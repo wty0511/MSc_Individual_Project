@@ -1,4 +1,7 @@
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+
+# This code is modified from  DCASE 2022 challenge https://github.com/c4dm/dcase-few-shot-bioacoustic
+
 # This code is modified from https://github.com/wyharveychen/CloserLookFewShot
 # This code is modified from https://github.com/phlippe/uvadlc_notebooks
 import torch
@@ -119,7 +122,7 @@ class ProtoNet(BaseModel):
             pos_feat = torch.stack(pos_feat, dim=0).mean(0)
             # print(pos_feat)
             prob_mean = []
-            for i in range(5):
+            for i in range(3):
                 neg_sup[1] = neg_sup[1].squeeze() 
                 # neg_sup[1] = query
                 if neg_sup[1].shape[0] > self.config.val.test_loop_neg_sample:

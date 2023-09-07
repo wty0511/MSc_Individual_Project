@@ -385,7 +385,7 @@ class MAMLFewShotClassifierWithHead(nn.Module):
                 # pos_feat = torch.stack(pos_feat, dim=0).mean(0)
                 
                 prob_mean = []
-                for i in range(5):
+                for i in range(3):
                     
 
                     test_loop_neg_sample = self.config.val.test_loop_neg_sample

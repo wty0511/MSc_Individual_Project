@@ -1,4 +1,7 @@
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+
+# This code is modified from  DCASE 2022 challenge https://github.com/c4dm/dcase-few-shot-bioacoustic
+
 import numpy as np
 def time2frame(t, fps):
     if isinstance(t, list):
@@ -9,7 +12,8 @@ def time2frame(t, fps):
         print(t)
         raise TypeError('t should be float or list of float')
     
-# GPT
+# 
+
 def merge_intervals(meta):
     time_spane = meta['time_spane']
     if len(time_spane) == 0:

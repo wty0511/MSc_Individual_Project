@@ -16,7 +16,8 @@ from src.utils.class_dataset import *
 from src.utils.file_dataset import *
 import omegaconf
 import json
-# GPT
+# 
+
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)

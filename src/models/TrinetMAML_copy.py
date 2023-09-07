@@ -1,4 +1,7 @@
 # This code is modified from https://github.com/haoheliu/DCASE_2022_Task_5
+
+# This code is modified from  DCASE 2022 challenge https://github.com/c4dm/dcase-few-shot-bioacoustic
+
 # This code is modified from https://github.com/wyharveychen/CloserLookFewShot
 # This code is modified from https://github.com/phlippe/uvadlc_notebooks
 import torch

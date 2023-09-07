@@ -1,4 +1,7 @@
 
+# code modified how to train your maml
+# https://github.com/AntreasAntoniou/HowToTrainYourMAMLPytorch
+
 import os
 import sys
 current_dir = os.path.abspath(os.path.dirname(__file__))
